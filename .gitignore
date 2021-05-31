@@ -1,0 +1,4 @@
+input_files/
+outputs/
+model/MODULES/__pycache__/
+model_v3/MODULES/__pycache__/
