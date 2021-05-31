@@ -1,4 +1,13 @@
 input_files/
 outputs/
 model/MODULES/__pycache__/
+model/CONFIG/__pycache__/
+model/INPUT/__pycache__/
+model/PREPROC/__pycache__/
+model/POSTPROC/__pycache__/
+
 model_v3/MODULES/__pycache__/
+model_v3/CONFIG/__pycache__/
+model_v3/INPUT/__pycache__/
+model_v3/PREPROC/__pycache__/
+model_v3/POSTPROC/__pycache__/
