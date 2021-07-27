@@ -692,7 +692,7 @@ class HOUSING_MODULE:
 
     ## initialisation for house (barn) cleaning; all variables at the cleaning day are reset to zero
     def cleaning_pit(self,day_idx,housing_type):
-        if housing_type.lower() == 'slat/pit hosue':
+        if housing_type.lower() == 'slat/pit house':
             ## pools: from housing to MMS
             self.manure_pool_pit_to_storage[day_idx] = self.manure_pool_pit[day_idx]+self.manure_pool_slat[day_idx]
             self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]
@@ -778,7 +778,7 @@ class HOUSING_MODULE:
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.slat_pit_housing_sim(dd,dd+cleaning_frequency+1,self.fslat,self.fgap)
-                self.cleaning_pit(dd+cleaning_frequency)
+                self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.slat_pit_housing_sim(dd,end_idx,self.fslat,self.fgap)
         return
@@ -790,7 +790,7 @@ class HOUSING_MODULE:
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency+1)
-                self.cleaning_pit(dd,housing_type+cleaning_frequency)
+                self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.barn_housing_sim(dd,end_idx)
         return
@@ -802,7 +802,7 @@ class HOUSING_MODULE:
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.poultry_housing_sim(dd,dd+cleaning_frequency+1)
-                self.cleaning_pit(dd,housing_type+cleaning_frequency)
+                self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.poultry_housing_sim(dd,end_idx)
         return 

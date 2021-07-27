@@ -91,7 +91,7 @@ def write_netcdf_file(file_info,file_data):
     lat_coords = 90.0 - np.arange(lats) * dlat 
     lon_coords = -180.0 + np.arange(lons) * dlon
 
-    meta_data = xr.Dataset({'time': time, 'lat': lat, 'lon':lon})
+    meta_data = xr.Dataset({'time': time, 'lat': lats, 'lon':lons})
     meta_data = meta_data.assign_coords(time = np.arange(1,time+1), lat = lat_coords, lon = lon_coords)
     meta_data.attrs = {'Title': str(file_info['title'])}
 
@@ -105,6 +105,6 @@ def write_netcdf_file(file_info,file_data):
             meta_data[file_info['variable'][ii]].attrs['unit'] = file_info['unit'][ii]
             meta_data[file_info['variable'][ii]].attrs['long_name'] =  file_info['long_name'][ii]
 
-    meta_data.to_netcdf(str(file_info['file_name'])+'.nc')
+    meta_data.to_netcdf(str(file_info['file_name']),format='netCDF4',engine='netcdf4')
     print(str(file_info['file_name'])+' file complete!')
     return
