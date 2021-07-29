@@ -1,10 +1,3 @@
-####################################
-## import python packages
-####################################
-import numpy as np
-import sys
-import os
-from pathlib import Path
 
 ####################################
 ## import essential AMCLIM modules
@@ -15,6 +8,7 @@ print(module_path)
 
 if module_path not in sys.path:
     sys.path.append(module_path)'''
+from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
 from MODULES.FUNC import *
