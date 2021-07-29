@@ -271,7 +271,7 @@ class MMS_module:
                                                                 self.water[dd+1][water_idx<=0] 
                                                                 
                 ## TAN pool
-                self.TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
+                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
                 self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
                 self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
 
