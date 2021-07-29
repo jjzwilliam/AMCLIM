@@ -40,14 +40,14 @@ MMS_liquid_list = ['mmsaerobic','mmsliquid']
 ## manure stored in liquid phase with emission mitigation measures: lagoon (typically with cover), liquid crust
 MMS_liquid_less_list = ['mmslagoon','mmsliqcrust']
 
-f_MMS_loss = np.zeros(mtrx)
-f_MMS_sold = np.zeros(mtrx)
-f_MMS_fuel = np.zeros(mtrx)
-f_MMS_preserve = np.zeros(mtrx)
-f_MMS_barn = np.zeros(mtrx)
-f_MMS_land = np.zeros(mtrx)
-f_MMS_liquid = np.zeros(mtrx)
-f_MMS_liquid_less = np.zeros(mtrx) 
+f_MMS_loss = np.zeros(mtrx[1:])
+f_MMS_sold = np.zeros(mtrx[1:])
+f_MMS_fuel = np.zeros(mtrx[1:])
+f_MMS_preserve = np.zeros(mtrx[1:])
+f_MMS_barn = np.zeros(mtrx[1:])
+f_MMS_land = np.zeros(mtrx[1:])
+f_MMS_liquid = np.zeros(mtrx[1:])
+f_MMS_liquid_less = np.zeros(mtrx[1:]) 
 
 for mms in MMS_loss_list:
     try:f_MMS_loss = f_MMS_loss + MMS_file[mms].values   
