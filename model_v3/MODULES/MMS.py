@@ -138,7 +138,7 @@ class MMS_module:
         ## TAN pool conc (aqueous phase)
         self.TAN_amount = np.zeros(array_shape)
         ## TAN pool in molar concentration
-        self.TAN_amout_M = np.zeros(array_shape)
+        self.TAN_amount_M = np.zeros(array_shape)
         ## water added from housing
         self.water_added = water_added
         self.water = np.zeros(array_shape)
@@ -279,9 +279,9 @@ class MMS_module:
                 self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
 
                 ## TAN conc
-                self.TAN_amount[dd+1][Total_water_pool[dd+1]==0] = 0
-                self.TAN_amount[dd+1][Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][Total_water_pool[dd+1]!=0]/\
-                                                            self.Total_water_pool[dd+1][Total_water_pool[dd+1]!=0]
+                self.TAN_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0
+                self.TAN_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
+                                                            self.Total_water_pool[dd+1][self.Total_water_pool[dd+1]!=0]
 
                 ## TAN molar conc
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
