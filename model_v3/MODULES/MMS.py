@@ -195,9 +195,9 @@ class MMS_module:
             self.R_star[:] = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim/1000)
         else:
             self.T_sim[:] = temp_data
-            self.u_sim[:] = u_out
-            self.RH_sim[:] = RH_out
-            self.evap_sim[:] = evap_out
+            self.u_sim[:] = wind_data
+            self.RH_sim[:] = rhum_data
+            self.evap_sim[:] = evap_data
             self.R_star[:] = R_star_out
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
@@ -207,7 +207,7 @@ class MMS_module:
         ## mositure equilirium, mositure content of manure
         self.mois_coeff[:] = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
         if livestock.lower()=="poultry":
-            self.daily_ua_conv_factor[:] = ua_hydrolysis_rate(temp=self.T_sim,rhum=self.RH_sim,ph=pH)
+            self.daily_ua_conv_factor[:] = ua_hydrolysis_rate(temp=self.T_sim,rhum=self.RH_sim,ph=self.pH)
         else:
             ## daily urea hydrolysis rate
             self.daily_urea_hydro_rate[:] = urea_hydrolysis_rate(temp=self.T_sim,delta_t=timestep)

@@ -277,7 +277,7 @@ class HOUSING_MODULE:
             print("Naturally ventilated barn")
             self.T_sim, self.u_sim = barn_env(temp_data,wind_data)
             self.RH_sim = rhum_data
-        elif production_system_type.lower() == 'poultry house':
+        elif housing_type.lower() == 'poultry house':
             print("Poultry house")
             self.T_sim, self.u_sim, self.RH_sim = housing_env(temp_data,rhum_data,livestock,production_system)
         else:
@@ -637,7 +637,7 @@ class HOUSING_MODULE:
             self.NH3_flux[:] = 0.0
             if housing_type.lower() == 'barn':
                 self.urea_pool[:] = 0.0
-            elif hosuing_type.lower() == 'poultry_house':
+            elif housing_type.lower() == 'poultry_house':
                 self.UA_pool[:] = 0.0
 
     ## initialisation: 2nd initialisation for housing simulation
@@ -741,7 +741,7 @@ class HOUSING_MODULE:
                 self.urea_pool_to_storage[day_idx] = (1 - self.daily_urea_hydro_rate[day_idx])*self.urea_pool[day_idx]
                 self.urea_pool[day_idx] = 0.0
             elif housing_type.lower() == 'poultry house':
-                self.UA_pool_to_storage[day_idx] = UA_pool[day_idx]
+                self.UA_pool_to_storage[day_idx] = self.UA_pool[day_idx]
                 self.UA_pool[day_idx] = 0.0
 
     def housing_to_storage_init(self,housing_type):
