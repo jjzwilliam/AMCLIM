@@ -775,6 +775,8 @@ class HOUSING_MODULE:
                 self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.slat_pit_housing_sim(dd,end_idx,self.fslat,self.fgap)
+        self.housing_2nd_init(housing_type)
+        self.slat_pit_housing_sim(0,start_idx,self.fslat,self.fgap)
         return
 
     def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency):
@@ -787,6 +789,8 @@ class HOUSING_MODULE:
                 self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.barn_housing_sim(dd,end_idx)
+        self.housing_2nd_init(housing_type)
+        self.barn_housing_sim(0,start_idx)
         return
 
     def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency):
@@ -799,6 +803,8 @@ class HOUSING_MODULE:
                 self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.poultry_housing_sim(dd,end_idx)
+        self.housing_2nd_init(housing_type)
+        self.poultry_housing_sim(0,start_idx)
         return 
 
     
