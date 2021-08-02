@@ -275,10 +275,10 @@ class MMS_module:
 
                 ## water pool
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
-                self.Total_water_pool[dd+1][water_idx>=0] = self.Total_water_pool[dd][water_idx>0] +\
+                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
                                                                 self.water_added[dd+1][water_idx>0] +\
                                                                 self.evap_sim[dd][water_idx>0]
-                self.Total_water_pool[dd+1][water_idx<0] = self.manure_minwc[dd+1][water_idx<=0] +\
+                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
                                                                 self.water_added[dd+1][water_idx<=0] 
                                                                 
                 ## TAN pool
@@ -360,10 +360,10 @@ class MMS_module:
 
                 ## water pool
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
-                self.Total_water_pool[dd+1][water_idx>=0] = self.Total_water_pool[dd][water_idx>0] +\
+                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
                                                                 self.manure_water[dd+1][water_idx>0] +\
                                                                 self.evap_sim[dd][water_idx>0]
-                self.Total_water_pool[dd+1][water_idx<0] = self.manure_minwc[dd+1][water_idx<=0] +\
+                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
                                                                 self.manure_water[dd+1][water_idx<=0] 
                                                                 
                 ## TAN pool
