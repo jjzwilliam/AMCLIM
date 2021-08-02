@@ -24,54 +24,61 @@ for MMS in MMS_file.data_vars:
 
 ## provisional MMS categories
 ## loss (untraceable): fishpond, discahrge, public sewage
-MMS_loss_list = ['fishpond','discharge','publsewage']
+loss_list = ['fishpond','discharge','publsewage','dumping']
 ## sold (untraceable): sold
-MMS_sold_list = ['mmssolid']
-## no significant emission; used as fuel: biogas(digester), burned
+sold_list = ['sold']
+## Cat D: no significant emission; used as fuel: biogas(digester,liquid), burned (solid)
 MMS_fuel_list = ['mmsbiogas','mmsburned']
-## N mostly preserved for further use: thermal drying
-MMS_preserve_list = ['mmsthermal']
-## manure stored in barns: composting, deep litter, litter (poultry), no litter (poultry), pit1, pit2
-MMS_barn_list = ['mmscompost','mmsdeeplitt','mmslitter','mmsnolitt','mmspit1','mmspit2']
-## manure left on land: aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
-MMS_land_list = ['mmsaerproc','mmsconfin','mmsdaily','mmsdrylot','mmspasture','mmspastpad']
-## manure stored in liquid phase: aerobic lagoon, liquid
-MMS_liquid_list = ['mmsaerobic','mmsliquid']
-## manure stored in liquid phase with emission mitigation measures: lagoon (typically with cover), liquid crust
-MMS_liquid_less_list = ['mmslagoon','mmsliqcrust']
+## Cat C: N mostly preserved for further use (as solid): thermal drying 
+MMS_preserve_solid_list = ['mmsthermal']
+## Cat C: N mostly preserved for further use (as liquid), e.g., manure stored in liquid phase with emission mitigation measures: lagoon (typically with cover), liquid crust
+MMS_preserve_liquid_list = ['mmslagoon','mmsliqcrust']
+## Cat A: manure stored in barns (as solid): composting, deep litter, litter (poultry), no litter (poultry), pit1, pit2, solid storage
+MMS_barn_solid_list = ['mmscompost','mmsdeeplitt','mmslitter','mmsnolitt','mmspit1','mmspit2','mmssolid']
+##  Cat A: manure stored in barns (as liquid): aerobic processing, liquid, pit (layer)
+MMS_barn_liquid_list = ['mmsaerproc','mmsliquid']
+## Cat B: manure in open environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
+MMS_open_solid_list = ['mmsconfin','mmsdaily','mmsdrylot','mmspasture','mmspastpad']
+## Cat B: manure in open environment (as liquid): aerobic lagoon, liquid
+MMS_open_liquid_list = ['mmsaerobic','mmsliquid']
 
-f_MMS_loss = np.zeros(mtrx[1:])
-f_MMS_sold = np.zeros(mtrx[1:])
+
+f_loss = np.zeros(mtrx[1:])
+f_sold = np.zeros(mtrx[1:])
 f_MMS_fuel = np.zeros(mtrx[1:])
-f_MMS_preserve = np.zeros(mtrx[1:])
-f_MMS_barn = np.zeros(mtrx[1:])
-f_MMS_land = np.zeros(mtrx[1:])
-f_MMS_liquid = np.zeros(mtrx[1:])
-f_MMS_liquid_less = np.zeros(mtrx[1:]) 
+f_MMS_preserve_solid = np.zeros(mtrx[1:])
+f_MMS_preserve_liquid = np.zeros(mtrx[1:])
+f_MMS_barn_solid = np.zeros(mtrx[1:])
+f_MMS_barn_liquid = np.zeros(mtrx[1:])
+f_MMS_open_solid = np.zeros(mtrx[1:])
+f_MMS_open_liquid = np.zeros(mtrx[1:]) 
 
-for mms in MMS_loss_list:
-    try:f_MMS_loss = f_MMS_loss + MMS_file[mms].values   
+for mms in loss_list:
+    try:f_loss = f_loss + MMS_file[mms].values   
     except:pass
-for mms in MMS_sold_list:
-    try:f_MMS_sold = f_MMS_sold + MMS_file[mms].values
+for mms in sold_list:
+    try:f_sold = f_sold + MMS_file[mms].values
     except:pass
 for mms in MMS_fuel_list:
     try:f_MMS_fuel = f_MMS_fuel + MMS_file[mms].values
     except:pass
-for mms in MMS_preserve_list:
-    try:f_MMS_preserve = f_MMS_preserve + MMS_file[mms].values
+for mms in MMS_preserve_solid_list:
+    try:f_MMS_preserve_solid = f_MMS_preserve_solid + MMS_file[mms].values
     except:pass
-for mms in MMS_barn_list:
-    try:f_MMS_barn = f_MMS_barn + MMS_file[mms].values
+for mms in MMS_preserve_liquid_list:
+    try:f_MMS_preserve_liquid = f_MMS_preserve_liquid + MMS_file[mms].values
     except:pass
-for mms in MMS_land_list:
-    try:f_MMS_land = f_MMS_land + MMS_file[mms].values
+for mms in MMS_barn_solid_list:
+    try:f_MMS_barn_solid = f_MMS_barn_solid + MMS_file[mms].values
     except:pass
-for mms in MMS_liquid_list:
-    try:f_MMS_liquid = f_MMS_liquid + MMS_file[mms].values
+for mms in MMS_barn_liquid_list:
+    try:f_MMS_barn_liquid = f_MMS_barn_liquid + MMS_file[mms].values
     except:pass
-for mms in MMS_liquid_less_list: 
-    try: f_MMS_liquid_less = f_MMS_liquid_less + MMS_file[mms].values
+for mms in MMS_open_solid_list:
+    try:f_MMS_open_solid = f_MMS_open_solid + MMS_file[mms].values
+    except:pass
+for mms in MMS_open_liquid_list:
+    try:f_MMS_open_liquid = f_MMS_open_liquid + MMS_file[mms].values
     except:pass
 
 
@@ -80,7 +87,10 @@ for mms in MMS_liquid_less_list:
 ###################################
 ## assuming the roughness height of manure storage barn is ~ 0.5 m
 zo_barn = 0.5  
-
+## assuming the dry matter (DM) content of solid manure is 20%
+DM_content = solid_m_DM[livestock]
+## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
+manure_density = pho_m[livestock]
 ##################################
 ## define 
 ##################################
@@ -218,8 +228,10 @@ class MMS_module:
         ## dissociation constant of NH4+; 298.15 K is 25 degC (room temperature)
         self.k_NH4[:] = 5.67e-10*np.exp(-6286*(1/(self.T_sim + 273.15)-1/298.15))
         return
-
-    def MMS_barn_sim(self,start_day_idx,end_day_idx):
+    
+    ## Simulation: Cat A manure stored in barns (as liquid)
+    ## water pool is transfered from housing to MMS barn 
+    def MMS_barn_liquid_sim(self,start_day_idx,end_day_idx):
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
@@ -227,23 +239,23 @@ class MMS_module:
         else:
             for dd in np.arange(start_day_idx,end_day_idx-1):
                 ## daily manure and urine on per unit area
-                self.manure[dd+1] = self.manure_added[dd+1]*(1.0 - f_MMS_loss)*f_MMS_barn
+                self.manure[dd+1] = self.manure_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
 
                 ## manure pool
                 self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
 
                 ## N input in multiple forms
-                self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_MMS_loss)*f_MMS_barn
-                self.avail_N[dd+1] = self.avail_N_added[dd+1]*(1.0 - f_MMS_loss)*f_MMS_barn
-                self.resist_N[dd+1] = self.resist_N_added[dd+1]*(1.0 - f_MMS_loss)*f_MMS_barn
-                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]*(1.0 - f_MMS_loss)*f_MMS_barn
+                self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
+                self.avail_N[dd+1] = self.avail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
+                self.resist_N[dd+1] = self.resist_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
+                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
 
                 ## TAN production from urea hydrolysis and the N decomposition rate from dung
                 self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
                                         self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
                                         self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
                 ## TAN from housing to storage
-                self.TAN[dd+1] = self.TAN_added[dd+1]*(1.0 - f_MMS_loss)*f_MMS_barn
+                self.TAN[dd+1] = self.TAN_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
 
                 ## Urea pool
                 urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
@@ -255,7 +267,6 @@ class MMS_module:
                 self.resist_N_pool[dd+1] = self.resist_N_pool[dd]* (1 - self.daily_Nr_decomp_rate[dd+1]) + self.resist_N[dd+1]
                 self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1]
 
-
                 ## water from the fresh dung
                 # self.manure_initwc[dd+1] = * f_MMS_barn
 
@@ -265,10 +276,10 @@ class MMS_module:
                 ## water pool
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
                 self.Total_water_pool[dd+1][water_idx>=0] = self.Total_water_pool[dd][water_idx>0] +\
-                                                                self.water[dd+1][water_idx>0] +\
+                                                                self.water_added[dd+1][water_idx>0] +\
                                                                 self.evap_sim[dd][water_idx>0]
                 self.Total_water_pool[dd+1][water_idx<0] = self.manure_minwc[dd+1][water_idx<=0] +\
-                                                                self.water[dd+1][water_idx<=0] 
+                                                                self.water_added[dd+1][water_idx<=0] 
                                                                 
                 ## TAN pool
                 TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
@@ -282,6 +293,96 @@ class MMS_module:
                 self.TAN_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0
                 self.TAN_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
                                                             self.Total_water_pool[dd+1][self.Total_water_pool[dd+1]!=0]
+
+                ## TAN molar conc
+                self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
+
+                ## Gamma value
+                self.Gamma_manure[dd+1] =  self.TAN_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])
+
+                ## Gaseous NH3 at the surface
+                self.NH3_gas_M[dd+1] = self.Henry_constant[dd+1]*self.Gamma_manure[dd+1]
+
+                ## in ug
+                self.NH3_gas_ug[dd+1] = self.NH3_gas_M[dd+1]*14*1e9
+
+                ## determining the maximum emission; emission cannot exceed TAN pool
+                emiss_idx = (self.NH3_gas_ug[dd+1]*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
+                self.modelled_emiss[dd+1][emiss_idx>=0] = self.TAN_pool_ug[dd+1][emiss_idx>=0]
+                self.modelled_emiss[dd+1][emiss_idx<0] = self.NH3_gas_ug[dd+1][emiss_idx<0]*3600*timestep/\
+                                                            self.R_star[dd+1][emiss_idx<0]
+
+                ## final emission flux
+                self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
+        return
+
+    ## Simulation: Cat B manure stored in barns (as solid) //// under development 02/Aug
+    ## manure/animal waste is processed/dried to reduce water content; water pool is determined by:
+    ## a) mositure equilibrium (minimum amount of manure moisture content) b) assuming 20 % (?) DM content (Sommer&Hutchings,2001)
+    def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
+        if livestock.lower()=="poultry":
+            # for dd in np.arange(start_day_idx,end_day_idx-1):
+            print(livestock)
+
+        else:
+            for dd in np.arange(start_day_idx,end_day_idx-1):
+                ## daily manure and urine on per unit area
+                self.manure[dd+1] = self.manure_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+
+                ## manure pool
+                self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
+
+                ## N input in multiple forms
+                self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+                self.avail_N[dd+1] = self.avail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+                self.resist_N[dd+1] = self.resist_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+
+                ## TAN production from urea hydrolysis and the N decomposition rate from dung
+                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
+                                        self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
+                                        self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
+                ## TAN from housing to storage
+                self.TAN[dd+1] = self.TAN_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+
+                ## Urea pool
+                urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
+                self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
+                self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+
+                ## Org N pools in various forms
+                self.avail_N_pool[dd+1] = self.avail_N_pool[dd]*(1 - self.daily_Na_decomp_rate[dd+1]) + self.avail_N[dd+1]
+                self.resist_N_pool[dd+1] = self.resist_N_pool[dd]* (1 - self.daily_Nr_decomp_rate[dd+1]) + self.resist_N[dd+1]
+                self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1]
+
+                ## water amount when mositure content reach equilibrium
+                self.manure_water[dd+1] = self.manure[dd+1]*((1-DM_content/100)/(DM_content/100))
+
+                ## water pool
+                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
+                self.Total_water_pool[dd+1][water_idx>=0] = self.Total_water_pool[dd][water_idx>0] +\
+                                                                self.manure_water[dd+1][water_idx>0] +\
+                                                                self.evap_sim[dd][water_idx>0]
+                self.Total_water_pool[dd+1][water_idx<0] = self.manure_minwc[dd+1][water_idx<=0] +\
+                                                                self.manure_water[dd+1][water_idx<=0] 
+                                                                
+                ## TAN pool
+                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
+                self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
+                self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
+
+                ## TAN pool in ug
+                self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
+
+                ## TAN conc
+                ## TAN will partitioned into aqueous and solid (adsorption to manure) phase
+                ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd = 1.0 m^3/m^3; (Vira et al, 2020 GMD)
+                ## [TAN(s)] is concentration of sorbed NH4+ with respect to the volume of manure
+                ## manure density varies, ~ 0.3-1.9 g/cm^3, we assume 1.0 g/cm^3
+                ## [TAN(aq)] = TAN_mass(total)/(manure_mass/manure_density)
+                self.TAN_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0
+                self.TAN_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
+                                                            (self.manure_pool[dd+1][self.Total_water_pool[dd+1]!=0]/manure_density)
 
                 ## TAN molar conc
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000

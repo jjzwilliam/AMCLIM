@@ -249,6 +249,8 @@ frac_N = defaultdict(dict)
 conc_N = defaultdict(dict)
 frac_urea = defaultdict(dict)
 m_DM = defaultdict(dict)
+solid_m_DM = defaultdict(dict)
+pho_m = defaultdict(dict)
 pH_info = defaultdict(dict)
 name = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 ## regions include: 1)North America, 2)Western Europe, 3) Eastern Europe, 4)Oceania, 5)Latin America, 6)Africa
@@ -294,6 +296,10 @@ c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [
 ##      2. Zhao et al., Nitrogen utilization efficiency and prediction of nitrogen excretion in sheep
 ##      offered fresh perennial ryegrass, J. of. Animal Science, 2016; (for sheep/goat)
 f_DM = [181.5, 181.5, 181.5, 222.0, 222.0, 222.0, 155.0, 155.0, 574.0, 181.5]
+## the dry matter (DM) content of solid manure, assuming 20% for cattle, pigs etc, 50% for poultry
+f_solid_DM = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 50.0, 20.0]
+## assuming the density of manure; 1t kg/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
+pho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
 ## fraction of urinal N in the form of urea
 f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75]
 ## pH value of livestock slurry
@@ -311,6 +317,8 @@ for ii in np.arange(10):
         conc_N[name[ii]][conc_type[jj]] = c_N[ii][jj]
         frac_urea[name[ii]] = f_urea[ii]
         m_DM[name[ii]] = f_DM[ii]
+        solid_m_DM[name[ii]] = f_solid_DM[ii]
+        pho_m[name[ii]] = pho_manure[ii]
         pH_info[name[ii]] = pH_val[ii] 
 
 
