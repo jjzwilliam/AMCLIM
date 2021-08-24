@@ -24,9 +24,9 @@ except:
     pass
 #print(np.nanmedian(animal_weight.values[np.where(animal_weight!=0)]))
 animal_weight[np.where((animal_head!=0)&(animal_weight==0))] = np.nanmedian(animal_weight.values[np.where(animal_weight!=0)])
-animal_Nrate = animal_file['N_rate'][0]
+#animal_Nrate = animal_file['N_rate'][0]
 #print(np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)]))
-animal_Nrate[np.where((animal_head!=0)&(animal_Nrate==0))] = np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)])
+#animal_Nrate[np.where((animal_head!=0)&(animal_Nrate==0))] = np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)])
 ## pig density 1: 120 kg/m^2
 #animal_density = 120.0
 animal_density = stocking_desity[livestock]
