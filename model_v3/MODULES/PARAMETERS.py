@@ -245,6 +245,7 @@ def livestock_waste_info(livestock_type, waste_N):
 livestock_N = defaultdict(dict)
 livestock_Nrate = defaultdict(dict)
 livestock_weight = defaultdict(dict)
+stocking_desity = defaultdict(dict)
 frac_N = defaultdict(dict)
 conc_N = defaultdict(dict)
 frac_urea = defaultdict(dict)
@@ -283,6 +284,9 @@ N_rates =[[0.29,0.31,0.32,0.44,0.35,0.59,0.74,0.34],
           [0.45,1.28,1.28,1.42,1.37,1.37,1.37,1.37],
           [0.83,0.83,0.82,0.82,0.82,0.82,0.82,0.82],
           [0.32,0.32,0.32,0.32,0.32,0.32,0.32,0.32]]
+## livestock stocking density in animal houses (needs to be updated)
+name = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
+den_stock = [200.0, 200.0, 200.0, 120.0, 120.0, 60.0, 100.0, 100.0, 30.0, 200.0]
 ## fraction of urine N and dung N; proportion
 f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
        [1.0/2, 1.0/2], [1.0/2, 1.0/2], [0.0, 1.0],[1.0/2, 1.0/2]]
@@ -311,6 +315,7 @@ for ii in np.arange(10):
         livestock_N[name[ii]][region[jj]] = N_values[ii][jj]
         livestock_Nrate[name[ii]][region[jj]] = N_rates[ii][jj]
         livestock_weight[name[ii]][region[jj]] = 1000*N_values[ii][jj]/(N_rates[ii][jj]*365)
+        stocking_desity[name[ii]] = den_stock[ii]
 for ii in np.arange(10):
     for jj in np.arange(2):
         frac_N[name[ii]][N_type[jj]] = f_N[ii][jj]

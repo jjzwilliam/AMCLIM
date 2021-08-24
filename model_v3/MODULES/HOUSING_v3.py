@@ -28,7 +28,9 @@ animal_Nrate = animal_file['N_rate'][0]
 #print(np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)]))
 animal_Nrate[np.where((animal_head!=0)&(animal_Nrate==0))] = np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)])
 ## pig density 1: 120 kg/m^2
-animal_density = 120.0 
+#animal_density = 120.0
+animal_density = stocking_desity[livestock]
+print(str(livestock)+" stocking density is "+str(animal_density)+" kg/m^2")
 massgrid = animal_head*animal_weight
 housing_area = animal_head*animal_weight/animal_density
 ## total animal mass per grid
