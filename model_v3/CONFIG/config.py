@@ -37,6 +37,9 @@ livestock = 'PIG'
 animal_file_name = 'Pig_FAO_Gleam.nc'       ## input files should be put in AMCLIM/INPUT/
 ## production_system_list = ['industrial','intermediate','backyard']
 production_system = 'industrial'
+## level index: 
+## PIG: industrial-0; intermediate-1, backyard-2
+lvl_idx = 0
 ## housing_system: 1. insulated building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
 ## housing_system_list = ['slat/pit house','barn','poultry_house']
 housing_system = 'slat/pit house'

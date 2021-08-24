@@ -16,10 +16,10 @@ from MODULES.FUNC import *
 ######################################
 ## excreted N data
 ######################################
-excretN_info = animal_file['Excreted_N'][0]
-animal_head = animal_file['Animal_head'][0]
+excretN_info = animal_file['Excreted_N'][lvl_idx]
+animal_head = animal_file['Animal_head'][lvl_idx]
 try:
-    animal_weight = animal_file['Animal_weight'][0]
+    animal_weight = animal_file['Animal_weight'][lvl_idx]
 except:
     pass
 #print(np.nanmedian(animal_weight.values[np.where(animal_weight!=0)]))
