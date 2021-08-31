@@ -149,6 +149,8 @@ class MMS_module:
         self.TAN_amount = np.zeros(array_shape)
         ## TAN pool in molar concentration
         self.TAN_amount_M = np.zeros(array_shape)
+        ## TAN conc at the surface
+        self.TAN_surf_amount_M = np.zeros(array_shape)
         ## water added from housing
         self.water_added = water_added
         self.water = np.zeros(array_shape)
@@ -174,7 +176,8 @@ class MMS_module:
         self.RH_sim = np.zeros(array_shape)
         self.evap_sim = np.zeros(array_shape)
         self.R_star = np.zeros(array_shape)
-
+        ## manure resistance
+        self.R_manure = np.zeros(array_shape)
         ## mositure equilirium, mositure content of manure
         self.mois_coeff = np.zeros(array_shape)
         ## daily UA hydrolysis rate
@@ -188,6 +191,8 @@ class MMS_module:
         self.Henry_constant = np.zeros(array_shape)
         ## dissociation constant of NH4+; 298.15 K is 25 degC (room temperature)
         self.k_NH4 = np.zeros(array_shape)
+        ## molecular diffusivity of NH4+ in the water
+        self.D_aq_NH4 = np.zeros(array_shape)
         ## pH and H+ ions concentration
         self.pH = pH_value
         self.cc_H = np.float(10**(-pH_value))
@@ -203,6 +208,7 @@ class MMS_module:
             ## Q_vent above pit is set to be 0.6 m/s (full efficiency)
             self.evap_sim[:] = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_barn)*1000
             self.R_star[:] = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim/1000)
+            self.D_aq_NH4[:] = diffusivity_NH4(temp=self.T_sim)
         else:
             self.T_sim[:] = temp_data
             self.u_sim[:] = wind_data
@@ -316,9 +322,19 @@ class MMS_module:
                 self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
         return
 
-    ## Simulation: Cat B manure stored in barns (as solid) //// under development 02/Aug
+    ## Simulation: Cat B manure stored in barns (as solid) //// under development 31/Aug
     ## manure/animal waste is processed/dried to reduce water content; water pool is determined by:
     ## a) mositure equilibrium (minimum amount of manure moisture content) b) assuming 20 % (?) DM content (Sommer&Hutchings,2001)
+    ## c) incorporate a [surface compensation point] scheme in the model:
+    ##       gaseouos concentrations (chi): chi_indoor; chi_surface
+    ##       aqueous concrntrations: [TAN]_bulk (TAN conc in the manure); [TAN]_surf (TAN conc at the surface, in equilibrium with chi_surf)
+    ##       equilibrium between [TAN]_surf and chi_surf: chi_surf = (k_H_D/([H+]+k_NH4+))*[TAN]_surf; 
+    ##                   Note: k_H_D = (161500/(temp+273.15))*np.exp(-10380/(temp+273.15)) 
+    ##       fluxes (F): F_atm, surface to indoor; F_tosurf: manure to surface;;; 
+    ##                   F_atm=(chi_surf-chi_indoor)/R_star; F_tosurf=([TAN]_bulk-[TAN]_surf)/R_manure; F_atm = F_tosurf
+    ##    [TAN]_bulk is the prognostic variable and is determined by source and loss based on the mass balance approach
+    ##    solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_indoor*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_star)
+
     def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
@@ -331,6 +347,9 @@ class MMS_module:
 
                 ## manure pool
                 self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
+
+                ## manure resistance
+                self.R_manure[dd+1] = (self.manure_pool[dd+1]/manure_density)/(2*self.D_aq_NH4[dd+1]) 
 
                 ## N input in multiple forms
                 self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
@@ -389,6 +408,10 @@ class MMS_module:
 
                 ## TAN molar conc
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
+
+                ## TAN conc at the surface
+                self.TAN_surf_amount_M[dd+1] = (self.TAN_amount_M[dd+1]*self.R_star[dd+1])/\
+                                            (self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+self.R_star[dd+1])
 
                 ## Gamma value
                 self.Gamma_manure[dd+1] =  self.TAN_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])

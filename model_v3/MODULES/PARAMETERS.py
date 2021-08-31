@@ -170,6 +170,12 @@ def water_evap_a(temp,rhum,u,zo):
     evap = evap*1000*3600*24
     return evap
 
+## physical variables: molecular diffusivity of NH4+ in water; D_aq_nh4, m^2/s (Van Der Molen et al.,1990; Vira et al., GMD2020)
+## temp in degC
+def diffusivity_NH4(temp):
+    d_aq_nh4 = 9.8e-10*1.03**temp
+    return d_aq_nh4
+
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent
 def resistance_water_air(temp,rhum,evap_flux):
     T = temp + 273.15
