@@ -355,8 +355,10 @@ class MMS_module:
                 self.resist_N_pool[dd+1] = self.resist_N_pool[dd]* (1 - self.daily_Nr_decomp_rate[dd+1]) + self.resist_N[dd+1]
                 self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1]
 
-                ## water amount when mositure content reach equilibrium
-                self.manure_water[dd+1] = self.manure[dd+1]*((1-DM_content/100)/(DM_content/100))
+                ## water amount in "solid" manure
+                ## self.manure refers to the DM mass; therefore, total manure mass = DM mass/DM%
+                ## water in the "solid" manure = water% x total manure mass
+                self.manure_water[dd+1] = (self.manure[dd+1]/(DM_content/100))*(1-DM_content/100)
 
                 ## water pool
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
@@ -376,7 +378,8 @@ class MMS_module:
 
                 ## TAN conc
                 ## TAN will partitioned into aqueous and solid (adsorption to manure) phase
-                ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd = 1.0 m^3/m^3; (Vira et al, 2020 GMD)
+                ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd = 1.0 m^3/m^3 
+                ## Kd = 1.0 m^3/m^3 (this is probably for the convenience of calculation...); (Vira et al, 2020 GMD)
                 ## [TAN(s)] is concentration of sorbed NH4+ with respect to the volume of manure
                 ## manure density varies, ~ 0.3-1.9 g/cm^3, we assume 1.0 g/cm^3
                 ## [TAN(aq)] = TAN_mass(total)/(manure_mass/manure_density)
