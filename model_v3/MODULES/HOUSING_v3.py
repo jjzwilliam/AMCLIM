@@ -691,12 +691,12 @@ class HOUSING_MODULE:
         if housing_type.lower() == 'slat/pit house':
             ## pools: from housing to MMS
             ## Note: by multiplying the housing area, we get the total mass of each pool rather than mass/unit area
-            self.manure_pool_pit_to_storage[day_idx] = (self.manure_pool_pit[day_idx]+self.manure_pool_slat[day_idx])*housing_area
-            self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]*housing_area
-            self.resist_N_pool_pit_to_storage[day_idx] = self.resist_N_pool_pit[day_idx]*housing_area
-            self.unavail_N_pool_pit_to_storage[day_idx] = self.unavail_N_pool_pit[day_idx]*housing_area
-            self.TAN_pool_pit_to_storage[day_idx] = (self.TAN_pool_pit[day_idx]+self.urea_pool_pit[day_idx])*housing_area
-            self.Total_water_pool_pit_to_storage[day_idx] = self.Total_water_pool_pit[day_idx]*housing_area
+            self.manure_pool_pit_to_storage[day_idx] = (self.manure_pool_pit[day_idx]+self.manure_pool_slat[day_idx])*housing_area.values
+            self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]*housing_area.values
+            self.resist_N_pool_pit_to_storage[day_idx] = self.resist_N_pool_pit[day_idx]*housing_area.values
+            self.unavail_N_pool_pit_to_storage[day_idx] = self.unavail_N_pool_pit[day_idx]*housing_area.values
+            self.TAN_pool_pit_to_storage[day_idx] = (self.TAN_pool_pit[day_idx]+self.urea_pool_pit[day_idx])*housing_area.values
+            self.Total_water_pool_pit_to_storage[day_idx] = self.Total_water_pool_pit[day_idx]*housing_area.values
             
             self.manure_pool_slat[day_idx] = 0.0
             self.manure_pool_pit[day_idx] = 0.0
@@ -722,12 +722,12 @@ class HOUSING_MODULE:
             self.NH3_flux_pit[day_idx] = 0.0
         else:
             ## pools: from housing to MMS
-            self.manure_pool_to_storage[day_idx] = self.manure_pool[day_idx]*housing_area
-            self.avail_N_pool_to_storage[day_idx] = (1 - self.daily_Na_decomp_rate[day_idx])*self.avail_N_pool[day_idx]*housing_area
-            self.resist_N_pool_to_storage[day_idx] = (1 - self.daily_Nr_decomp_rate[day_idx])*self.resist_N_pool[day_idx]*housing_area
-            self.unavail_N_pool_to_storage[day_idx] = self.unavail_N_pool[day_idx]*housing_area
-            self.TAN_pool_to_storage[day_idx] = (self.TAN_pool[[day_idx]]-self.NH3_flux[day_idx])*housing_area
-            self.Total_water_pool_to_storage[day_idx] = self.Total_water_pool[day_idx]*housing_area
+            self.manure_pool_to_storage[day_idx] = self.manure_pool[day_idx]*housing_area.values
+            self.avail_N_pool_to_storage[day_idx] = (1 - self.daily_Na_decomp_rate[day_idx])*self.avail_N_pool[day_idx]*housing_area.values
+            self.resist_N_pool_to_storage[day_idx] = (1 - self.daily_Nr_decomp_rate[day_idx])*self.resist_N_pool[day_idx]*housing_area.values
+            self.unavail_N_pool_to_storage[day_idx] = self.unavail_N_pool[day_idx]*housing_area.values
+            self.TAN_pool_to_storage[day_idx] = (self.TAN_pool[[day_idx]]-self.NH3_flux[day_idx])*housing_area.values
+            self.Total_water_pool_to_storage[day_idx] = self.Total_water_pool[day_idx]*housing_area.values
             ## NH3 flux is not multiplied by housing area, do this in main script!
             self.NH3_flux_from_barn[day_idx] = self.NH3_flux[day_idx]
 
