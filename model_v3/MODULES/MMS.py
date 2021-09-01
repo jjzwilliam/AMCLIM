@@ -90,8 +90,9 @@ MMS_area_factor = {
     "mms_barn_solid":0.1,
     "mms_barn_liquid":1.0,
     "mms_open_solid":0.1,
-    "mms_open_liquid":0.5})
-MMS_area = np.zeros(mtrx[1:]
+    "mms_open_liquid":0.5}
+
+MMS_area = np.zeros(mtrx[1:])
 ###################################
 ## MMS parameters
 ###################################
@@ -250,7 +251,7 @@ class MMS_module:
     ## Simulation: Cat A manure stored in barns (as liquid)
     ## water pool is transfered from housing to MMS barn 
     def MMS_barn_liquid_sim(self,start_day_idx,end_day_idx):
-        MMS_area = MMS_area_factor['mms_barn_liquid']*f_MMS_barn_liquid*self.housingarea
+        MMS_area[:] = MMS_area_factor['mms_barn_liquid']*f_MMS_barn_liquid*self.housingarea
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
@@ -349,7 +350,7 @@ class MMS_module:
     ##    solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_indoor*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_star)
 
     def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
-        MMS_area = MMS_area_factor['mms_barn_solid']*f_MMS_barn_solid*self.housingarea
+        MMS_area[:] = MMS_area_factor['mms_barn_solid']*f_MMS_barn_solid*self.housingarea
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
@@ -452,13 +453,13 @@ class MMS_module:
         return
     
     def MMS_land_sim(self,start_day_idx,end_day_idx):
-        MMS_area = MMS_area_factor['mms_open_solid'] * f_MMS_open_solid * self.housingarea
+        MMS_area[:] = MMS_area_factor['mms_open_solid'] * f_MMS_open_solid * self.housingarea
         # for dd in np.arange(start_day_idx,end_day_idx-1):
         
         return
     
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
-        MMS_area = MMS_area_factor['mms_open_liquid'] * f_MMS_open_liquid * self.housingarea
+        MMS_area[:] = MMS_area_factor['mms_open_liquid'] * f_MMS_open_liquid * self.housingarea
         # for dd in np.arange(start_day_idx,end_day_idx):
 
         return
