@@ -368,7 +368,7 @@ class MMS_module:
                 ##        tortuosity dependence for aqueous diffusion is not applicable here (?)
                 ## layer thickness of manure: z = manure pool/manure density
                 ##        manure density is given in g/cm^3, and needs to be converted to g/m^3 by multiplying by 10^6
-                self.R_manure[dd+1] = (self.manure_pool[dd+1]/manure_density*1e6)/(2*self.D_aq_NH4[dd+1]) 
+                self.R_manure[dd+1] = (self.manure_pool[dd+1]/(manure_density*1e6))/(2*self.D_aq_NH4[dd+1]) 
 
                 ## N input in multiple forms
                 self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
