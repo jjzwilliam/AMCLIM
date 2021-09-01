@@ -90,8 +90,8 @@ MMS_area_factor = {
     "mms_barn_solid":0.1,
     "mms_barn_liquid":1.0,
     "mms_open_solid":0.1,
-    "mms_open_liquid":0.5}
-MMS_area = np.zeros(mtrx[1:])
+    "mms_open_liquid":0.5})
+MMS_area = np.zeros(mtrx[1:]
 ###################################
 ## MMS parameters
 ###################################
