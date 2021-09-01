@@ -742,10 +742,10 @@ class HOUSING_MODULE:
             self.NH3_flux[day_idx] = 0.0
 
             if housing_type.lower() == 'barn':
-                self.urea_pool_to_storage[day_idx] = (1 - self.daily_urea_hydro_rate[day_idx])*self.urea_pool[day_idx]*housing_area
+                self.urea_pool_to_storage[day_idx] = (1 - self.daily_urea_hydro_rate[day_idx])*self.urea_pool[day_idx]*housing_area.values
                 self.urea_pool[day_idx] = 0.0
             elif housing_type.lower() == 'poultry house':
-                self.UA_pool_to_storage[day_idx] = self.UA_pool[day_idx]*housing_area
+                self.UA_pool_to_storage[day_idx] = self.UA_pool[day_idx]*housing_area.values
                 self.UA_pool[day_idx] = 0.0
 
     def housing_to_storage_init(self,housing_type):

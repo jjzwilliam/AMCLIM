@@ -1,6 +1,7 @@
 input_files/
 outputs/
 test*.py
+*.ipynb
 model/MODULES/__pycache__/
 model/CONFIG/__pycache__/
 model/INPUT/__pycache__/
