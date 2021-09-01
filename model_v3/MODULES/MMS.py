@@ -92,7 +92,13 @@ MMS_area_factor = {
     "mms_open_solid":0.1,
     "mms_open_liquid":0.5}
 
-MMS_area = np.zeros(mtrx[1:])
+## areas of each MMS, initial values are None
+MMS_area = {
+    "mms_barn_solid_area":None,
+    "mms_barn_liquid_area":None,
+    "mms_open_solid_area":None,
+    "mms_open_liquid_area":None}
+
 ###################################
 ## MMS parameters
 ###################################
@@ -251,31 +257,42 @@ class MMS_module:
     ## Simulation: Cat A manure stored in barns (as liquid)
     ## water pool is transfered from housing to MMS barn 
     def MMS_barn_liquid_sim(self,start_day_idx,end_day_idx):
-        MMS_area[:] = MMS_area_factor['mms_barn_liquid']*f_MMS_barn_liquid*self.housingarea
+        ## area of MMS_barn_liquid
+        MMS_area["mms_barn_liquid_area"] = self.housingarea*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid*MMS_area_factor['mms_barn_liquid']
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
 
         else:
             for dd in np.arange(start_day_idx,end_day_idx-1):
+
+                ## the equations used to represent these pools need to be explained here:
+                ## each pool should be in a unit of, mass/unit area, i.e., g/m^2
+                ## and each MMS corresponds to a specific MMS area, so the explicit equation would be:
+                ##     self.[pool] = self.[poolmass]*(1.0-f_loss-f_sold)*f_MMS_[MMS type]/MMS_area["MMS type"]
+                ## then, note that  
+                ##     MMS_area["MMS type"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_[MMS type]*MMS_area_factor["MMS type"]
+                ##     self.[pool] = self.[poolmass]/(self.housingarea*MMS_area_factor["MMS_type"])
+                ## this is different to the HOUSING module as N excretion has been divided by the housing area before used as input
+
                 ## daily manure and urine on per unit area
-                self.manure[dd+1] = self.manure_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
+                self.manure[dd+1] = self.manure_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
 
                 ## manure pool
                 self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
 
                 ## N input in multiple forms
-                self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
-                self.avail_N[dd+1] = self.avail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
-                self.resist_N[dd+1] = self.resist_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
-                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
+                self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
+                self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
+                self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
+                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
 
                 ## TAN production from urea hydrolysis and the N decomposition rate from dung
                 self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
                                         self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
                                         self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
                 ## TAN from housing to storage
-                self.TAN[dd+1] = self.TAN_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid
+                self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
 
                 ## Urea pool
                 urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
@@ -296,10 +313,10 @@ class MMS_module:
                 ## water pool
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
                 self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
-                                                                self.water_added[dd+1][water_idx>0] +\
+                                                                self.water_added[dd+1][water_idx>0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"]) +\
                                                                 self.evap_sim[dd][water_idx>0]
                 self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
-                                                                self.water_added[dd+1][water_idx<=0] 
+                                                                self.water_added[dd+1][water_idx<=0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
                                                                 
                 ## TAN pool
                 TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
@@ -350,15 +367,16 @@ class MMS_module:
     ##    solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_indoor*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_star)
 
     def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
-        MMS_area[:] = MMS_area_factor['mms_barn_solid']*f_MMS_barn_solid*self.housingarea
+        MMS_area["mms_barn_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_barn_solid*MMS_area_factor["mms_barn_solid"]
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
 
         else:
             for dd in np.arange(start_day_idx,end_day_idx-1):
+                ## note the equations for the pools are similar to "barn liquid sim"; see comments above
                 ## daily manure and urine on per unit area
-                self.manure[dd+1] = self.manure_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+                self.manure[dd+1] = self.manure_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
 
                 ## manure pool
                 self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
@@ -372,17 +390,17 @@ class MMS_module:
                 self.R_manure[dd+1] = (self.manure_pool[dd+1]/(manure_density*1e6))/(2*self.D_aq_NH4[dd+1]) 
 
                 ## N input in multiple forms
-                self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
-                self.avail_N[dd+1] = self.avail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
-                self.resist_N[dd+1] = self.resist_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
-                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+                self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
+                self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
+                self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
+                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
 
                 ## TAN production from urea hydrolysis and the N decomposition rate from dung
                 self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
                                         self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
                                         self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
                 ## TAN from housing to storage
-                self.TAN[dd+1] = self.TAN_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
+                self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
 
                 ## Urea pool
                 urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])

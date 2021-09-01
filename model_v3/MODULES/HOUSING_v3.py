@@ -690,12 +690,13 @@ class HOUSING_MODULE:
     def cleaning_pit(self,day_idx,housing_type):
         if housing_type.lower() == 'slat/pit house':
             ## pools: from housing to MMS
-            self.manure_pool_pit_to_storage[day_idx] = self.manure_pool_pit[day_idx]+self.manure_pool_slat[day_idx]
-            self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]
-            self.resist_N_pool_pit_to_storage[day_idx] = self.resist_N_pool_pit[day_idx]
-            self.unavail_N_pool_pit_to_storage[day_idx] = self.unavail_N_pool_pit[day_idx]
-            self.TAN_pool_pit_to_storage[day_idx] = self.TAN_pool_pit[day_idx]+self.urea_pool_pit[day_idx]
-            self.Total_water_pool_pit_to_storage[day_idx] = self.Total_water_pool_pit[day_idx]
+            ## Note: by multiplying the housing area, we get the total mass of each pool rather than mass/unit area
+            self.manure_pool_pit_to_storage[day_idx] = (self.manure_pool_pit[day_idx]+self.manure_pool_slat[day_idx])*housing_area
+            self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]*housing_area
+            self.resist_N_pool_pit_to_storage[day_idx] = self.resist_N_pool_pit[day_idx]*housing_area
+            self.unavail_N_pool_pit_to_storage[day_idx] = self.unavail_N_pool_pit[day_idx]*housing_area
+            self.TAN_pool_pit_to_storage[day_idx] = (self.TAN_pool_pit[day_idx]+self.urea_pool_pit[day_idx])*housing_area
+            self.Total_water_pool_pit_to_storage[day_idx] = self.Total_water_pool_pit[day_idx]*housing_area
             
             self.manure_pool_slat[day_idx] = 0.0
             self.manure_pool_pit[day_idx] = 0.0
