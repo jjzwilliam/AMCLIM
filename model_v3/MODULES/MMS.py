@@ -33,16 +33,16 @@ MMS_fuel_list = ['mmsbiogas','mmsburned']
 MMS_preserve_solid_list = ['mmsthermal']
 ## Cat C: N mostly preserved for further use (as liquid), e.g., manure stored in liquid phase with emission mitigation measures: lagoon (typically with cover), liquid crust
 MMS_preserve_liquid_list = ['mmslagoon','mmsliqcrust']
-## Cat A: manure stored in barns (as solid): composting, deep litter, litter (poultry), no litter (poultry), pit1, pit2, solid storage
-MMS_barn_solid_list = ['mmscompost','mmsdeeplitt','mmslitter','mmsnolitt','mmspit1','mmspit2','mmssolid']
-##  Cat A: manure stored in barns (as liquid): aerobic processing, liquid, pit (layer)
-MMS_barn_liquid_list = ['mmsaerproc','mmsliquid']
+## Cat A: manure stored in barns (as solid): composting, deep litter, litter (poultry), no litter (poultry), pit (layer),solid storage
+MMS_barn_solid_list = ['mmscompost','mmsdeeplitt','mmslitter','mmsnolitt','mmssolid']
+##  Cat A: manure stored in barns (as liquid): aerobic processing, liquid, pit1, pit2
+MMS_barn_liquid_list = ['mmsaerproc','mmsliquid','mmspit1','mmspit2']
 ## Cat B: manure in open environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
 MMS_open_solid_list = ['mmsconfin','mmsdaily','mmsdrylot','mmspasture','mmspastpad']
 ## Cat B: manure in open environment (as liquid): aerobic lagoon, liquid
 MMS_open_liquid_list = ['mmsaerobic','mmsliquid']
 
-
+## shape in [lat,lon]
 f_loss = np.zeros(mtrx[1:])
 f_sold = np.zeros(mtrx[1:])
 f_MMS_fuel = np.zeros(mtrx[1:])
@@ -81,7 +81,17 @@ for mms in MMS_open_liquid_list:
     try:f_MMS_open_liquid = f_MMS_open_liquid + MMS_file[mms].values
     except:pass
 
-
+## this refers to the storage surface area in farms relative to the housing area
+## e.g., mms_barn_solid = 0.1, 
+##       which means the area of a barn that stores solid manure has 1/10 of housing area in the local farm;
+##       housing area = 10 km^2 in a grid; barn_solid area = 1 km^2 (1/10) * f_MMS_barn_solid
+## these values need to be reviewed (?)
+MMS_area_factor = {
+    "mms_barn_solid":0.1,
+    "mms_barn_liquid":1.0,
+    "mms_open_solid":0.1,
+    "mms_open_liquid":0.5}
+MMS_area = np.zeros(mtrx[1:])
 ###################################
 ## MMS parameters
 ###################################
@@ -96,7 +106,7 @@ manure_density = pho_m[livestock]
 ##################################
 class MMS_module:
     def __init__(self,array_shape,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
-    TAN_added,water_added,pH_value):
+    TAN_added,water_added,pH_value,area_housing):
         ## feces input from housing
         self.manure_added = manure_added
         self.manure = np.zeros(array_shape)
@@ -196,6 +206,8 @@ class MMS_module:
         ## pH and H+ ions concentration
         self.pH = pH_value
         self.cc_H = np.float(10**(-pH_value))
+        ## housing area that is used to determine MMS area
+        self.housingarea = area_housing
 
     def sim_env(self,mms_type):
         if mms_type == 'MMS_barn':
@@ -238,6 +250,7 @@ class MMS_module:
     ## Simulation: Cat A manure stored in barns (as liquid)
     ## water pool is transfered from housing to MMS barn 
     def MMS_barn_liquid_sim(self,start_day_idx,end_day_idx):
+        MMS_area = MMS_area_factor['mms_barn_liquid']*f_MMS_barn_liquid*self.housingarea
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
@@ -336,6 +349,7 @@ class MMS_module:
     ##    solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_indoor*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_star)
 
     def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
+        MMS_area = MMS_area_factor['mms_barn_solid']*f_MMS_barn_solid*self.housingarea
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
@@ -349,7 +363,12 @@ class MMS_module:
                 self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
 
                 ## manure resistance
-                self.R_manure[dd+1] = (self.manure_pool[dd+1]/manure_density)/(2*self.D_aq_NH4[dd+1]) 
+                ## manure resistance is determined by: R = z/(2*D); 
+                ##        z is the layer thickness of manure; D is molecular diffusivity of NH4+ in water
+                ##        tortuosity dependence for aqueous diffusion is not applicable here (?)
+                ## layer thickness of manure: z = manure pool/manure density
+                ##        manure density is given in g/cm^3, and needs to be converted to g/m^3 by multiplying by 10^6
+                self.R_manure[dd+1] = (self.manure_pool[dd+1]/manure_density*1e6)/(2*self.D_aq_NH4[dd+1]) 
 
                 ## N input in multiple forms
                 self.urea[dd+1] = self.urea_added[dd+1]*(1.0 - f_loss - f_sold)*f_MMS_barn_solid
@@ -400,7 +419,7 @@ class MMS_module:
                 ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd = 1.0 m^3/m^3 
                 ## Kd = 1.0 m^3/m^3 (this is probably for the convenience of calculation...); (Vira et al, 2020 GMD)
                 ## [TAN(s)] is concentration of sorbed NH4+ with respect to the volume of manure
-                ## manure density varies, ~ 0.3-1.9 g/cm^3, we assume 1.0 g/cm^3
+                ## manure density varies, ~ 0.3-1.9 g/cm^3, we assume 1.0 g/cm^3 (note the unit!)
                 ## [TAN(aq)] = TAN_mass(total)/(manure_mass/manure_density)
                 self.TAN_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0
                 self.TAN_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
@@ -433,11 +452,13 @@ class MMS_module:
         return
     
     def MMS_land_sim(self,start_day_idx,end_day_idx):
+        MMS_area = MMS_area_factor['mms_open_solid'] * f_MMS_open_solid * self.housingarea
         # for dd in np.arange(start_day_idx,end_day_idx-1):
         
         return
     
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
+        MMS_area = MMS_area_factor['mms_open_liquid'] * f_MMS_open_liquid * self.housingarea
         # for dd in np.arange(start_day_idx,end_day_idx):
 
         return
