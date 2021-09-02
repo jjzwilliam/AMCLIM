@@ -36,11 +36,11 @@ MMS_preserve_liquid_list = ['mmslagoon','mmsliqcrust']
 ## Cat A: manure stored in barns (as solid): composting, deep litter, litter (poultry), no litter (poultry), pit (layer),solid storage
 MMS_barn_solid_list = ['mmscompost','mmsdeeplitt','mmslitter','mmsnolitt','mmssolid']
 ##  Cat A: manure stored in barns (as liquid): aerobic processing, liquid, pit1, pit2
-MMS_barn_liquid_list = ['mmsaerproc','mmsliquid','mmspit1','mmspit2']
+MMS_barn_liquid_list = ['mmsaerproc','mmsliquid','mmsliqoth','mmspit1','mmspit2']
 ## Cat B: manure in open environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
 MMS_open_solid_list = ['mmsconfin','mmsdaily','mmsdrylot','mmspasture','mmspastpad']
 ## Cat B: manure in open environment (as liquid): aerobic lagoon, liquid
-MMS_open_liquid_list = ['mmsaerobic','mmsliquid']
+MMS_open_liquid_list = ['mmsaerobic']
 
 ## shape in [lat,lon]
 f_loss = np.zeros(mtrx[1:])
