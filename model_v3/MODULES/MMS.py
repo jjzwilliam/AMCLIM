@@ -108,6 +108,10 @@ zo_barn = 0.5
 DM_content = solid_m_DM[livestock]
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
 manure_density = pho_m[livestock]
+## assuming source layer of the top soil is 2 cm (0.02 m) thick
+z_soil = 0.02
+## assuming infiltration of manure water to the soil is 3mm/day (3000 g/m^2/day) ref: Sommer&Jacobsen,1999 and Vira et al.,2020 GMD
+ki = 3000.0
 ##################################
 ## define 
 ##################################
@@ -166,8 +170,10 @@ class MMS_module:
         self.TAN_amount = np.zeros(array_shape)
         ## TAN pool in molar concentration
         self.TAN_amount_M = np.zeros(array_shape)
-        ## TAN conc at the surface
+        ## TAN conc at the surface; for [MMS (barn,open) solid]
         self.TAN_surf_amount_M = np.zeros(array_shape)
+        ## TAN conc at the soil surface/interface between manure and land (soil); for [MMS open solid]
+        self.TAN_soil_amount_M = np.zeros(array_shape)
         ## water added from housing
         self.water_added = water_added
         self.water = np.zeros(array_shape)
@@ -187,6 +193,10 @@ class MMS_module:
         ## the atmosphere, i.e. measures mitigating emissions during housing stage such as coverings, straw ...;
         ## during land spreading stages, such as canopy recapture, deap injection...
         self.NH3_flux = np.zeros(array_shape)
+        ## diffusion of aqueous TAN to soil
+        self.diffusiveflux = np.zeros(array_shape)
+        ## infiltration of aqueous TAN to subsurface (not diffusive)
+        self.infilflux = np.zeros(array_shape)
 
         self.T_sim = np.zeros(array_shape)
         self.u_sim = np.zeros(array_shape)
@@ -195,6 +205,8 @@ class MMS_module:
         self.R_star = np.zeros(array_shape)
         ## manure resistance
         self.R_manure = np.zeros(array_shape)
+        ## soil resistance
+        self.R_soil = np.zeros(array_shape)
         ## mositure equilirium, mositure content of manure
         self.mois_coeff = np.zeros(array_shape)
         ## daily UA hydrolysis rate
@@ -210,6 +222,10 @@ class MMS_module:
         self.k_NH4 = np.zeros(array_shape)
         ## molecular diffusivity of NH4+ in the water
         self.D_aq_NH4 = np.zeros(array_shape)
+        ## tortuosity for diffusion
+        self.tor_soil = np.zeros(array_shape)
+        ## infiltration rate; m/s
+        self.qinfil = np.zeros(array_shape)
         ## pH and H+ ions concentration
         self.pH = pH_value
         self.cc_H = np.float(10**(-pH_value))
@@ -227,7 +243,6 @@ class MMS_module:
             ## Q_vent above pit is set to be 0.6 m/s (full efficiency)
             self.evap_sim[:] = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_barn)*1000
             self.R_star[:] = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim/1000)
-            self.D_aq_NH4[:] = diffusivity_NH4(temp=self.T_sim)
         else:
             self.T_sim[:] = temp_data
             self.u_sim[:] = wind_data
@@ -238,6 +253,9 @@ class MMS_module:
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
             self.evap_sim = xr_to_np(self.evap_sim)
+            self.tor_soil = soil_tuotorsity(theta_sat=0,theta=0,phase="aqueous")
+            ## 
+            self.qinfil = infiltration_rate(theta_sat=0,theta=0)
 
         ## mositure equilirium, mositure content of manure
         self.mois_coeff[:] = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
@@ -252,6 +270,8 @@ class MMS_module:
         self.Henry_constant[:] = (161500/(self.T_sim + 273.15)) * np.exp(-10380/(self.T_sim + 273.15))
         ## dissociation constant of NH4+; 298.15 K is 25 degC (room temperature)
         self.k_NH4[:] = 5.67e-10*np.exp(-6286*(1/(self.T_sim + 273.15)-1/298.15))
+        ## molecular diffusivity of NH4+ in water
+        self.D_aq_NH4[:] = diffusivity_NH4(temp=self.T_sim)
         return
     
     ## Simulation: Cat A manure stored in barns (as liquid)
@@ -311,9 +331,10 @@ class MMS_module:
                 self.manure_minwc[dd+1] = self.manure_pool[dd+1]*self.mois_coeff[dd+1]/100
 
                 ## water pool
+                ## Note: the water pool in [MMS barn liquid] is "inheritated" from housing water pool
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
                 self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
-                                                                self.water_added[dd+1][water_idx>0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"]) +\
+                                                                self.water_added[dd+1][water_idx>0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"]) -\
                                                                 self.evap_sim[dd][water_idx>0]
                 self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
                                                                 self.water_added[dd+1][water_idx<=0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
@@ -417,10 +438,15 @@ class MMS_module:
                 ## water in the "solid" manure = water% x total manure mass
                 self.manure_water[dd+1] = (self.manure[dd+1]/(DM_content/100))*(1-DM_content/100)
 
+                ## water amount when mositure content reach equilibrium
+                self.manure_minwc[dd+1] = self.manure_pool[dd+1]*self.mois_coeff[dd+1]/100
+
                 ## water pool
+                ## Note the difference between the water pool of [MMS barn solid] and [MMS barn liquid]
+                ## water pool of [MMS barn solid] is directly determined by the amount of manure as we assumed a dry matter content
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
                 self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
-                                                                self.manure_water[dd+1][water_idx>0] +\
+                                                                self.manure_water[dd+1][water_idx>0] -\
                                                                 self.evap_sim[dd][water_idx>0]
                 self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
                                                                 self.manure_water[dd+1][water_idx<=0] 
@@ -469,15 +495,157 @@ class MMS_module:
                 ## final emission flux
                 self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
         return
-    
+
+    ## Simulation: Cat C manure stored in open environment (as solid) //// under development 07/Sep
+    ## manure/animal waste is processed/dried to reduce water content; water pool is determined by:
+    ## a) mositure equilibrium (minimum amount of manure moisture content) b) assuming 20 % (?) DM content (Sommer&Hutchings,2001)
+    ## c) incorporate a [surface compensation point] scheme in the model as Cat B [MMS barn solid]
+    ## d) incorporate a [soil surface compensation point] in the model; with additional TAN loss through aqueous diffusion to soil
+    ##    and infiltration (subsurface leaching) to soil
+    ##       gaseouos concentrations (chi): chi_atm; chi_surface
+    ##       aqueous concrntrations: [TAN]_bulk; [TAN]_surf; [TAN]_soil (TAN conc at the interface between manure and land/soil)
+    ##       fluxes (F_upwards): F_atm, surface to atmosphere; F_tosurf: manure to surface;;; 
+    ##                   F_atm=(chi_surf-chi_atm)/R_ab; F_tosurf=([TAN]_bulk-[TAN]_surf)/R_manure; F_atm = F_tosurf
+    ##       fluxes (F_downwards): F_tosoil: manure to interface layer between manure and soil; F_diffusion: aqueous diffusion to soil
+    ##                             F_infiltration: infiltration/subsurface leaching of TAN
+    ##                   F_diffusion=[TAN]_soil/R_soil; F_infil=[TAN]_soil*qinfil; F_tosoil=([TAN]_bulk-[TAN]_soil)/R_manure;
+    ##                   F_tosoil = F_diffusion + F_infiltration
+    ##    ([TAN]_bulk is the prognostic variable and is determined by source and loss based on the mass balance approach)
+    ##    (solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_atm*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_ab; as Cat B [MMS barn solid])
+    ##    solve [TAN]_soil: [TAN]_soil = [TAN]_bulk/(R_manure/R_soil+R_manure*qinfil+1)
     def MMS_land_sim(self,start_day_idx,end_day_idx):
-        MMS_area[:] = MMS_area_factor['mms_open_solid'] * f_MMS_open_solid * self.housingarea
-        # for dd in np.arange(start_day_idx,end_day_idx-1):
-        
+        MMS_area[:] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_solid*MMS_area_factor["mms_open_solid"]
+        if livestock.lower()=="poultry":
+            # for dd in np.arange(start_day_idx,end_day_idx-1):
+            print(livestock)
+
+        else:
+            for dd in np.arange(start_day_idx,end_day_idx-1):
+                ## note the equations for the pools are similar to "barn liquid sim"; see comments above
+                ## daily manure and urine on per unit area
+                self.manure[dd+1] = self.manure_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+
+                ## manure pool
+                self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
+
+                ## manure resistance
+                ## manure resistance is determined by: R = z/(2*D); 
+                ##        z is the layer thickness of manure; D is molecular diffusivity of NH4+ in water
+                ##        tortuosity dependence for aqueous diffusion is not applicable here (?)
+                ## layer thickness of manure: z = manure pool/manure density
+                ##        manure density is given in g/cm^3, and needs to be converted to g/m^3 by multiplying by 10^6
+                self.R_manure[dd+1] = ((self.manure_pool[dd+1]/(DM_content/100))/(manure_density*1e6))/(2*self.D_aq_NH4[dd+1]) 
+                
+                ## soil resistance
+                ## soil resistance = thickness of the source layer (z) / (tortuosity for diffusion x diffusivity of the species)
+                ## Note the differences between Vira et al., 2020 GMD and Moring et al., 2016 BG; we used Moring et al.
+                self.R_soil[dd+1] = z_soil/(self.tor_soil[dd+1]*self.D_aq_NH4[dd+1])
+
+                ## N input in multiple forms
+                self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+                self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+                self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+
+                ## TAN production from urea hydrolysis and the N decomposition rate from dung
+                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
+                                        self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
+                                        self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
+                ## TAN from housing to storage
+                self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+
+                ## Urea pool
+                urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
+                self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
+                self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+
+                ## Org N pools in various forms
+                self.avail_N_pool[dd+1] = self.avail_N_pool[dd]*(1 - self.daily_Na_decomp_rate[dd+1]) + self.avail_N[dd+1]
+                self.resist_N_pool[dd+1] = self.resist_N_pool[dd]* (1 - self.daily_Nr_decomp_rate[dd+1]) + self.resist_N[dd+1]
+                self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1]
+
+                ## water amount in "solid" manure
+                ## self.manure refers to the DM mass; therefore, total manure mass = DM mass/DM%
+                ## water in the "solid" manure = water% x total manure mass
+                self.manure_water[dd+1] = (self.manure[dd+1]/(DM_content/100))*(1-DM_content/100)
+
+                ## water amount when mositure content reach equilibrium
+                self.manure_minwc[dd+1] = self.manure_pool[dd+1]*self.mois_coeff[dd+1]/100
+
+                ## water pool
+                ## water pool of [MMS open solid] is determined by:
+                ##   source: manure water, rain (precipitation)
+                ##   loss: evaporation, infiltration to soil 
+                ## Note: infiltration of manure water to soil is assumed to be 3mm/day (Sommer&Jacobsen,1999; Vira et al., 2020GMD)
+                ##       and this should be differentiate with TAN infiltration to soil
+                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-ki-self.manure_minwc[dd+1]
+                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
+                                                                self.manure_water[dd+1][water_idx>0] -\
+                                                                self.evap_sim[dd][water_idx>0] - ki
+                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
+                                                                self.manure_water[dd+1][water_idx<=0] 
+                                                                
+                ## TAN pool (different from [MMS barn (liquid,solid)])
+                ## Note: source of TAN pool: TAN production from 1) urea hydrolysis and 2) decomposition of org N
+                ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) diffusion to soil, and 3) infiltration (subsurface leaching) to soil
+                ##       only aqueous phase diffusion is considered, and gaseous diffusion is not considered in this study
+                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusiveflux[dd] - self.infilflux[dd]
+                self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
+                self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
+
+                ## TAN pool in ug
+                self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
+
+                ## TAN conc
+                ## TAN will partitioned into aqueous and solid (adsorption to manure) phase
+                ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd = 1.0 m^3/m^3 
+                ## Kd = 1.0 m^3/m^3 (this is probably for the convenience of calculation...); (Vira et al, 2020 GMD)
+                ## [TAN(s)] is concentration of sorbed NH4+ with respect to the volume of manure
+                ## manure density varies, ~ 0.3-1.9 g/cm^3, we assume 1.0 g/cm^3 (note the unit!)
+                ## [TAN(aq)] = TAN_mass(total)/(manure_mass/manure_density)
+                self.TAN_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0
+                self.TAN_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
+                                                            (self.manure_pool[dd+1][self.Total_water_pool[dd+1]!=0]/manure_density)
+
+                ## TAN molar conc
+                self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
+
+                ## TAN conc at the surface
+                self.TAN_surf_amount_M[dd+1] = (self.TAN_amount_M[dd+1]*self.R_star[dd+1])/\
+                                            (self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+self.R_star[dd+1])
+
+                ## TAN conc at the soil surface/interface between manure and land (soil)
+
+                self.TAN_soil_amount_M[dd+1] = self.TAN_amount_M[dd+1]/\
+                    (self.R_manure[dd+1]/self.R_soil[dd+1]+self.R_manure[dd+1]*self.qinfil[dd+1]+1)
+
+                ## TAN loss through aqueous diffusion to soil
+                self.diffusiveflux[dd+1] = self.TAN_soil_amount_M[dd+1]/self.R_soil[dd+1]*24*3600
+
+                ## TAN loss through subsurface leaching (infiltration to soil)
+                self.infilflux[dd+1] = self.TAN_soil_amount_M[dd+1]*self.qinfil[dd+1]*24*3600
+
+                ## Gamma value
+                self.Gamma_manure[dd+1] =  self.TAN_surf_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])
+
+                ## Gaseous NH3 at the surface
+                self.NH3_gas_M[dd+1] = self.Henry_constant[dd+1]*self.Gamma_manure[dd+1]
+
+                ## in ug
+                self.NH3_gas_ug[dd+1] = self.NH3_gas_M[dd+1]*14*1e9
+
+                ## determining the maximum emission; emission cannot exceed TAN pool
+                emiss_idx = (self.NH3_gas_ug[dd+1]*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
+                self.modelled_emiss[dd+1][emiss_idx>=0] = self.TAN_pool_ug[dd+1][emiss_idx>=0]
+                self.modelled_emiss[dd+1][emiss_idx<0] = self.NH3_gas_ug[dd+1][emiss_idx<0]*3600*timestep/\
+                                                            self.R_star[dd+1][emiss_idx<0]
+
+                ## final emission flux
+                self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
         return
     
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
-        MMS_area[:] = MMS_area_factor['mms_open_liquid'] * f_MMS_open_liquid * self.housingarea
+        MMS_area[:] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_liquid*MMS_area_factor["mms_open_liquid"]
         # for dd in np.arange(start_day_idx,end_day_idx):
 
         return

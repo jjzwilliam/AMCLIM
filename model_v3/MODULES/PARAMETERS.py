@@ -176,6 +176,32 @@ def diffusivity_NH4(temp):
     d_aq_nh4 = 9.8e-10*1.03**temp
     return d_aq_nh4
 
+## soil characteristics: tortuosity for diffusion
+## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
+## theta in per cent
+def soil_tuotorsity(theta_sat,theta,phase):
+    ## convert per cent to float
+    theta_sat = theta_sat/100
+    theta = theta/100
+    ## soil tuotorsity in aqueous phase and gaeous phase (Millington and Quirk, 1961)
+    if phase == 'aqueous':
+        soil_tor = ((theta)**(10/3))/(theta_sat**2)
+    elif phase == 'gaseous':
+        soil_tor = ((theta_sat-theta)**(10/3))/(theta_sat**2)
+    return soil_tor
+
+## soil characteristics: infiltration rate (m/s)
+## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
+## ref: Sommer and Jacobsen, 1999
+def infiltration_rate(theta_sat,theta):
+    ## coefficient A of the empirical relationship; data source: Sommer and Jacobsen, 1999
+    A = 1.5432
+    ## Ks is the permeability coefficient at saturation for loamy sand, Ks=0.714cm/h (0.0119cm/min;171.36mm/day) ref: Hu et al., 2017 J.Arid.Land
+    Ks = 0.714
+    ## infiltration rate Ki m/s
+    Ki = (Ks/(3600*100)) * np.exp(A*(theta_sat-theta)/theta_sat)
+    return Ki
+
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent
 def resistance_water_air(temp,rhum,evap_flux):
     T = temp + 273.15
@@ -308,7 +334,7 @@ c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [
 f_DM = [181.5, 181.5, 181.5, 222.0, 222.0, 222.0, 155.0, 155.0, 574.0, 181.5]
 ## the dry matter (DM) content of solid manure, assuming 20% for cattle, pigs etc, 50% for poultry
 f_solid_DM = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 50.0, 20.0]
-## assuming the density of manure; 1t kg/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
+## assuming the density of manure; 1t/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
 pho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
 ## fraction of urinal N in the form of urea
 f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75]
