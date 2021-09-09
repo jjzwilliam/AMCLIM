@@ -18,17 +18,20 @@ met_data_path = 'met_data/'
 animal_file = xr.open_dataset(file_path+animal_data_path+animal_file_name)
 
 ## open meteorology files
-## test by using 2010 met data
+## meteorological data in 2018: 1) temperature (2m air), 2) relative humidity, 3) wind, 4) evaporation from soil,
+##     5) soil moisture data, 6) percentage of saturation soil moisture
 temp_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_meant2m05.nc')
 rhum_file = xr.open_dataset(file_path+met_data_path+'AgERA5_2018d_meanRH2m05.nc')
 wind_file = xr.open_dataset(file_path+met_data_path+'AgERA5_2018d_10mwind05.nc')
 evap_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_evapfromsoil_dailytotal.nc')
-#soil_moist_file = xr.open_dataset(file_path+met_data_path+'SOILMOIST.nc')
+soilmoist_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
+soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
 temp_data = temp_file['t2m'] - 273.15
 rhum_data = rhum_file['Relative_Humidity_2m_06h']
 wind_data = wind_file['Wind_Speed_10m_Mean']
 evap_data = evap_file['evabs']*(-1000)
-# soil_moist = soil_moist_file['VAR']
+soil_moist = soilmoist_file['sm']
+per_soilsm = soilsm_file['sm']
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')

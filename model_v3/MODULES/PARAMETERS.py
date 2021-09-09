@@ -192,14 +192,20 @@ def soil_tuotorsity(theta_sat,theta,phase):
 
 ## soil characteristics: infiltration rate (m/s)
 ## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
-## ref: Sommer and Jacobsen, 1999
-def infiltration_rate(theta_sat,theta):
-    ## coefficient A of the empirical relationship; data source: Sommer and Jacobsen, 1999
-    A = 1.5432
+## data source: Patle et al., Geo.Eco.Landscale 2019
+## loamy sand and sandy loam in 14 sites (quality control; remove bad quality data)
+## multilinear regression: R^2 = 0.75; 
+## soil para: sand (%), clay (%), bulk density (g/cm^3), particle density (g/cm^3)
+## percentage of saturation soil moisture 
+def infiltration_rate(soilmoist_percent,sand_percent,clay_percent,bulk_density,particle_density):
+    ## soil parameters matrix
+    soil_para = 0.62*sand_percent - 0.17*clay_percent - 26.42*bulk_density + 3.14*particle_density - 10.58
+    ## soil moisture dependence
+    infil_func = soil_para + 6.31*(soilmoist_percent/100)
     ## Ks is the permeability coefficient at saturation for loamy sand, Ks=0.714cm/h (0.0119cm/min;171.36mm/day) ref: Hu et al., 2017 J.Arid.Land
     Ks = 0.714
     ## infiltration rate Ki m/s
-    Ki = (Ks/(3600*100)) * np.exp(A*(theta_sat-theta)/theta_sat)
+    Ki = (infil_func/Ks)/(100*3600)
     return Ki
 
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent

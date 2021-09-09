@@ -112,6 +112,11 @@ manure_density = pho_m[livestock]
 z_soil = 0.02
 ## assuming infiltration of manure water to the soil is 3mm/day (3000 g/m^2/day) ref: Sommer&Jacobsen,1999 and Vira et al.,2020 GMD
 ki = 3000.0
+## assuming soil characteristics: 1) sand (%), 2) clay (%), 3) bulk density (g/cm^3), 4) particle density (g/cm^3)
+soil_sand = 80
+soil_clay = 8
+soil_bd = 1.5
+soil_pd = 2.66
 ##################################
 ## define 
 ##################################
@@ -198,10 +203,19 @@ class MMS_module:
         ## infiltration of aqueous TAN to subsurface (not diffusive)
         self.infilflux = np.zeros(array_shape)
 
+        ## temp
         self.T_sim = np.zeros(array_shape)
+        ## wind/ventilation
         self.u_sim = np.zeros(array_shape)
+        ## RH
         self.RH_sim = np.zeros(array_shape)
+        ## evaporation
         self.evap_sim = np.zeros(array_shape)
+        ## volumetric soil moisture
+        self.soilmoist = np.zeros(array_shape)
+        ## percentage saturation soil moisture
+        self.persm = np.zeros(array_shape)
+        ## barn/buidling resistance
         self.R_star = np.zeros(array_shape)
         ## manure resistance
         self.R_manure = np.zeros(array_shape)
@@ -234,44 +248,47 @@ class MMS_module:
 
     def sim_env(self,mms_type):
         if mms_type == 'MMS_barn':
-            self.T_sim[:],self.u_sim[:] = barn_env(temp_data,wind_data)
+            self.T_sim,self.u_sim = barn_env(temp_data,wind_data)
             self.RH_sim[:] = rhum_data
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
             ## daily evaporation; aerodynamic method; (g/m^2)
             ## Q_vent above pit is set to be 0.6 m/s (full efficiency)
-            self.evap_sim[:] = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_barn)*1000
-            self.R_star[:] = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim/1000)
+            self.evap_sim = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_barn)*1000
+            self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim/1000)
         else:
-            self.T_sim[:] = temp_data
-            self.u_sim[:] = wind_data
-            self.RH_sim[:] = rhum_data
-            self.evap_sim[:] = evap_data
-            self.R_star[:] = R_star_out
+            self.T_sim = temp_data
+            self.u_sim = wind_data
+            self.RH_sim = rhum_data
+            self.evap_sim = evap_data
+            self.soilmoist = soilmoist_data
+            self.persm = persm_data
+            self.R_star = R_star_out
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
             self.evap_sim = xr_to_np(self.evap_sim)
             self.tor_soil = soil_tuotorsity(theta_sat=0,theta=0,phase="aqueous")
             ## 
-            self.qinfil = infiltration_rate(theta_sat=0,theta=0)
+            self.qinfil = infiltration_rate(soilmoist_percent=self.soilmoist,sand_percent=soil_sand,\
+            clay_percent=soil_clay,bulk_density=soil_bd,particle_density=soil_pd)
 
         ## mositure equilirium, mositure content of manure
-        self.mois_coeff[:] = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
+        self.mois_coeff = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
         if livestock.lower()=="poultry":
-            self.daily_ua_conv_factor[:] = ua_hydrolysis_rate(temp=self.T_sim,rhum=self.RH_sim,ph=self.pH)
+            self.daily_ua_conv_factor = ua_hydrolysis_rate(temp=self.T_sim,rhum=self.RH_sim,ph=self.pH)
         else:
             ## daily urea hydrolysis rate
-            self.daily_urea_hydro_rate[:] = urea_hydrolysis_rate(temp=self.T_sim,delta_t=timestep)
+            self.daily_urea_hydro_rate = urea_hydrolysis_rate(temp=self.T_sim,delta_t=timestep)
             ## daily decomposition rate of available and resistant N components
-            self.daily_Na_decomp_rate[:], self.daily_Nr_decomp_rate[:] = N_pools_decomp_rate(temp=self.T_sim, delta_t=timestep)
+            self.daily_Na_decomp_rate, self.daily_Nr_decomp_rate = N_pools_decomp_rate(temp=self.T_sim, delta_t=timestep)
         ## Henry's law constant and dissociation equilibria; Eq.6
         self.Henry_constant[:] = (161500/(self.T_sim + 273.15)) * np.exp(-10380/(self.T_sim + 273.15))
         ## dissociation constant of NH4+; 298.15 K is 25 degC (room temperature)
-        self.k_NH4[:] = 5.67e-10*np.exp(-6286*(1/(self.T_sim + 273.15)-1/298.15))
+        self.k_NH4 = 5.67e-10*np.exp(-6286*(1/(self.T_sim + 273.15)-1/298.15))
         ## molecular diffusivity of NH4+ in water
-        self.D_aq_NH4[:] = diffusivity_NH4(temp=self.T_sim)
+        self.D_aq_NH4 = diffusivity_NH4(temp=self.T_sim)
         return
     
     ## Simulation: Cat A manure stored in barns (as liquid)
@@ -644,8 +661,15 @@ class MMS_module:
                 self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
         return
     
+    ## Simulation: Cat C manure stored in open environment (as solid) //// under development 08/Sep
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
         MMS_area[:] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_liquid*MMS_area_factor["mms_open_liquid"]
-        # for dd in np.arange(start_day_idx,end_day_idx):
+        if livestock.lower()=="poultry":
+            # for dd in np.arange(start_day_idx,end_day_idx-1):
+            print(livestock)
+
+        else:
+            for dd in np.arange(start_day_idx,end_day_idx-1):
+
 
         return
