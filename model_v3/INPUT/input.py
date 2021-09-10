@@ -19,7 +19,7 @@ animal_file = xr.open_dataset(file_path+animal_data_path+animal_file_name)
 
 ## open meteorology files
 ## meteorological data in 2018: 1) temperature (2m air), 2) relative humidity, 3) 10m wind speed, 4) evaporation from soil,
-##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux
+##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s)
 temp_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_meant2m05.nc')
 rhum_file = xr.open_dataset(file_path+met_data_path+'AgERA5_2018d_meanRH2m05.nc')
 wind_file = xr.open_dataset(file_path+met_data_path+'AgERA5_2018d_10mwind05.nc')
@@ -34,7 +34,7 @@ wind_data = wind_file['Wind_Speed_10m_Mean']
 evap_data = evap_file['evabs']*(-1000)
 soilmoist_data = soilmoist_file['sm']
 persm_data = soilsm_file['sm']
-sshf_data = sshf_file['sshf']
+sshf_data = sshf_file['sshf']/(24*3600)
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')

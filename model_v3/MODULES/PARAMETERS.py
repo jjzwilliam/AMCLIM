@@ -281,7 +281,7 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     R = 287.0
     ## acceleration of gravity
     g = 9.81
-    ## Karman constant
+    ## van Karman constant
     k = 0.41
     ## heat capcity of air: 1005 J/kg/K
     cpair = 1005.0
@@ -308,6 +308,13 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     B = 5
     Rb = 1/(B*ustar)
     return Ra, Rb
+
+## physical: wind profile
+## calculating mean wind speed at a specific height by knowing the wind speed at a reference height
+## uref in m/s; height_ref and height_out in m; zo in m
+def wind_profile(uref,height_ref,height_out,zo):
+    uout = uref*(np.log(height_out/zo)/np.log(height_ref/zo))
+    return uout
 
 ## aniaml info: waste N should be consistent to livestock_N
 ## unit in kg N per head per year; returning daily values
@@ -412,6 +419,10 @@ for ii in np.arange(10):
         pho_m[name[ii]] = pho_manure[ii]
         pH_info[name[ii]] = pH_val[ii] 
 
-
+############################
+## model variables
+############################
+wind_data_height = 10
+ref_height = 2
 
 
