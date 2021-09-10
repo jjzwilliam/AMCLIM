@@ -102,8 +102,10 @@ MMS_area = {
 ###################################
 ## MMS parameters
 ###################################
-## assuming the roughness height of manure storage barn is ~ 0.5 m
+## assuming the roughness height of manure storage barn is ~ 0.5m (<ref height of 2m)
 zo_barn = 0.5  
+## assuming the roughness height of manure pile (open land) is ~ 1.0m (<ref height of 2m)
+zo_manureland = 1.0
 ## assuming the dry matter (DM) content of solid manure is 20%
 DM_content = solid_m_DM[livestock]
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
@@ -248,8 +250,9 @@ class MMS_module:
 
     def sim_env(self,mms_type):
         if mms_type == 'MMS_barn':
-            self.T_sim,self.u_sim = barn_env(temp_data,wind_data)
-            self.RH_sim[:] = rhum_data
+            self.T_sim,self.u_sim = barn_env(temp_data,\
+                wind_profile(uref=wind_data,height_ref=wind_data_height,height_out=ref_height,zo=zo_barn))
+            self.RH_sim = rhum_data
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
@@ -264,7 +267,9 @@ class MMS_module:
             self.evap_sim = evap_data
             self.soilmoist = soilmoist_data
             self.persm = persm_data
-            self.R_star = R_star_out
+            self.R_star = resistance_aero_boundary(temp=self.T_sim,rhum=self.RH_sim,\
+                u=wind_profile(uref=self.u_sim,height_ref=wind_data_height,height_out=ref_height,zo=zo_manureland),\
+                    H=sshf_data,Z=ref_height,zo=zo_manureland)
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
@@ -284,7 +289,7 @@ class MMS_module:
             ## daily decomposition rate of available and resistant N components
             self.daily_Na_decomp_rate, self.daily_Nr_decomp_rate = N_pools_decomp_rate(temp=self.T_sim, delta_t=timestep)
         ## Henry's law constant and dissociation equilibria; Eq.6
-        self.Henry_constant[:] = (161500/(self.T_sim + 273.15)) * np.exp(-10380/(self.T_sim + 273.15))
+        self.Henry_constant = (161500/(self.T_sim + 273.15)) * np.exp(-10380/(self.T_sim + 273.15))
         ## dissociation constant of NH4+; 298.15 K is 25 degC (room temperature)
         self.k_NH4 = 5.67e-10*np.exp(-6286*(1/(self.T_sim + 273.15)-1/298.15))
         ## molecular diffusivity of NH4+ in water

@@ -257,9 +257,57 @@ def resistance_manure(temp, u):
     return r_ab_star
 
 ## resistance: resistance for aerodynamic and boundary layer resistance; 
-def resistance_aero_boundary():
-    
-    return
+## temp in degC; rhum in %; u in m/s; H is sensible heat flux in J/(m^2 s); Z is reference height in m; zo is surface roughness in m 
+def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
+    ## temp in K
+    T = temp + 273.15
+    ## latent heat of vaporization; MJ per kg
+    lambda_v = 2.45
+    ## atmospheric pressuure; Pa
+    p = 101325
+    ## saturated water vapor pressure, use a different method compare to function (humidity_measures)
+    es = 0.6108*np.exp(17.27*temp/(temp+237.3))      # T is K, es in kPa here
+    es = es * 1000
+    ## water vapor pressure
+    ea = es*rhum/100                           # RH is in percentage
+    ## water vapor deficit
+    #delta_e = es - ea
+   
+    ## specific humidity
+    q = (0.622*ea)/(p-0.378*ea)
+    ## virtual temperature
+    T_v = T/(1+0.608*q)
+    ## specific gas constant of dry air: 287 J/kg/K
+    R = 287.0
+    ## acceleration of gravity
+    g = 9.81
+    ## Karman constant
+    k = 0.41
+    ## heat capcity of air: 1005 J/kg/K
+    cpair = 1005.0
+    ## density of air
+    pho = p/(R*T_v)
+    ## friction velocity
+    ustar = k*u/(np.log(Z/zo))
+    ## Monin-Obukhov length
+    L = -T*(ustar**3)*pho*cpair/(k*g*H)
+    ## stability correction function: psi
+    u = np.array(u)
+    H = np.array(H)
+    psi = np.zeros(u.shape)
+    ## stable condition
+    psi[H<=0] = -5*Z/L[H<=0]  
+    ## unstable condition
+    X = np.zeros(u.shape)
+    X[H>0] = (1-16*Z/L[H>0])**0.25
+    psi[H>0] = np.log(((1+X[H>0])/2)**2)+np.log((1+X[H>0]**2)/2)-2*np.arctan(X[H>0])+np.pi/2
+    ## aerodynamic resistance
+    Ra = (np.log(Z/zo)-psi)**2/(k**2*u)
+
+    ## coefficient B that is used to determine boundary layer resistance 
+    B = 5
+    Rb = 1/(B*ustar)
+    return Ra, Rb
 
 ## aniaml info: waste N should be consistent to livestock_N
 ## unit in kg N per head per year; returning daily values
