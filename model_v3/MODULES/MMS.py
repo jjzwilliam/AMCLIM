@@ -669,12 +669,12 @@ class MMS_module:
     ## Simulation: Cat C manure stored in open environment (as solid) //// under development 08/Sep
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
         MMS_area[:] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_liquid*MMS_area_factor["mms_open_liquid"]
-        if livestock.lower()=="poultry":
-            # for dd in np.arange(start_day_idx,end_day_idx-1):
-            print(livestock)
+        # if livestock.lower()=="poultry":
+        #     # for dd in np.arange(start_day_idx,end_day_idx-1):
+        #     print(livestock)
 
-        else:
-            for dd in np.arange(start_day_idx,end_day_idx-1):
+        # else:
+        #     for dd in np.arange(start_day_idx,end_day_idx-1):
 
 
         return
