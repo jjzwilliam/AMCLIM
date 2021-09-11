@@ -259,6 +259,10 @@ def resistance_manure(temp, u):
 ## resistance: resistance for aerodynamic and boundary layer resistance; 
 ## temp in degC; rhum in %; u in m/s; H is sensible heat flux in J/(m^2 s); Z is reference height in m; zo is surface roughness in m 
 def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
+    temp = np.array(temp)
+    rhum = np.array(rhum)
+    u = np.array(u)
+    H = np.array(H)
     ## temp in K
     T = temp + 273.15
     ## latent heat of vaporization; MJ per kg
@@ -281,7 +285,7 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     R = 287.0
     ## acceleration of gravity
     g = 9.81
-    ## van Karman constant
+    ## Karman constant
     k = 0.41
     ## heat capcity of air: 1005 J/kg/K
     cpair = 1005.0
@@ -292,8 +296,6 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     ## Monin-Obukhov length
     L = -T*(ustar**3)*pho*cpair/(k*g*H)
     ## stability correction function: psi
-    u = np.array(u)
-    H = np.array(H)
     psi = np.zeros(u.shape)
     ## stable condition
     psi[H<=0] = -5*Z/L[H<=0]  
@@ -303,11 +305,10 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     psi[H>0] = np.log(((1+X[H>0])/2)**2)+np.log((1+X[H>0]**2)/2)-2*np.arctan(X[H>0])+np.pi/2
     ## aerodynamic resistance
     Ra = (np.log(Z/zo)-psi)**2/(k**2*u)
-
-    ## coefficient B that is used to determine boundary layer resistance 
+    
     B = 5
     Rb = 1/(B*ustar)
-    return Ra, Rb
+    return Ra+Rb
 
 ## physical: wind profile
 ## calculating mean wind speed at a specific height by knowing the wind speed at a reference height
