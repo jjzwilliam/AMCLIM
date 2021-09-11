@@ -266,7 +266,7 @@ class MMS_module:
             self.RH_sim = rhum_data
             self.evap_sim = evap_data
             self.soilmoist = soilmoist_data
-            self.persm = persm_data
+            self.persm = soilmoist_data/(persm_data/100)
             self.R_star = resistance_aero_boundary(temp=self.T_sim,rhum=self.RH_sim,\
                 u=wind_profile(uref=self.u_sim,height_ref=wind_data_height,height_out=ref_height,zo=zo_manureland),\
                     H=sshf_data,Z=ref_height,zo=zo_manureland)
@@ -274,7 +274,7 @@ class MMS_module:
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
             self.evap_sim = xr_to_np(self.evap_sim)
-            self.tor_soil = soil_tuotorsity(theta_sat=0,theta=0,phase="aqueous")
+            self.tor_soil = soil_tuotorsity(theta_sat=self.soilmoist,theta=self.persm,phase="aqueous")
             ## 
             self.qinfil = infiltration_rate(soilmoist_percent=self.soilmoist,sand_percent=soil_sand,\
             clay_percent=soil_clay,bulk_density=soil_bd,particle_density=soil_pd)

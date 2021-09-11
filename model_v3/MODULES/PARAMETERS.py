@@ -178,11 +178,11 @@ def diffusivity_NH4(temp):
 
 ## soil characteristics: tortuosity for diffusion
 ## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
-## theta in per cent
+## theta in m3/m3
 def soil_tuotorsity(theta_sat,theta,phase):
     ## convert per cent to float
-    theta_sat = theta_sat/100
-    theta = theta/100
+    theta_sat = theta_sat
+    theta = theta
     ## soil tuotorsity in aqueous phase and gaeous phase (Millington and Quirk, 1961)
     if phase == 'aqueous':
         soil_tor = ((theta)**(10/3))/(theta_sat**2)
