@@ -27,6 +27,7 @@ evap_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_evapfromsoil_dai
 soilmoist_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
 soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
 sshf_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_sshf05.nc')
+# rain_file = xr.open_dataset(file_path+met_data_path+'RAINFILE.nc')
 
 temp_data = temp_file['t2m'] - 273.15
 rhum_data = rhum_file['Relative_Humidity_2m_06h']
@@ -35,6 +36,7 @@ evap_data = evap_file['evabs']*(-1000)
 soilmoist_data = soilmoist_file['sm']
 persm_data = soilsm_file['sm']
 sshf_data = sshf_file['sshf']/(24*3600)
+# rain_data = rain_file['val']
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')

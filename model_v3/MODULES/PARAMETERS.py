@@ -394,8 +394,8 @@ c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [
 ##      2. Zhao et al., Nitrogen utilization efficiency and prediction of nitrogen excretion in sheep
 ##      offered fresh perennial ryegrass, J. of. Animal Science, 2016; (for sheep/goat)
 f_DM = [181.5, 181.5, 181.5, 222.0, 222.0, 222.0, 155.0, 155.0, 574.0, 181.5]
-## the dry matter (DM) content of solid manure, assuming 20% for cattle, pigs etc, 50% for poultry
-f_solid_DM = [20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 50.0, 20.0]
+## the dry matter (DM) content of solid manure (assumed to be equivalent to manure fertilizer)； ref (Boyd, CAB reviews, 2018)
+f_solid_DM = [31.4, 24.1, 31.4, 30.8, 30.8, 30.8, 32.2, 32.2, 60.6, 31.4]
 ## assuming the density of manure; 1t/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
 pho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
 ## fraction of urinal N in the form of urea
