@@ -505,6 +505,9 @@ class HOUSING_MODULE:
 
             ## TAN pool 
             self.TAN_pool[dd+1] = self.TAN_pool[dd]-self.NH3_flux[dd]+self.TAN_prod[dd+1]
+            # TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
+            # self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]
+            # self.TAN_pool[dd+1][TAN_idx<0] = self.TAN_prod[dd+1][TAN_idx<0]
             ## TAN pool in ug
             self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
 
@@ -726,7 +729,7 @@ class HOUSING_MODULE:
             self.avail_N_pool_to_storage[day_idx] = (1 - self.daily_Na_decomp_rate[day_idx])*self.avail_N_pool[day_idx]*housing_area.values
             self.resist_N_pool_to_storage[day_idx] = (1 - self.daily_Nr_decomp_rate[day_idx])*self.resist_N_pool[day_idx]*housing_area.values
             self.unavail_N_pool_to_storage[day_idx] = self.unavail_N_pool[day_idx]*housing_area.values
-            self.TAN_pool_to_storage[day_idx] = (self.TAN_pool[[day_idx]]-self.NH3_flux[day_idx])*housing_area.values
+            self.TAN_pool_to_storage[day_idx] = (self.TAN_pool[day_idx]-self.NH3_flux[day_idx])*housing_area.values
             self.Total_water_pool_to_storage[day_idx] = self.Total_water_pool[day_idx]*housing_area.values
             ## NH3 flux is not multiplied by housing area, do this in main script!
             self.NH3_flux_from_barn[day_idx] = self.NH3_flux[day_idx]
