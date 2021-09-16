@@ -615,7 +615,7 @@ class MMS_module:
                 infil_idx = (self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd])/1e6
                 infil_idx[infil_idx>dailymaxinfil]=dailymaxinfil
                 ## soil infiltration flux is given in m/s
-                self.qinfil[dd+1] = infiltration_rate_method(dailyinfil=infil_idx,theta_sat=self.persm)
+                self.qinfil[dd+1] = infiltration_rate_method(dailyinfil=infil_idx,theta_sat=self.persm[dd+1])
                 self.qinfil[dd+1][self.qinfil<0] = 0.0
                 infil_idx[infil_idx<0] = 0.0
                 ## justify the water amount; infil flux is the infiltration within the manure (between 0-10mm/day)
