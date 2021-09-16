@@ -620,11 +620,11 @@ class MMS_module:
                 infil_idx[infil_idx<0] = 0.0
                 ## justify the water amount; infil flux is the infiltration within the manure (between 0-10mm/day)
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]-infil_idx*1e6
-                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] + self.rainfall[dd+1] + \
+                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] + self.rainfall[dd+1][water_idx>0] + \
                                                                 self.manure_water[dd+1][water_idx>0] - \
                                                                     self.evap_sim[dd][water_idx>0] - \
                                                                         infil_idx[water_idx>0]*1e6
-                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] + self.rainfall[dd+1] + \
+                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] + self.rainfall[dd+1][water_idx<=0] + \
                                                                 self.manure_water[dd+1][water_idx<=0] 
                 
                 ## maximum water holding capcity of the manure; assuming a minimum DM of 10%
