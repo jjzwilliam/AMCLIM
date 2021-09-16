@@ -130,7 +130,32 @@ def N_pools_decomp_rate(temp,delta_t):
     kr = B_r * f_T 
     k_a = 1 - np.exp(-ka*delta_t) 
     k_r = 1 - np.exp(-kr*delta_t) 
-    return k_a, k_r    
+    return k_a, k_r 
+
+## rate: nitrification rate 
+## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
+## ground temp in K; theta in m3/m3, theta_sat in m3/m3
+def nitrification_rate(ground_temp,theta,theta_sat):
+    ## maximum and optimum temp for microbial activity
+    tmax = 313   
+    topt = 301
+    ## empirical factor in this parameterization
+    asigma = 2.4
+    ## temperature responce funtion
+    func_tg = ((tmax-ground_temp)/(tmax-topt))**asigma*np.exp(asigma*(ground_temp-topt)/(tmax-topt))
+    ## water in soil
+    soilwc = theta*rho_water/((1-theta_sat)*rho_soil)
+    ## critical water content of soil (g/g)
+    mcrit = 0.12
+    ## sharp paramter of moisture response function
+    b = 2
+    ## moisture response function
+    func_soilwc = 1 - np.exp(-(soilwc/mcrit)**b)
+    ## maximum rate of nitrification; s^-1
+    rmax = 1.16e-6
+    ## nitrification rate; per second
+    nitrif_rate = 2*rmax/(1/func_tg+1/func_soilwc)
+    return nitrif_rate
 
 ## physical variables: specific humidity; temp in degC, rhum in per cent
 def humidity_measures(temp, rhum):
@@ -180,9 +205,6 @@ def diffusivity_NH4(temp):
 ## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
 ## theta in m3/m3
 def soil_tuotorsity(theta_sat,theta,phase):
-    ## convert per cent to float
-    theta_sat = theta_sat
-    theta = theta
     ## soil tuotorsity in aqueous phase and gaeous phase (Millington and Quirk, 1961)
     if phase == 'aqueous':
         soil_tor = ((theta)**(10/3))/(theta_sat**2)
@@ -190,14 +212,14 @@ def soil_tuotorsity(theta_sat,theta,phase):
         soil_tor = ((theta_sat-theta)**(10/3))/(theta_sat**2)
     return soil_tor
 
-## soil characteristics: infiltration rate (m/s)
+## soil characteristics: infiltration rate (m/s) - empirical method 
 ## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
 ## data source: Patle et al., Geo.Eco.Landscale 2019
 ## loamy sand and sandy loam in 14 sites (quality control; remove bad quality data)
 ## multilinear regression: R^2 = 0.75; 
 ## soil para: sand (%), clay (%), bulk density (g/cm^3), particle density (g/cm^3)
 ## percentage of saturation soil moisture 
-def infiltration_rate(soilmoist_percent,sand_percent,clay_percent,bulk_density,particle_density):
+def infiltration_rate_empirical(soilmoist_percent,sand_percent,clay_percent,bulk_density,particle_density):
     ## soil parameters matrix
     soil_para = 0.62*sand_percent - 0.17*clay_percent - 26.42*bulk_density + 3.14*particle_density - 10.58
     ## soil moisture dependence
@@ -206,6 +228,18 @@ def infiltration_rate(soilmoist_percent,sand_percent,clay_percent,bulk_density,p
     Ks = 0.714
     ## infiltration rate Ki m/s
     Ki = (infil_func/Ks)/(100*3600)
+    return Ki
+
+## soil characteristics: infiltration rate (m/s) - conceptual method
+## In Sommer&Jacobsen 1999, 3kg/m2 slurry was applied to loamdy sand (9.5%clay;11%silt;77%sand;BD~1.5g/cm3)
+## and infiltrate within 24h, which is equivalent to 3mm/24h;
+## dailyevap in m/day
+def infiltration_rate_method(dailyinfil,theta_sat):
+    ## 10 mm of water/slurry; ref 5mm for 12h infiltration in Vira et al., FANv2 2020 GMD
+    ## infiltration to a depth of 4mm; ref: source layer thickness used in Moring et al., GAG model, 2016 BG
+    z_layer = 0.004
+    ## infiltration rate; m/s
+    Ki = (dailyinfil - z_layer*theta_sat)/(24*3600)
     return Ki
 
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent
@@ -290,11 +324,11 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     ## heat capcity of air: 1005 J/kg/K
     cpair = 1005.0
     ## density of air
-    pho = p/(R*T_v)
+    rho_air = p/(R*T_v)
     ## friction velocity
     ustar = k*u/(np.log(Z/zo))
     ## Monin-Obukhov length
-    L = -T*(ustar**3)*pho*cpair/(k*g*H)
+    L = -T*(ustar**3)*rho_air*cpair/(k*g*H)
     ## stability correction function: psi
     psi = np.zeros(u.shape)
     ## stable condition
@@ -345,7 +379,7 @@ conc_N = defaultdict(dict)
 frac_urea = defaultdict(dict)
 m_DM = defaultdict(dict)
 solid_m_DM = defaultdict(dict)
-pho_m = defaultdict(dict)
+rho_m = defaultdict(dict)
 pH_info = defaultdict(dict)
 name = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 ## regions include: 1)North America, 2)Western Europe, 3) Eastern Europe, 4)Oceania, 5)Latin America, 6)Africa
@@ -397,7 +431,7 @@ f_DM = [181.5, 181.5, 181.5, 222.0, 222.0, 222.0, 155.0, 155.0, 574.0, 181.5]
 ## the dry matter (DM) content of solid manure (assumed to be equivalent to manure fertilizer)； ref (Boyd, CAB reviews, 2018)
 f_solid_DM = [31.4, 24.1, 31.4, 30.8, 30.8, 30.8, 32.2, 32.2, 60.6, 31.4]
 ## assuming the density of manure; 1t/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
-pho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
+rho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
 ## fraction of urinal N in the form of urea
 f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75]
 ## pH value of livestock slurry
@@ -417,7 +451,7 @@ for ii in np.arange(10):
         frac_urea[name[ii]] = f_urea[ii]
         m_DM[name[ii]] = f_DM[ii]
         solid_m_DM[name[ii]] = f_solid_DM[ii]
-        pho_m[name[ii]] = pho_manure[ii]
+        rho_m[name[ii]] = rho_manure[ii]
         pH_info[name[ii]] = pH_val[ii] 
 
 ############################
@@ -426,4 +460,8 @@ for ii in np.arange(10):
 wind_data_height = 10
 ref_height = 2
 
+## density of water: 997 kg/m3
+rho_water = 997
+## density of soil: 1500 kg/m3; 1.5 g/cm3
+rho_soil = 1500
 
