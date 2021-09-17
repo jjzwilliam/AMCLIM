@@ -724,12 +724,22 @@ class HOUSING_MODULE:
             self.NH3_flux_slat[day_idx] = 0.0
             self.NH3_flux_pit[day_idx] = 0.0
         else:
+            #print(housing_type)
             ## pools: from housing to MMS
             self.manure_pool_to_storage[day_idx] = self.manure_pool[day_idx]*housing_area.values
             self.avail_N_pool_to_storage[day_idx] = (1 - self.daily_Na_decomp_rate[day_idx])*self.avail_N_pool[day_idx]*housing_area.values
             self.resist_N_pool_to_storage[day_idx] = (1 - self.daily_Nr_decomp_rate[day_idx])*self.resist_N_pool[day_idx]*housing_area.values
             self.unavail_N_pool_to_storage[day_idx] = self.unavail_N_pool[day_idx]*housing_area.values
+            #print("TAN pool: ",self.TAN_pool[day_idx,41,84])
+            #print("NH3 flux: ",self.NH3_flux[day_idx,41,84])
+            #print("calculation: ",(self.TAN_pool[day_idx,41,84]-self.NH3_flux[day_idx,41,84])*housing_area.values[41,84])
             self.TAN_pool_to_storage[day_idx] = (self.TAN_pool[day_idx]-self.NH3_flux[day_idx])*housing_area.values
+            ## get rid of numpy rounding error: maximum NH3 flux is equivalent to TAN pool and should not exceed TAN pool
+            ## however, when do calculations, NH3 flux is sometimes rounded to a value that is bigger than TAN pool
+            ## e.g. NH3 flux = 2.7233141344, TAN pool = 2.7233141343; this leads to the [TAN to storage] a negative value,
+            ## which is against reality/mass conservative principle due to the rounding error in numpy
+            self.TAN_pool_to_storage[day_idx][self.TAN_pool_to_storage[day_idx]<0] = 0.0
+            #print("TAN pool to storage: ",self.TAN_pool_to_storage[day_idx,41,84])
             self.Total_water_pool_to_storage[day_idx] = self.Total_water_pool[day_idx]*housing_area.values
             ## NH3 flux is not multiplied by housing area, do this in main script!
             self.NH3_flux_from_barn[day_idx] = self.NH3_flux[day_idx]
@@ -745,6 +755,7 @@ class HOUSING_MODULE:
             self.NH3_flux[day_idx] = 0.0
 
             if housing_type.lower() == 'barn':
+                #print("barn2")
                 self.urea_pool_to_storage[day_idx] = (1 - self.daily_urea_hydro_rate[day_idx])*self.urea_pool[day_idx]*housing_area.values
                 self.urea_pool[day_idx] = 0.0
             elif housing_type.lower() == 'poultry house':

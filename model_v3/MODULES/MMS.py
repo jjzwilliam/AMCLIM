@@ -594,6 +594,9 @@ class MMS_module:
                 ## daily manure and urine on per unit area
                 self.manure[dd+1] = self.manure_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
 
+                ## manure pool: with manure input (washoff has not been taken into account here)
+                self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1]
+
                 ## water amount in "solid" manure
                 ## self.manure refers to the DM mass; therefore, total manure mass = DM mass/DM%
                 ## water in the "solid" manure = water% x total manure mass
@@ -613,35 +616,49 @@ class MMS_module:
                 ## justify the amount of water that is available for infiltration; daily maximum infiltration is 10mm;
                 ## convert g/m^2 to m
                 infil_idx = (self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd])/1e6
+                #print("infil_idx 1: ",infil_idx[120,596])
                 infil_idx[infil_idx>dailymaxinfil]=dailymaxinfil
+                #print("infil_idx 2: ",infil_idx[120,596])
                 ## soil infiltration flux is given in m/s
                 self.qinfil[dd+1] = infiltration_rate_method(dailyinfil=infil_idx,theta_sat=self.persm[dd+1])
+                #print("qinfil 1:",self.qinfil[dd+1][120,596])
                 self.qinfil[dd+1][self.qinfil[dd+1]<0] = 0.0
+                #print("qinfil 2:",self.qinfil[dd+1][120,596])
                 infil_idx[infil_idx<0] = 0.0
+                #print("infil_idx 3: ",infil_idx[120,596])
                 ## justify the water amount; infil flux is the infiltration within the manure (between 0-10mm/day)
                 water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]-infil_idx*1e6
+                #print("water_idx: ",water_idx[120,596])
                 self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] + self.rainfall[dd+1][water_idx>0] + \
                                                                 self.manure_water[dd+1][water_idx>0] - \
                                                                     self.evap_sim[dd][water_idx>0] - \
                                                                         infil_idx[water_idx>0]*1e6
+                #print("Total_water_pool 1: ",self.Total_water_pool[dd+1][120,596])
                 self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] + self.rainfall[dd+1][water_idx<=0] + \
                                                                 self.manure_water[dd+1][water_idx<=0] 
-                
+                #print("Total_water_pool 2: ",self.Total_water_pool[dd+1][120,596])
                 ## maximum water holding capcity of the manure; assuming a minimum DM of 10%
                 max_wc = f_wcmax*self.manure_pool[dd+1]/(1-f_wcmax)
+                #print("f_wcmax:",f_wcmax)
+                #print("manure_pool:", self.manure_pool[dd+1][120,596])
+                #print("max_wc cal",f_wcmax*self.manure_pool[dd+1][120,596]/(1-f_wcmax))
+                #print("max_wc: ",max_wc[120,596])
                 ## justipy whether current water pool exceeds the maximum water holidng capacity
                 water_idx2 =  max_wc - self.Total_water_pool[dd+1]
+                #print("water_idx2: ",water_idx2[120,596])
                 ## if exceeds: the surplus amount of water acts of "washoff" water, and the water pool equals the maximum wc
                 ## rain available for washoff has the unit of mm (as an accumulation of a day's rainfall in mm)
                 self.rain_avail_washoff[dd+1][water_idx2<0] = (-1)*water_idx2[water_idx2<0]/1000
+                #print("rain_avail_washoff: ",self.rain_avail_washoff[dd+1][120,596])
                 self.Total_water_pool[dd+1][water_idx2<0] = max_wc[water_idx2<0]
+                #print("Total_water_pool 3: ",self.Total_water_pool[dd+1][120,596])
                 ## if not exceeds: "washoff" water is 0 as water is absorbed by the manure
                 self.rain_avail_washoff[dd+1] = 0.0
 
                 ## washoff: 1) manure, 2) urea, 3) available org N, 4) reistant org N, 5) TAN
                 ## washoff coefficient (m) = washoff water (mm) * washoff (%/mm)
-                nonN_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_nonN*z_manuresurf
-                N_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_N*z_manuresurf
+                nonN_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_nonN
+                N_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_N
                 self.manure_washoff[dd+1] = nonN_washoff_rate*self.manure_pool[dd]
                 self.urea_washoff[dd+1] =  N_washoff_rate*self.urea_pool[dd]
                 self.avail_N_washoff[dd+1] = N_washoff_rate*self.avail_N_pool[dd]
@@ -650,9 +667,10 @@ class MMS_module:
                 ## TAN washoff: rain available for washoff * [TAN]_bulk
                 self.TAN_washoff[dd+1] = self.rain_avail_washoff[dd+1]*self.TAN_amount_M[dd]
 
-                ## manure pool
-                self.manure_pool[dd+1] = self.manure_pool[dd] + self.manure[dd+1] - self.manure_washoff[dd+1]
-
+                ## manure pool: subtracting washoff
+                manure_idx = self.manure_pool[dd+1] - self.manure_washoff[dd+1]
+                self.manure_pool[dd+1][manure_idx>0] = manure_idx[manure_idx>0]
+                self.manure_pool[dd+1][manure_idx<=0] = 0.0  ## manure has been washed off  
                 ## manure resistance
                 ## manure resistance is determined by: R = z/(2*D); 
                 ##        z is the layer thickness of manure; D is molecular diffusivity of NH4+ in water
