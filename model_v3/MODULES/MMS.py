@@ -669,14 +669,20 @@ class MMS_module:
                 ## manure pool: subtracting washoff
                 manure_idx = self.manure_pool[dd+1] - self.manure_washoff[dd+1]
                 self.manure_pool[dd+1][manure_idx>0] = manure_idx[manure_idx>0]
-                self.manure_pool[dd+1][manure_idx<=0] = 0.0  ## manure has been washed off  
+                self.manure_pool[dd+1][manure_idx<=0] = 0.0  ## manure has been washed off 
+
+                ## thickness of the manure (DM+water) in meter
+                z_total = (self.manure_pool[dd+1] + self.Total_water_pool[dd+1])/(manure_density*1e6)
+
                 ## manure resistance
-                ## manure resistance is determined by: R = z/(2*D); 
+                ## manure resistance is determined by: R = z/(2*tor_manure*D); 
                 ##        z is the layer thickness of manure; D is molecular diffusivity of NH4+ in water
-                ##        tortuosity dependence for aqueous diffusion is not applicable here (?)
+                ##        tortuosity dependence for aqueous diffusion is analoged to soil, which is a function of moisture conten
+                ##        tor_manure = (manure_moist)^(4/3); assuming manure moisture is always at saturation
                 ## layer thickness of manure: z = manure pool/manure density
                 ##        manure density is given in g/cm^3, and needs to be converted to g/m^3 by multiplying by 10^6
-                self.R_manure[dd+1] = ((self.manure_pool[dd+1]/(DM_content/100))/(manure_density*1e6))/(2*self.D_aq_NH4[dd+1]) 
+                manure_moist = self.Total_water_pool[dd+1]/(self.Total_water_pool[dd+1]+self.manure_pool[dd+1])
+                self.R_manure[dd+1] = z_total/(2*(manure_moist**(4/3))*self.D_aq_NH4[dd+1]) 
                 
                 ## soil resistance
                 ## soil resistance = thickness of the source layer (z) / (tortuosity for diffusion x diffusivity of the species)
