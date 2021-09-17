@@ -314,7 +314,7 @@ class MMS_module:
             self.rainfall = xr_to_np(self.rainfall)
             self.R_star = xr_to_np(self.R_star)
             self.tor_soil = soil_tuotorsity(theta_sat=self.persm,theta=self.soilmoist,phase="aqueous")
-            self.daily_KNO3 = nitrification_rate(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm)*24*3600
+            self.daily_KNO3 = nitrification_rate(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm)*timestep*3600
 
         ## mositure equilirium, mositure content of manure
         self.mois_coeff = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
@@ -753,10 +753,10 @@ class MMS_module:
                     (1/self.R_manure[dd+1]+infil_idx)/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qinfil[dd+1])
 
                 ## TAN loss through aqueous diffusion to soil
-                self.diffusiveflux[dd+1] = self.TAN_soil_amount_M[dd+1]/self.R_soil[dd+1]*24*3600
+                self.diffusiveflux[dd+1] = self.TAN_soil_amount_M[dd+1]/self.R_soil[dd+1]*timestep*3600
 
                 ## TAN loss through subsurface leaching (infiltration to soil)
-                self.infilflux[dd+1] = self.TAN_soil_amount_M[dd+1]*self.qinfil[dd+1]*24*3600
+                self.infilflux[dd+1] = self.TAN_soil_amount_M[dd+1]*self.qinfil[dd+1]*timestep*3600
 
                 ## Gamma value
                 self.Gamma_manure[dd+1] =  self.TAN_surf_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])

@@ -8,6 +8,7 @@ from pathlib import Path
 ## import essential AMCLIM modules
 ####################################
 from CONFIG.config import *        ## animal data file names specified in CONFIG.config.py
+from MODULES.FUNC import *
 
 ## directing input file directory
 file_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/' 
@@ -19,7 +20,7 @@ animal_file = xr.open_dataset(file_path+animal_data_path+animal_file_name)
 
 ## open meteorology/parameter/variable files
 ## meteorological data in 2018: 1) temperature (2m air; ground), 2) relative humidity, 3) 10m wind speed, 4) evaporation from soil,
-##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s) 8) rainfall (kg/m^2) 
+##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s)(not used) 8) rainfall (kg/m^2) 
 ##     9) aerogynamic and boundary layer resistance (s/m)
 temp_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_meant2m05.nc')
 groundtemp_file = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl1temp-2018d-05.nc')
@@ -28,7 +29,7 @@ wind_file = xr.open_dataset(file_path+met_data_path+'AgERA5_2018d_10mwind05.nc')
 evap_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_evapfromsoil_dailytotal.nc')
 soilmoist_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
 soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
-sshf_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_sshf05.nc')
+# sshf_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_sshf05.nc')
 rain_file = xr.open_dataset(file_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
 ratm_file = xr.open_dataset(file_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
 
@@ -39,10 +40,22 @@ wind_data = wind_file['Wind_Speed_10m_Mean']  ## m/s
 evap_data = evap_file['evabs']*(-1000)  ## g/day
 soilmoist_data = soilmoist_file['sm']  ## m3/m3
 persm_data = soilsm_file['sm']  ## per cent
-sshf_data = sshf_file['sshf']/(24*3600)  ## J/m2/s
+# sshf_data = sshf_file['sshf']/(24*3600)  ## J/m2/s
 rain_data = rain_file['tcrw']*1000  ## g/m2
 ram1_data = ratm_file['RAM1']  ## s/m
 rb1_data = ratm_file['RB1']  ## s/m
+
+##################################
+## fill land input data
+##################################
+
+temp_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=temp_data)  ## degC
+groundtemp_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_data)  ## degC
+rhum_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rhum_data)  ## per cent
+wind_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=wind_data)  ## m/s
+evap_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=evap_data) ## g/day
+soilmoist_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_data)  ## m3/m3
+persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=persm_data)  ## per cent
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')

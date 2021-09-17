@@ -76,4 +76,4 @@ def xesmf_regrid(ds_in,dr_in,regrid_method,dlat,dlon):
     regridder = xe.Regridder(ds_in, ds_out, regrid_method)
     dr_out = regridder(dr_in)
     regridder.clean_weight_file()
-    return dr_out 
+    return dr_out
