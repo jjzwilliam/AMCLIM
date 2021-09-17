@@ -304,9 +304,7 @@ class MMS_module:
             self.soilmoist = soilmoist_data
             self.persm = soilmoist_data/(persm_data/100)
             self.rainfall = rain_data
-            self.R_star = resistance_aero_boundary(temp=self.T_sim,rhum=self.RH_sim,\
-                u=wind_profile(uref=self.u_sim,height_ref=wind_data_height,height_out=ref_height,zo=zo_manureland),\
-                    H=sshf_data,Z=ref_height,zo=zo_manureland)
+            self.R_star = ram1_data+rb1_data
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
@@ -314,6 +312,7 @@ class MMS_module:
             self.soilmoist = xr_to_np(self.soilmoist)
             self.persm = xr_to_np(self.persm)
             self.rainfall = xr_to_np(self.rainfall)
+            self.R_star = xr_to_np(self.R_star)
             self.tor_soil = soil_tuotorsity(theta_sat=self.persm,theta=self.soilmoist,phase="aqueous")
             self.daily_KNO3 = nitrification_rate(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm)*24*3600
 

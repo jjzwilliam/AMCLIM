@@ -17,9 +17,10 @@ met_data_path = 'met_data/'
 ## Open animal data files and meteorological files
 animal_file = xr.open_dataset(file_path+animal_data_path+animal_file_name)
 
-## open meteorology files
+## open meteorology/parameter/variable files
 ## meteorological data in 2018: 1) temperature (2m air; ground), 2) relative humidity, 3) 10m wind speed, 4) evaporation from soil,
-##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s) 8) rainfall (kg/m^2)
+##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s) 8) rainfall (kg/m^2) 
+##     9) aerogynamic and boundary layer resistance (s/m)
 temp_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_meant2m05.nc')
 groundtemp_file = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl1temp-2018d-05.nc')
 rhum_file = xr.open_dataset(file_path+met_data_path+'AgERA5_2018d_meanRH2m05.nc')
@@ -29,6 +30,7 @@ soilmoist_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMV-
 soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
 sshf_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_sshf05.nc')
 rain_file = xr.open_dataset(file_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
+ratm_file = xr.open_dataset(file_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
 
 temp_data = temp_file['t2m'] - 273.15  ## degC
 groundtemp_data = groundtemp_file['stl1'] - 273.15  ## degC
@@ -39,6 +41,8 @@ soilmoist_data = soilmoist_file['sm']  ## m3/m3
 persm_data = soilsm_file['sm']  ## per cent
 sshf_data = sshf_file['sshf']/(24*3600)  ## J/m2/s
 rain_data = rain_file['tcrw']*1000  ## g/m2
+ram1_data = ratm_file['RAM1']  ## s/m
+rb1_data = ratm_file['RB1']  ## s/m
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')
