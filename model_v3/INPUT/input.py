@@ -48,14 +48,14 @@ rb1_data = ratm_file['RB1']  ## s/m
 ##################################
 ## fill land input data
 ##################################
-
-temp_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=temp_data)  ## degC
 groundtemp_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_data)  ## degC
 rhum_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rhum_data)  ## per cent
 wind_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=wind_data)  ## m/s
 evap_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=evap_data) ## g/day
 soilmoist_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_data)  ## m3/m3
 persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=persm_data)  ## per cent
+ram1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=ram1_data)  ## s/m
+rb1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rb1_data)  ## s/m
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')
