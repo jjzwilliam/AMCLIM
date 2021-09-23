@@ -130,8 +130,9 @@ soil_pd = 2.66
 ## washoff coefficients: 0.1%/mm water for N species, and 0.05%/mm water for non N species (manure)
 f_washoff_nonN = 0.0005
 f_washoff_N = 0.001
+
 ##################################
-## define 
+## MMS module
 ##################################
 class MMS_module:
     def __init__(self,array_shape,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
@@ -444,7 +445,7 @@ class MMS_module:
     ##       fluxes (F): F_atm, surface to indoor; F_tosurf: manure to surface;;; 
     ##                   F_atm=(chi_surf-chi_indoor)/R_star; F_tosurf=([TAN]_bulk-[TAN]_surf)/R_manure; F_atm = F_tosurf
     ##    [TAN]_bulk is the prognostic variable and is determined by source and loss based on the mass balance approach
-    ##    solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_indoor*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_star)
+    ##    solve [TAN]_surf: [TAN]_surf = ([TAN]_bulk*R_star+chi_indoor*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_star)
 
     def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
         MMS_area["mms_barn_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_barn_solid*MMS_area_factor["mms_barn_solid"]
@@ -569,7 +570,8 @@ class MMS_module:
     ##       gaseouos concentrations (chi): chi_atm; chi_surface
     ##       aqueous concrntrations: [TAN]_bulk; [TAN]_surf; [TAN]_soil (TAN conc at the interface between manure and land/soil)
     ##       fluxes (F_upwards): F_atm, surface to atmosphere; F_tosurf: manure to surface;;; 
-    ##                   F_atm=(chi_surf-chi_atm)/R_ab; F_tosurf=([TAN]_bulk-[TAN]_surf)/R_manure; F_atm = F_tosurf
+    ##                   F_atm=(chi_surf-chi_atm)/R_ab; F_tosurf=([TAN]_bulk-[TAN]_surf)/R_manure; F_runoff = qr*[TAN]_surf
+    ##                   F_tosurf = F_atm + F_runoff
     ##       fluxes (F_downwards): F_difftosoil: TAN from manure to interface layer between manure and soil (diffusion);
     ##                             F_infiltosoil: TAN from manure to interface layer between manure and soil (infiltration)  
     ##                             F_soildiffusion: aqueous diffusion to deeper soil; 
@@ -579,7 +581,7 @@ class MMS_module:
     ##                   F_difftosoil + F_infiltosoil = F_soildiffusion + F_soilinfiltration
     ##                   kinfil and qinfil are different for both infiltration processes (manrue to interface; interface to deeper soil)
     ##    ([TAN]_bulk is the prognostic variable and is determined by source and loss based on the mass balance approach)
-    ##    (solve chi_surf: chi_surf = ([TAN]_bulk*R_star+chi_atm*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_ab; as Cat B [MMS barn solid])
+    ##    (solve [TAN]_surf: [TAN]_surf = ([TAN]_bulk*R_star+chi_atm*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_ab
     ##    solve [TAN]_soil: [TAN]_soil = [TAN]_bulk*(1/R_manure+kinfil)/(qinfil+1/R_soil+1/R_manure)     
     def MMS_land_sim(self,start_day_idx,end_day_idx):
         MMS_area["mms_open_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_solid*MMS_area_factor["mms_open_solid"]
@@ -744,7 +746,7 @@ class MMS_module:
 
                 ## TAN conc at the surface
                 self.TAN_surf_amount_M[dd+1] = (self.TAN_amount_M[dd+1]*self.R_star[dd+1])/\
-                                            (self.R_manure[dd+1]*self.R_star[dd+1]*N_washoff_rate + \
+                                            (self.R_manure[dd+1]*self.R_star[dd+1]*self.rain_avail_washoff[dd+1] + \
                                                 self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+\
                                                     self.R_star[dd+1])
 
