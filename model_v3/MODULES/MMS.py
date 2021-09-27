@@ -118,8 +118,8 @@ f_wcmax = 0.9
 manure_density = rho_m[livestock]
 ## assuming layer of the top soil is 2 cm (0.02 m) thick beyond source layer of 4mm
 z_soil = 0.02
-## assuming infiltration of manure water to the soil is 10mm/day (10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
-dailymaxinfil = 10000.0
+## assuming infiltration of manure water to the soil is 10mm/day (1cm/day; 10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
+dailymaxinfil = 0.01
 ## infiltration flux within manure (m/s)
 qinfil_manure = (dailymaxinfil/1e6)/(24*3600)
 ## assuming soil characteristics: 1) sand (%), 2) clay (%), 3) bulk density (g/cm^3), 4) particle density (g/cm^3)
@@ -713,10 +713,10 @@ class MMS_module:
                 self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1] - self.unavail_N_washoff[dd+1]
 
                 ## NO3- from nitrification of TAN
-                self.nitrif_NO3[dd+1] = self.daily_KNO3[dd+1]*self.TAN_pool[dd]
+                # self.nitrif_NO3[dd+1] = self.daily_KNO3[dd+1]*self.TAN_pool[dd]
 
                 ## NO3- pool
-                self.NO3_pool[dd+1] = self.NO3_pool[dd] + self.nitrif_NO3[dd+1]
+                # self.NO3_pool[dd+1] = self.NO3_pool[dd] + self.nitrif_NO3[dd+1]
                 
                 ## TAN pool (different from [MMS barn (liquid,solid)])
                 ## Note: source of TAN pool: TAN production from 1) urea hydrolysis, 2) decomposition of org N and 3) input of TAN from housing
