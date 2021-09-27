@@ -116,8 +116,8 @@ DM_content = solid_m_DM[livestock]
 f_wcmax = 0.9
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
 manure_density = rho_m[livestock]
-## assuming layer of the top soil is 2 cm (0.02 m) thick beyond source layer of 4mm
-z_soil = 0.02
+## assuming soil interface (source layer) of 4mm
+z_soil = 0.004
 ## assuming infiltration of manure water to the soil is 10mm/day (1cm/day; 10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
 dailymaxinfil = 0.01
 ## infiltration flux within manure (m/s)
