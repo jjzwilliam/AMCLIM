@@ -20,5 +20,5 @@ def field_var_fill(sd_template,input_field):
     
     for dd in np.arange(365):
         output_field[dd][(sd_template!=0)&np.isnan(input_field[dd])] = time_fill[dd]        
-    
+        output_field[dd][(sd_template!=0)&(input_field[dd]==0)] = time_fill[dd]    
     return output_field
