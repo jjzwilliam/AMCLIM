@@ -207,7 +207,7 @@ class MMS_module:
         ## TAN conc at the surface; for [MMS (barn,open) solid]
         self.TAN_surf_amount_M = np.zeros(array_shape)
         ## TAN conc at the soil surface/interface between manure and land (soil); for [MMS open solid]
-        self.TAN_soil_amount_M = np.zeros(array_shape)
+        self.TAN_soil_amount = np.zeros(array_shape)
         ## NO3- from nitrification 
         self.nitrif_NO3 = np.zeros(array_shape)
         ## NO3- pool
@@ -747,20 +747,20 @@ class MMS_module:
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
 
                 ## TAN conc at the surface
-                self.TAN_surf_amount_M[dd+1] = (self.TAN_amount_M[dd+1]*self.R_star[dd+1])/\
+                self.TAN_surf_amount_M[dd+1] = ((self.TAN_amount[dd+1]*self.R_star[dd+1])/\
                                             (self.R_manure[dd+1]*self.R_star[dd+1]*self.rain_avail_washoff[dd+1] + \
                                                 self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+\
-                                                    self.R_star[dd+1])
+                                                    self.R_star[dd+1]))/14*1000
 
                 ## TAN conc at the soil surface/interface between manure and land (soil)
-                self.TAN_soil_amount_M[dd+1] = self.TAN_amount_M[dd+1]*\
+                self.TAN_soil_amount[dd+1] = self.TAN_amount[dd+1]*\
                     (1/self.R_manure[dd+1]+self.qinfil[dd+1]/(timestep*3600))/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qpsoil[dd+1])
 
                 ## TAN loss through aqueous diffusion to soil
-                self.diffusiveflux[dd+1] = self.TAN_soil_amount_M[dd+1]/self.R_soil[dd+1]*timestep*3600
+                self.diffusiveflux[dd+1] = self.TAN_soil_amount[dd+1]/self.R_soil[dd+1]*timestep*3600
 
                 ## TAN loss through subsurface leaching (infiltration to soil)
-                self.infilflux[dd+1] = self.TAN_soil_amount_M[dd+1]*self.qpsoil[dd+1]*timestep*3600
+                self.infilflux[dd+1] = self.TAN_soil_amount[dd+1]*self.qpsoil[dd+1]*timestep*3600
 
                 ## Gamma value
                 self.Gamma_manure[dd+1] =  self.TAN_surf_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])
