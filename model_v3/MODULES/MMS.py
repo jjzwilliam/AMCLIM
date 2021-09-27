@@ -752,7 +752,7 @@ class MMS_module:
 
                 ## TAN conc at the soil surface/interface between manure and land (soil)
                 self.TAN_soil_amount_M[dd+1] = self.TAN_amount_M[dd+1]*\
-                    (1/self.R_manure[dd+1]+infil_idx)/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qinfil[dd+1])
+                    (1/self.R_manure[dd+1]+infil_idx/(timestep*3600))/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qinfil[dd+1])
 
                 ## TAN loss through aqueous diffusion to soil
                 self.diffusiveflux[dd+1] = self.TAN_soil_amount_M[dd+1]/self.R_soil[dd+1]*timestep*3600
