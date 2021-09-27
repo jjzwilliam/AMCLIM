@@ -121,7 +121,7 @@ z_soil = 0.02
 ## assuming infiltration of manure water to the soil is 10mm/day (1cm/day; 10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
 dailymaxinfil = 0.01
 ## infiltration flux within manure (m/s)
-qinfil_manure = (dailymaxinfil/1e6)/(24*3600)
+qpsoil_manure = (dailymaxinfil/1e6)/(24*3600)
 ## assuming soil characteristics: 1) sand (%), 2) clay (%), 3) bulk density (g/cm^3), 4) particle density (g/cm^3)
 soil_sand = 80
 soil_clay = 8
@@ -279,6 +279,8 @@ class MMS_module:
         self.tor_soil = np.zeros(array_shape)
         ## infiltration rate; m/s
         self.qinfil = np.zeros(array_shape)
+        ## percolation flux; m/s
+        self.qpsoil = np.zeros(array_shape)
         ## pH and H+ ions concentration
         self.pH = pH_value
         self.cc_H = np.float(10**(-pH_value))
@@ -577,12 +579,12 @@ class MMS_module:
     ##                             F_soildiffusion: aqueous diffusion to deeper soil; 
     ##                             F_soilinfiltration: infiltration/subsurface leaching of TAN to deeper soil
     ##                   F_difftosoil=([TAN]_bulk-[TAN]_soil)/R_manure; F_infiltosoil=[TAN]_bulk*kinfil;
-    ##                   F_soildiffusion=[TAN]_soil/R_soil; F_soilinfil=[TAN]_soil*qinfil; 
+    ##                   F_soildiffusion=[TAN]_soil/R_soil; F_soilinfil=[TAN]_soil*qpsoil; 
     ##                   F_difftosoil + F_infiltosoil = F_soildiffusion + F_soilinfiltration
-    ##                   kinfil and qinfil are different for both infiltration processes (manrue to interface; interface to deeper soil)
+    ##                   kinfil and qpsoil are different for both infiltration processes (manrue to interface; interface to deeper soil)
     ##    ([TAN]_bulk is the prognostic variable and is determined by source and loss based on the mass balance approach)
     ##    (solve [TAN]_surf: [TAN]_surf = ([TAN]_bulk*R_star+chi_atm*R_manure)/(R_manure*(k_H_D/([H+]+k_NH4+))+R_ab
-    ##    solve [TAN]_soil: [TAN]_soil = [TAN]_bulk*(1/R_manure+kinfil)/(qinfil+1/R_soil+1/R_manure)     
+    ##    solve [TAN]_soil: [TAN]_soil = [TAN]_bulk*(1/R_manure+kinfil)/(qpsoil+1/R_soil+1/R_manure)     
     def MMS_land_sim(self,start_day_idx,end_day_idx):
         MMS_area["mms_open_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_solid*MMS_area_factor["mms_open_solid"]
         if livestock.lower()=="poultry":
@@ -616,24 +618,24 @@ class MMS_module:
 
                 ## justify the amount of water that is available for infiltration; daily maximum infiltration is 10mm;
                 ## convert g/m^2 to m
-                infil_idx = (self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd])/1e6
-                #print("infil_idx 1: ",infil_idx[120,596])
-                infil_idx[infil_idx>dailymaxinfil]=dailymaxinfil
-                #print("infil_idx 2: ",infil_idx[120,596])
-                ## soil infiltration flux is given in m/s
-                self.qinfil[dd+1] = infiltration_rate_method(dailyinfil=infil_idx,theta_sat=self.persm[dd+1])
-                #print("qinfil 1:",self.qinfil[dd+1][120,596])
+                self.qinfil[dd+1] = (self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd])/1e6
+                #print("self.qinfil[dd+1] 1: ",self.qinfil[dd+1][120,596])
+                self.qinfil[dd+1][self.qinfil[dd+1]>dailymaxinfil]=dailymaxinfil
+                #print("self.qinfil[dd+1] 2: ",self.qinfil[dd+1][120,596])
                 self.qinfil[dd+1][self.qinfil[dd+1]<0] = 0.0
-                #print("qinfil 2:",self.qinfil[dd+1][120,596])
-                infil_idx[infil_idx<0] = 0.0
-                #print("infil_idx 3: ",infil_idx[120,596])
+                #print("self.qinfil[dd+1] 3: ",self.qinfil[dd+1][120,596])
+                ## soil infiltration flux is given in m/s
+                self.qpsoil[dd+1] = infiltration_rate_method(dailyinfil=self.qinfil[dd+1],theta_sat=self.persm[dd+1])
+                #print("qpsoil 1:",self.qpsoil[dd+1][120,596])
+                self.qpsoil[dd+1][self.qpsoil[dd+1]<0] = 0.0
+                #print("qpsoil 2:",self.qpsoil[dd+1][120,596])
                 ## justify the water amount; infil flux is the infiltration within the manure (between 0-10mm/day)
-                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]-infil_idx*1e6
+                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]-self.qinfil[dd+1]*1e6
                 #print("water_idx: ",water_idx[120,596])
                 self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] + self.rainfall[dd+1][water_idx>0] + \
                                                                 self.manure_water[dd+1][water_idx>0] - \
                                                                     self.evap_sim[dd][water_idx>0] - \
-                                                                        infil_idx[water_idx>0]*1e6
+                                                                        self.qinfil[dd+1][water_idx>0]*1e6
                 #print("Total_water_pool 1: ",self.Total_water_pool[dd+1][120,596])
                 self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] + self.rainfall[dd+1][water_idx<=0] + \
                                                                 self.manure_water[dd+1][water_idx<=0] 
@@ -752,13 +754,13 @@ class MMS_module:
 
                 ## TAN conc at the soil surface/interface between manure and land (soil)
                 self.TAN_soil_amount_M[dd+1] = self.TAN_amount_M[dd+1]*\
-                    (1/self.R_manure[dd+1]+infil_idx/(timestep*3600))/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qinfil[dd+1])
+                    (1/self.R_manure[dd+1]+self.qinfil[dd+1]/(timestep*3600))/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qpsoil[dd+1])
 
                 ## TAN loss through aqueous diffusion to soil
                 self.diffusiveflux[dd+1] = self.TAN_soil_amount_M[dd+1]/self.R_soil[dd+1]*timestep*3600
 
                 ## TAN loss through subsurface leaching (infiltration to soil)
-                self.infilflux[dd+1] = self.TAN_soil_amount_M[dd+1]*self.qinfil[dd+1]*timestep*3600
+                self.infilflux[dd+1] = self.TAN_soil_amount_M[dd+1]*self.qpsoil[dd+1]*timestep*3600
 
                 ## Gamma value
                 self.Gamma_manure[dd+1] =  self.TAN_surf_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])
