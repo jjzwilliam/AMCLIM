@@ -259,10 +259,10 @@ class HOUSING_MODULE:
                 ## uric acid hydrolysis rate
                 self.daily_ua_conv_factor = ua_hydrolysis_rate(temp=self.T_sim,rhum=self.RH_sim,ph=self.pH)
     
-    ## fraction of the floor area, assuming 40% is solid floor
-    fslat = 0.4
-    ## fraction of the gap of the area, assuming 60% (1-40%) is gap
-    fgap = 0.6
+    ## fraction of the floor area, assuming 80% is solid floor
+    fslat = 0.8
+    ## fraction of the gap of the area, assuming 20% (1-40%) is gap
+    fgap = 0.2
     ## background NH3 level, ug/m3
     X_air = 0.300
     ## cleaning frequency; i.e. duration of manure in houses until collected and transfered to storage

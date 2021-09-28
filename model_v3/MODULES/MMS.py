@@ -112,8 +112,8 @@ zo_manureland = 1.0
 z_manuresurf = 0.02
 ## dry matter (DM) content of solid manure 
 DM_content = solid_m_DM[livestock]
-## maximum water content of manure is 0.9 (90%)
-f_wcmax = 0.9
+## maximum water content of manure
+f_wcmax = 1 - (DM_content/100)/2
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
 manure_density = rho_m[livestock]
 ## assuming soil interface (source layer) of 4mm
