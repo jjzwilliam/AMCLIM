@@ -855,7 +855,7 @@ class MMS_module:
                 NH3_gas_ug = self.NH3_gas_M[dd+1]*14*1e9
 
                 ## determining the maximum emission; emission cannot exceed TAN pool
-                emiss_idx = (NH3_gas_ug*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
+                emiss_idx = (NH3_gas_ug*3600*timestep/self.R_star[dd+1]) - TAN_pool_ug[dd+1]
                 self.modelled_emiss[dd+1][emiss_idx>=0] = TAN_pool_ug[emiss_idx>=0]
                 self.modelled_emiss[dd+1][emiss_idx<0] = NH3_gas_ug[emiss_idx<0]*3600*timestep/\
                                                             self.R_star[dd+1][emiss_idx<0]
