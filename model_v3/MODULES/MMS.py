@@ -652,7 +652,7 @@ class MMS_module:
                 self.qinfil[dd+1][self.qinfil[dd+1]<0] = 0.0
                 #print("self.qinfil[dd+1] 3: ",self.qinfil[dd+1][120,596])
                 ## soil infiltration flux is given in m/s
-                self.qpsoil[dd+1] = infiltration_rate_method(dailyinfil=self.qinfil[dd+1],theta_sat=self.persm[dd+1])
+                self.qpsoil[dd+1] = infiltration_rate_method(dailyinfil=self.qinfil[dd+1],theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1])
                 #print("qpsoil 1:",self.qpsoil[dd+1][120,596])
                 self.qpsoil[dd+1][self.qpsoil[dd+1]<0] = 0.0
                 #print("qpsoil 2:",self.qpsoil[dd+1][120,596])
