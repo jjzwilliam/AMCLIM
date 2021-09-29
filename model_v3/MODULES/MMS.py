@@ -824,7 +824,7 @@ class MMS_module:
                 self.TAN_pool_soil[dd+1][TAN_soil_idx<=0] =  self.diffusivefluxmanure[dd][TAN_soil_idx<=0] + self.infilflux[dd+1][TAN_soil_idx<=0]
 
                 ## TAN conc at the soil surface/interface between manure and land (soil)
-                self.TAN_soil_amount[dd+1][self.water_pool_soil[dd+1]!=0] = self.TAN_pool_soil[dd+1]/z_soil*1e6
+                self.TAN_soil_amount[dd+1][self.water_pool_soil[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.water_pool_soil[dd+1]!=0]/z_soil*1e6
                 self.TAN_soil_amount[dd+1][self.water_pool_soil[dd+1]==0] = 0.0
 
                 ## diffusive aqueous TAN from bulk manure to soil interface
