@@ -748,12 +748,12 @@ class MMS_module:
                 ## nirification rate of TAN in bulk manure
                 KNO3_manure = nitrification_rate_manure(manure_temp=self.T_sim[dd+1],manure_wc=manurewc)
                 ## NO3- from nitrification of TAN in bulk manure
-                self.nitrif_NO3[dd+1] = KNO3_manure*self.TAN_pool[dd]
+                self.nitrif_NO3_manure[dd+1] = KNO3_manure*self.TAN_pool[dd]
 
                 ## NO3- pool of bulk manure
                 NO3_idx = self.NO3_pool[dd] - self.NO3_infilmanure[dd] - self.NO3_diffusivemanure[dd] - self.NO3_washoff[dd+1]
-                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3[dd+1][NO3_idx>0]
-                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3[dd+1][NO3_idx<=0]
+                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_manure[dd+1][NO3_idx>0]
+                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_manure[dd+1][NO3_idx<=0]
 
                 ## NO3- conc of bulk manure
                 self.NO3_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.NO3_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
@@ -765,7 +765,7 @@ class MMS_module:
                 ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) diffusion to soil, and 3) infiltration (subsurface leaching) to soil
                 ##       only aqueous phase diffusion is considered, and gaseous diffusion is not considered in this study
                 TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxmanure[dd] - self.infilflux[dd] - \
-                    self.nitrif_NO3[dd] - self.TAN_washoff[dd+1]
+                    self.nitrif_NO3_manure[dd] - self.TAN_washoff[dd+1]
                 self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
                 self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
 
