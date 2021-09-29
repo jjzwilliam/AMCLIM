@@ -132,29 +132,70 @@ def N_pools_decomp_rate(temp,delta_t):
     k_r = 1 - np.exp(-kr*delta_t) 
     return k_a, k_r 
 
-## rate: nitrification rate 
+## rate: nitrification rate in soils
 ## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
-## ground temp in K; theta in m3/m3, theta_sat in m3/m3
-def nitrification_rate(ground_temp,theta,theta_sat):
-    ## maximum and optimum temp for microbial activity
+## ground temp in degC; theta in m3/m3, theta_sat in m3/m3
+def nitrification_rate_soil(ground_temp,theta,theta_sat,fer_type):
+    ## convert degC to K
+    ground_temp = ground_temp + 273.15
+    ## maximum  temp for microbial activity
     tmax = 313   
-    topt = 301
-    ## empirical factor in this parameterization
-    asigma = 2.4
+    if fer_type == "manure":
+        ## optimum temp for microbial activity
+        topt = 301
+        ## empirical factor in this parameterization
+        asigma = 2.4
+        ## critical water content of soil (g/g)
+        mcrit = 0.12
+        ## sharp paramter of moisture response function
+        b = 2
+    elif fer_type == "mineral":
+        ## optimum temp for microbial activity
+        topt = 303
+        ## empirical factor in this parameterization
+        asigma = 1.8
+        ## critical water content of soil (g/g)
+        mcrit = 0.10
+        ## sharp paramter of moisture response function
+        b = 16
     ## temperature responce funtion
     func_tg = ((tmax-ground_temp)/(tmax-topt))**asigma*np.exp(asigma*(ground_temp-topt)/(tmax-topt))
     ## water in soil
     soilwc = theta*rho_water/((1-theta_sat)*rho_soil)
-    ## critical water content of soil (g/g)
-    mcrit = 0.12
-    ## sharp paramter of moisture response function
-    b = 2
+    
     ## moisture response function
     func_soilwc = 1 - np.exp(-(soilwc/mcrit)**b)
     ## maximum rate of nitrification; s^-1
     rmax = 1.16e-6
     ## nitrification rate; per second
     nitrif_rate = 2*rmax/(1/func_tg+1/func_soilwc)
+    return nitrif_rate
+
+## rate: nitrification rate of manure (analogy to nitrification rate in soils)
+## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
+## manure temp in degC; manure water content in fraction
+def nitrification_rate_manure(manure_temp,manure_wc):
+    ## convert degC to K
+    manure_temp = manure_temp + 273.15
+    ## maximum and optimum temp for microbial activity
+    tmax = 313   
+    topt = 301
+    ## empirical factor in this parameterization
+    asigma = 2.4
+    ## temperature responce funtion
+    func_tg = ((tmax-manure_temp)/(tmax-topt))**asigma*np.exp(asigma*(manure_temp-topt)/(tmax-topt))
+    ## water in manure
+    manurewc = manure_wc*rho_water/((1-manure_wc)*rho_m[livestock]*1e3)
+    ## critical water content of soil (g/g)
+    mcrit = 0.12
+    ## sharp paramter of moisture response function
+    b = 2
+    ## moisture response function
+    func_manurewc = 1 - np.exp(-(manure_wc/mcrit)**b)
+    ## maximum rate of nitrification; s^-1
+    rmax = 1.16e-6
+    ## nitrification rate; per second
+    nitrif_rate = 2*rmax/(1/func_tg+1/func_manurewc)
     return nitrif_rate
 
 ## physical variables: specific humidity; temp in degC, rhum in per cent
@@ -234,12 +275,12 @@ def infiltration_rate_empirical(soilmoist_percent,sand_percent,clay_percent,bulk
 ## In Sommer&Jacobsen 1999, 3kg/m2 slurry was applied to loamdy sand (9.5%clay;11%silt;77%sand;BD~1.5g/cm3)
 ## and infiltrate within 24h, which is equivalent to 3mm/24h;
 ## dailyevap in m/day
-def infiltration_rate_method(dailyinfil,theta_sat):
+def infiltration_rate_method(dailyinfil,theta_sat,theta):
     ## 10 mm of water/slurry; ref 5mm for 12h infiltration in Vira et al., FANv2 2020 GMD
     ## infiltration to a depth of 4mm; ref: source layer thickness used in Moring et al., GAG model, 2016 BG
     z_layer = 0.004
     ## infiltration rate; m/s
-    Ki = (dailyinfil - z_layer*theta_sat)/(24*3600)
+    Ki = (dailyinfil - z_layer*(theta_sat-theta))/(24*3600)
     return Ki
 
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent

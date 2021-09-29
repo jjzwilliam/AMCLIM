@@ -194,12 +194,14 @@ class MMS_module:
         self.TAN = np.zeros(array_shape)
         ## TAN production from urea hydrolysis, conversion from N_avail and N_resist pool
         self.TAN_prod = np.zeros(array_shape)
-        ## TAN pool
+        ## TAN pool (manure)
         self.TAN_pool = np.zeros(array_shape)
+        ## TAN pool of soil interface
+        self.TAN_pool_soil = np.zeros(array_shape)
         ## washoff flux of TAN 
         self.TAN_washoff = np.zeros(array_shape)
         ## TAN pool in ug/m2
-        self.TAN_pool_ug = np.zeros(array_shape)
+        # self.TAN_pool_ug = np.zeros(array_shape)
         ## TAN pool conc (aqueous phase)
         self.TAN_amount = np.zeros(array_shape)
         ## TAN pool in molar concentration
@@ -208,21 +210,41 @@ class MMS_module:
         self.TAN_surf_amount_M = np.zeros(array_shape)
         ## TAN conc at the soil surface/interface between manure and land (soil); for [MMS open solid]
         self.TAN_soil_amount = np.zeros(array_shape)
-        ## NO3- from nitrification 
-        self.nitrif_NO3 = np.zeros(array_shape)
-        ## NO3- pool
+        ## NO3- from nitrification in bulk manrue 
+        self.nitrif_NO3_manure = np.zeros(array_shape)
+        ## NO3- washoff 
+        self.NO3_washoff = np.zeros(array_shape)
+        ## NO3- pool in bulk manure
         self.NO3_pool = np.zeros(array_shape)
+        ## NO3- conc in bulk manure
+        self.NO3_amount = np.zeros(array_shape)
+        ## NO3- from nitrification in soil interface
+        self.nitrif_NO3_soil = np.zeros(array_shape)
+        ## NO3- pool in soil interface
+        self.NO3_pool_soil = np.zeros(array_shape)
+        ## NO3- conc in soil interface
+        self.NO3_soil_amount = np.zeros(array_shape)
+        ## infiltration of NO3 from manure to soil interface
+        self.NO3_infilmanure = np.zeros(array_shape)
+        ## diffusive aqueous NO3- from manure to soil interface
+        self.NO3_diffusivemanure = np.zeros(array_shape)
+        ## NO3- leaching to deeper soil
+        self.NO3_leaching = np.zeros(array_shape)
+        ## diffusive aqueous NO3- to deeper soil
+        self.NO3_diffusivesoil = np.zeros(array_shape)
         ## water added from housing
         self.water_added = water_added
         self.water = np.zeros(array_shape)
         ## total water pool of the system (manure water; urine+manure water+[washing water])
         self.Total_water_pool = np.zeros(array_shape)
+        ## total pool of the soil interface
+        self.water_pool_soil = np.zeros(array_shape)
         ## ratio of [NH4+]/[H+] in the system
         self.Gamma_manure = np.zeros(array_shape)
         ## surface NH3 concentrtion at equilirium (in molar mass)
         self.NH3_gas_M = np.zeros(array_shape)
         ## surface NH3 concentrtion at equilirium (in ug)
-        self.NH3_gas_ug = np.zeros(array_shape)
+        # self.NH3_gas_ug = np.zeros(array_shape)
         ## emission potential
         self.modelled_emiss = np.zeros(array_shape)
         ## final emission
@@ -231,10 +253,14 @@ class MMS_module:
         ## the atmosphere, i.e. measures mitigating emissions during housing stage such as coverings, straw ...;
         ## during land spreading stages, such as canopy recapture, deap injection...
         self.NH3_flux = np.zeros(array_shape)
-        ## diffusion of aqueous TAN to soil
-        self.diffusiveflux = np.zeros(array_shape)
-        ## infiltration of aqueous TAN to subsurface (not diffusive)
+        ## diffusion of aqueous TAN from manure to soil interface
+        self.diffusivefluxmanure = np.zeros(array_shape)
+        ## infiltration of aqueous TAN to soil interface
         self.infilflux = np.zeros(array_shape)
+        ## diffusion of aqueous TAN to deeper soil
+        self.diffusivefluxsoil = np.zeros(array_shape)
+        ## leaching of aqueous TAN to deeper soil (not diffusive)
+        self.leachingflux = np.zeros(array_shape)
 
         ## temp
         self.T_sim = np.zeros(array_shape)
@@ -317,7 +343,8 @@ class MMS_module:
             self.rainfall = xr_to_np(self.rainfall)
             self.R_star = xr_to_np(self.R_star)
             self.tor_soil = soil_tuotorsity(theta_sat=self.persm,theta=self.soilmoist,phase="aqueous")
-            self.daily_KNO3 = nitrification_rate(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm)*timestep*3600
+            self.daily_KNO3 = nitrification_rate_soil(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm,
+                                                        fer_type="manure")*timestep*3600
 
         ## mositure equilirium, mositure content of manure
         self.mois_coeff = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
@@ -407,7 +434,7 @@ class MMS_module:
                 self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
 
                 ## TAN pool in ug
-                self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
+                TAN_pool_ug = self.TAN_pool[dd+1] * 1e6
 
                 ## TAN conc
                 self.TAN_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0
@@ -424,12 +451,12 @@ class MMS_module:
                 self.NH3_gas_M[dd+1] = self.Henry_constant[dd+1]*self.Gamma_manure[dd+1]
 
                 ## in ug
-                self.NH3_gas_ug[dd+1] = self.NH3_gas_M[dd+1]*14*1e9
+                NH3_gas_ug = self.NH3_gas_M[dd+1]*14*1e9
 
                 ## determining the maximum emission; emission cannot exceed TAN pool
-                emiss_idx = (self.NH3_gas_ug[dd+1]*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
-                self.modelled_emiss[dd+1][emiss_idx>=0] = self.TAN_pool_ug[dd+1][emiss_idx>=0]
-                self.modelled_emiss[dd+1][emiss_idx<0] = self.NH3_gas_ug[dd+1][emiss_idx<0]*3600*timestep/\
+                emiss_idx = (NH3_gas_ug*3600*timestep/self.R_star[dd+1]) - TAN_pool_ug
+                self.modelled_emiss[dd+1][emiss_idx>=0] = TAN_pool_ug[emiss_idx>=0]
+                self.modelled_emiss[dd+1][emiss_idx<0] = NH3_gas_ug[emiss_idx<0]*3600*timestep/\
                                                             self.R_star[dd+1][emiss_idx<0]
 
                 ## final emission flux
@@ -519,7 +546,7 @@ class MMS_module:
                 self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
 
                 ## TAN pool in ug
-                self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
+                TAN_pool_ug = self.TAN_pool[dd+1] * 1e6
 
                 ## TAN conc
                 ## TAN will partitioned into aqueous and solid (adsorption to manure) phase
@@ -541,8 +568,8 @@ class MMS_module:
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
 
                 ## TAN conc at the surface
-                self.TAN_surf_amount_M[dd+1] = (self.TAN_amount_M[dd+1]*self.R_star[dd+1])/\
-                                            (self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+self.R_star[dd+1])
+                self.TAN_surf_amount_M[dd+1] = ((self.TAN_amount[dd+1]*self.R_star[dd+1])/\
+                                            (self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+self.R_star[dd+1]))/14*1000
 
                 ## Gamma value
                 self.Gamma_manure[dd+1] =  self.TAN_surf_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])
@@ -551,12 +578,12 @@ class MMS_module:
                 self.NH3_gas_M[dd+1] = self.Henry_constant[dd+1]*self.Gamma_manure[dd+1]
 
                 ## in ug
-                self.NH3_gas_ug[dd+1] = self.NH3_gas_M[dd+1]*14*1e9
+                NH3_gas_ug = self.NH3_gas_M[dd+1]*14*1e9
 
                 ## determining the maximum emission; emission cannot exceed TAN pool
-                emiss_idx = (self.NH3_gas_ug[dd+1]*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
-                self.modelled_emiss[dd+1][emiss_idx>=0] = self.TAN_pool_ug[dd+1][emiss_idx>=0]
-                self.modelled_emiss[dd+1][emiss_idx<0] = self.NH3_gas_ug[dd+1][emiss_idx<0]*3600*timestep/\
+                emiss_idx = (NH3_gas_ug*3600*timestep/self.R_star[dd+1]) - TAN_pool_ug
+                self.modelled_emiss[dd+1][emiss_idx>=0] = TAN_pool_ug[emiss_idx>=0]
+                self.modelled_emiss[dd+1][emiss_idx<0] = NH3_gas_ug[emiss_idx<0]*3600*timestep/\
                                                             self.R_star[dd+1][emiss_idx<0]
 
                 ## final emission flux
@@ -669,11 +696,15 @@ class MMS_module:
                 self.unavail_N_washoff[dd+1] = N_washoff_rate*self.unavail_N_pool[dd]
                 ## TAN washoff: rain available for washoff * [TAN]_bulk
                 self.TAN_washoff[dd+1] = self.rain_avail_washoff[dd+1]*self.TAN_amount_M[dd]
+                self.NO3_washoff[dd+1] = self.rain_avail_washoff[dd+1]*self.NO3_pool[dd]
 
                 ## manure pool: subtracting washoff
                 manure_idx = self.manure_pool[dd+1] - self.manure_washoff[dd+1]
                 self.manure_pool[dd+1][manure_idx>0] = manure_idx[manure_idx>0]
                 self.manure_pool[dd+1][manure_idx<=0] = 0.0  ## manure has been washed off 
+
+                ## water content of the manure
+                manurewc = self.Total_water_pool[dd+1]/(self.Total_water_pool[dd+1]+self.manure_pool[dd+1])
 
                 ## manure resistance
                 ## manure resistance is determined by: R = z/(2*tor_manure*D); 
@@ -714,23 +745,32 @@ class MMS_module:
                     self.resist_N[dd+1] 
                 self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1] - self.unavail_N_washoff[dd+1]
 
-                ## NO3- from nitrification of TAN
-                # self.nitrif_NO3[dd+1] = self.daily_KNO3[dd+1]*self.TAN_pool[dd]
+                ## nirification rate of TAN in bulk manure
+                KNO3_manure = nitrification_rate_manure(manure_temp=self.T_sim[dd+1],manure_wc=manurewc)
+                ## NO3- from nitrification of TAN in bulk manure
+                self.nitrif_NO3[dd+1] = KNO3_manure*self.TAN_pool[dd]
 
-                ## NO3- pool
-                # self.NO3_pool[dd+1] = self.NO3_pool[dd] + self.nitrif_NO3[dd+1]
+                ## NO3- pool of bulk manure
+                NO3_idx = self.NO3_pool[dd] - self.NO3_infilmanure[dd] - self.NO3_diffusivemanure[dd] - self.NO3_washoff[dd+1]
+                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3[dd+1][NO3_idx>0]
+                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3[dd+1][NO3_idx<=0]
+
+                ## NO3- conc of bulk manure
+                self.NO3_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.NO3_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
+                                                                            self.Total_water_pool[dd+1][self.Total_water_pool[dd+1]!=0]
+                self.NO3_amount[dd+1][self.Total_water_pool[dd+1]==0] = 0.0
                 
                 ## TAN pool (different from [MMS barn (liquid,solid)])
                 ## Note: source of TAN pool: TAN production from 1) urea hydrolysis, 2) decomposition of org N and 3) input of TAN from housing
                 ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) diffusion to soil, and 3) infiltration (subsurface leaching) to soil
                 ##       only aqueous phase diffusion is considered, and gaseous diffusion is not considered in this study
-                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusiveflux[dd] - self.infilflux[dd] - \
+                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxmanure[dd] - self.infilflux[dd] - \
                     self.nitrif_NO3[dd] - self.TAN_washoff[dd+1]
                 self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
                 self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
 
                 ## TAN pool in ug
-                self.TAN_pool_ug[dd+1] = self.TAN_pool[dd+1] * 1e6
+                TAN_pool_ug = self.TAN_pool[dd+1] * 1e6
 
                 ## TAN conc
                 ## TAN will partitioned into aqueous and solid (adsorption to manure) phase
@@ -743,24 +783,67 @@ class MMS_module:
                 self.TAN_amount[dd+1][self.Total_water_pool[dd+1]!=0] = self.TAN_pool[dd+1][self.Total_water_pool[dd+1]!=0]/\
                     (self.Total_water_pool[dd+1][self.Total_water_pool[dd+1]!=0]+Kd*self.manure_pool[dd+1][self.Total_water_pool[dd+1]!=0]/manure_density)
 
+                ## infiltration of aqueous TAN from bulk manure to soil interface
+                self.infilflux[dd+1] = self.qinfil[dd+1]*self.TAN_amount[dd+1]
+
+                ## infiltration of aqeuous NO3 from bulk manure to soil interface
+                self.NO3_infilmanure[dd+1] = self.qinfil[dd+1] * self.NO3_amount[dd+1] 
+
                 ## TAN molar conc
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/14*1000
 
-                ## TAN conc at the surface
+                ## TAN conc at the surface (solved)
                 self.TAN_surf_amount_M[dd+1] = ((self.TAN_amount[dd+1]*self.R_star[dd+1])/\
                                             (self.R_manure[dd+1]*self.R_star[dd+1]*self.rain_avail_washoff[dd+1] + \
                                                 self.R_manure[dd+1]*(self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1]))+\
                                                     self.R_star[dd+1]))/14*1000
 
+                ## water pool of soil interface
+                water_soil_idx = self.qinfil[dd+1]+z_soil*self.soilmoist[dd+1] - z_soil*self.persm[dd+1]
+                self.water_pool_soil[dd+1][water_soil_idx>0] = (z_soil*self.persm[dd+1][water_soil_idx>0])*1e6
+                self.water_pool_soil[dd+1][water_soil_idx<=0] = (self.qinfil[dd+1][water_soil_idx<=0] + \
+                                                                z_soil*self.soilmoist[dd+1][water_soil_idx<=0])*1e6
+
+                ## NO3- from TAN nitrification in soil interface
+                self.nitrif_NO3_soil[dd+1] = self.daily_KNO3[dd+1] * self.TAN_pool_soil[dd]
+
+                ## NO3- pool of soil interface
+                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd]
+                self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0]
+                self.NO3_pool_soil[dd+1][NO3_soil_idx<=0] = self.nitrif_NO3_soil[dd+1] 
+
+                ## NO3- conc of soil interface
+                self.NO3_soil_amount[dd+1][self.water_pool_soil[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.water_pool_soil[dd+1]!=0]/\
+                                                                            self.water_pool_soil[dd+1][self.water_pool_soil[dd+1]!=0]
+                self.NO3_soil_amount[dd+1][self.water_pool_soil[dd+1]==0] = 0.0
+
+                ## TAN pool in soil interface
+                TAN_soil_idx = self.TAN_pool_soil[dd] - self.diffusivefluxsoil[dd] - self.leachingflux[dd] - self.nitrif_NO3_soil[dd]
+                self.TAN_pool_soil[dd+1][TAN_soil_idx>0] = TAN_soil_idx[TAN_soil_idx>0] + self.diffusivefluxmanure[dd][TAN_soil_idx>0] + \
+                                                            self.infilflux[dd+1][TAN_soil_idx>0]
+                self.TAN_pool_soil[dd+1][TAN_soil_idx<=0] =  self.diffusivefluxmanure[dd][TAN_soil_idx>0] + self.infilflux[dd+1][TAN_soil_idx>0]
+
                 ## TAN conc at the soil surface/interface between manure and land (soil)
-                self.TAN_soil_amount[dd+1] = self.TAN_amount[dd+1]*\
-                    (1/self.R_manure[dd+1]+self.qinfil[dd+1]/(timestep*3600))/(1/self.R_soil[dd+1]+1/self.R_manure[dd+1]+self.qpsoil[dd+1])
+                self.TAN_soil_amount[dd+1][self.water_pool_soil[dd+1]!=0] = self.TAN_pool_soil[dd+1]/z_soil*1e6
+                self.TAN_soil_amount[dd+1][self.water_pool_soil[dd+1]==0] = 0.0
 
-                ## TAN loss through aqueous diffusion to soil
-                self.diffusiveflux[dd+1] = self.TAN_soil_amount[dd+1]/self.R_soil[dd+1]*timestep*3600
+                ## diffusive aqueous TAN from bulk manure to soil interface
+                self.diffusivefluxmanure[dd+1] = (self.TAN_amount[dd+1] - self.TAN_soil_amount[dd+1])/self.R_manure[dd+1]*timestep*3600
 
-                ## TAN loss through subsurface leaching (infiltration to soil)
-                self.infilflux[dd+1] = self.TAN_soil_amount[dd+1]*self.qpsoil[dd+1]*timestep*3600
+                ## diffusive aquous NO3 from bulk manure to soil interface
+                self.NO3_diffusivemanure[dd+1] = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd+1])/self.R_manure[dd+1]*timestep*3600
+
+                ## TAN loss through aqueous diffusion to deeper soil
+                self.diffusivefluxsoil[dd+1] = self.TAN_soil_amount[dd+1]/self.R_soil[dd+1]*timestep*3600
+
+                ## NO3 loss through aqeious diffusion to deeper soil
+                self.NO3_diffusivesoil[dd+1] = self.NO3_soil_amount[dd+1]/self.R_soil[dd+1]*timestep*3600
+
+                ## TAN loss through subsurface leaching (infiltration to deeper soil)
+                self.leachingflux[dd+1] = self.TAN_soil_amount[dd+1]*self.qpsoil[dd+1]*timestep*3600
+
+                ## NO3 leaching to deepeer soil
+                self.NO3_leaching[dd+1] = self.NO3_soil_amount[dd+1]*self.qpsoil[dd+1]*timestep*3600
 
                 ## Gamma value
                 self.Gamma_manure[dd+1] =  self.TAN_surf_amount_M[dd+1]/(self.cc_H + self.k_NH4[dd+1])
@@ -769,12 +852,12 @@ class MMS_module:
                 self.NH3_gas_M[dd+1] = self.Henry_constant[dd+1]*self.Gamma_manure[dd+1]
 
                 ## in ug
-                self.NH3_gas_ug[dd+1] = self.NH3_gas_M[dd+1]*14*1e9
+                NH3_gas_ug = self.NH3_gas_M[dd+1]*14*1e9
 
                 ## determining the maximum emission; emission cannot exceed TAN pool
-                emiss_idx = (self.NH3_gas_ug[dd+1]*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
-                self.modelled_emiss[dd+1][emiss_idx>=0] = self.TAN_pool_ug[dd+1][emiss_idx>=0]
-                self.modelled_emiss[dd+1][emiss_idx<0] = self.NH3_gas_ug[dd+1][emiss_idx<0]*3600*timestep/\
+                emiss_idx = (NH3_gas_ug*3600*timestep/self.R_star[dd+1]) - self.TAN_pool_ug[dd+1]
+                self.modelled_emiss[dd+1][emiss_idx>=0] = TAN_pool_ug[emiss_idx>=0]
+                self.modelled_emiss[dd+1][emiss_idx<0] = NH3_gas_ug[emiss_idx<0]*3600*timestep/\
                                                             self.R_star[dd+1][emiss_idx<0]
 
                 ## final emission flux
