@@ -264,7 +264,7 @@ class HOUSING_MODULE:
     ## fraction of the gap of the area, assuming 20% (1-40%) is gap
     fgap = 0.2
     ## background NH3 level, ug/m3
-    X_air = 0.300
+    X_air = 0.0
     ## cleaning frequency; i.e. duration of manure in houses until collected and transfered to storage
     cleaning_cycl = 90
     cleaning_freq = int(cleaning_cycl * nhours / timestep)
@@ -297,27 +297,36 @@ class HOUSING_MODULE:
         ## calculating diagnostic variables
         ###################################################
         if housing_type.lower() == 'slat/pit house':
-            ## daily evaporation; aerodynamic method; (g/m^2)
+            ## evaporation; aerodynamic method; (m/s)
             ## Q_vent above pit is set to be 0.6 m/s (full efficiency)
-            self.evap_slat = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house)*self.fslat*1000
-            self.evap_pit = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=0.6,zo=zo_house)*1000
+            self.evap_slat = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house)
+            self.evap_pit = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=0.6,zo=zo_house)
             ## housing resistance; s/m
-            self.R_star_slat = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house))
+            self.R_star_slat = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_slat)
             ## correction factor for indoor resistance R_star
             F_rcorret = 1.0
-            self.R_star_pit = F_rcorret * resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_pit/1000)
+            self.R_star_pit = F_rcorret * resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_pit)
+            ## convert evap from m/s to g/m2/day
+            self.evap_slat = self.evap_slat*1e6*timestep*3600*f_slat
+            self.evap_pit = self.evap_pit*1e6*timestep*3600
         else:
-            ## daily evaporation; aerodynamic method; (g/m^2)
+            ## daily evaporation; aerodynamic method; (m/s)
             ## Q_vent above pit is set to be 0.6 m/s (full efficiency)
-            self.evap = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house)*1000
+            self.evap = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house)
             ## housing resistance; s/m
-            self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap/1000)
+            self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap)
+            ## convert evap from m/s to g/m2/day
+            self.evap = self.evap*1e6*timestep*3600
+            # self.evap = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house)*1000
+            # ## housing resistance; s/m
+            # self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap/1000)
+
             if housing_type.lower() == 'poultry house':
                 ## housing resistance; 16700 s/m for poultry houses
                 self.R_star[:] = 16700
 
         ## mositure equilirium, mositure content of manure
-        self.mois_coeff = (-np.log(1.01-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
+        self.mois_coeff = (-np.log(1.00001-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
         ## daily urea hydrolysis rate
         self.daily_urea_hydro_rate = urea_hydrolysis_rate(temp=self.T_sim,delta_t=timestep)
         ## daily decomposition rate of available and resistant N components

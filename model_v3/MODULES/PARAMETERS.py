@@ -146,35 +146,44 @@ def nitrification_rate_soil(ground_temp,theta,theta_sat,fer_type):
         ## empirical factor in this parameterization
         asigma = 2.4
         ## critical water content of soil (g/g)
-        mcrit = 0.12
+        #mcrit = 0.12
         ## sharp paramter of moisture response function
-        b = 2
+        ##b = 2
     elif fer_type == "mineral":
         ## optimum temp for microbial activity
         topt = 303
         ## empirical factor in this parameterization
         asigma = 1.8
         ## critical water content of soil (g/g)
-        mcrit = 0.10
+        #mcrit = 0.10
         ## sharp paramter of moisture response function
-        b = 16
+        #b = 16
     ## temperature responce funtion
     func_tg = ((tmax-ground_temp)/(tmax-topt))**asigma*np.exp(asigma*(ground_temp-topt)/(tmax-topt))
     ## water in soil
-    soilwc = theta*rho_water/((1-theta_sat)*rho_soil)
-    
+    # soilwc = theta*rho_water/((1-theta_sat)*rho_soil)
     ## moisture response function
-    func_soilwc = 1 - np.exp(-(soilwc/mcrit)**b)
+    # func_soilwc = 1 - np.exp(-(soilwc/mcrit)**b)
+    ## soil WFPS
+    WFPS = theta/theta_sat
+    ## WFPS response function; a 4th order polynomial regression
+    a = 0.55
+    b = 1.7
+    c = -0.007
+    d = 3.22
+    func_wfps = (((WFPS-b)/(a-b))**(d*(b-a)/(a-c)))*(((WFPS-c)/(a-c))**d)
     ## maximum rate of nitrification; s^-1
     rmax = 1.16e-6
+    # rmax = 1.16e-6/2   ## test rmax
     ## nitrification rate; per second
-    nitrif_rate = 2*rmax/(1/func_tg+1/func_soilwc)
+    # nitrif_rate = (2*rmax*func_tg*func_wfps)/(func_tg+func_wfps)
+    nitrif_rate = rmax*func_tg*func_wfps
     return nitrif_rate
 
 ## rate: nitrification rate of manure (analogy to nitrification rate in soils)
 ## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
-## manure temp in degC; manure water content in fraction
-def nitrification_rate_manure(manure_temp,manure_wc):
+## manure temp in degC; WFPS in fraction
+def nitrification_rate_manure(manure_temp,WFPS):
     ## convert degC to K
     manure_temp = manure_temp + 273.15
     ## maximum and optimum temp for microbial activity
@@ -182,21 +191,40 @@ def nitrification_rate_manure(manure_temp,manure_wc):
     topt = 301
     ## empirical factor in this parameterization
     asigma = 2.4
-    ## temperature responce funtion
+    ## temperature response funtion
     func_tg = ((tmax-manure_temp)/(tmax-topt))**asigma*np.exp(asigma*(manure_temp-topt)/(tmax-topt))
-    ## water in manure
-    manurewc = manure_wc*rho_water/((1-manure_wc)*rho_m[livestock]*1e3)
-    ## critical water content of soil (g/g)
-    mcrit = 0.12
-    ## sharp paramter of moisture response function
-    b = 2
-    ## moisture response function
-    func_manurewc = 1 - np.exp(-(manure_wc/mcrit)**b)
+    ## WFPS response function; a 4th order polynomial regression
+    # a1 = 26.34
+    # a2 = -54.51
+    # a3 = 32.61
+    # a4 = -4.31
+    # a5 = 0.15
+    # func_wfps = a1*(WFPS**4)+a2*(WFPS**3)+a3*(WFPS**2)+a4*WFPS+a5
+    a = 0.55
+    b = 1.7
+    c = -0.007
+    d = 3.22
+    func_wfps = (((WFPS-b)/(a-b))**(d*(b-a)/(a-c)))*(((WFPS-c)/(a-c))**d)
     ## maximum rate of nitrification; s^-1
     rmax = 1.16e-6
+    # rmax = 1.16e-6/2   ## test rmax
     ## nitrification rate; per second
-    nitrif_rate = 2*rmax/(1/func_tg+1/func_manurewc)
+    # nitrif_rate = (2*rmax*func_tg*func_wfps)/(func_tg+func_wfps)
+    nitrif_rate = rmax*func_tg*func_wfps
     return nitrif_rate
+
+## manure characteristics: manure 1) volumetric water content 2) porosity 3) water-filled pore space (WFPS)
+## solid mass in g/m2; water mass in g/m2; rho_manure in g/cm3
+def manure_properties(solidmass,watermass):
+    ## total volume of manure; m3/m2
+    vtotal = solidmass/(manure_BD*1e3)
+    ## gravimetric water content of manure
+    theta_g = watermass/solidmass
+    ## volumetric water content
+    theta_v = theta_g*manure_BD/rho_water
+    ## WFPS: volumetric water content/porosity
+    WFPS = theta_v/manure_porosity
+    return vtotal,theta_v,WFPS
 
 ## physical variables: specific humidity; temp in degC, rhum in per cent
 def humidity_measures(temp, rhum):
@@ -229,17 +257,20 @@ def water_evap_a(temp,rhum,u,zo):
     # zo = 0.002               ## roughness height 2mm
     Z = 2                     ## reference height 2m
     k = 0.41                  ## van Karman constant
-    rho_air = 1.2754          ## 1.2754 kg/m^3, density of air;
-    rho_water = 997           ## 997kg/m^3, density of water;
     B = (rho_air/rho_water)*(0.622*k**2*u)/(Pressure*(np.log(Z/zo))**2)
     evap = B*(es-ea)*1000
-    evap = evap*1000*3600*24
+    # evap = evap*1000*3600*24
     return evap
 
 ## physical variables: molecular diffusivity of NH4+ in water; D_aq_nh4, m^2/s (Van Der Molen et al.,1990; Vira et al., GMD2020)
 ## temp in degC
-def diffusivity_NH4(temp):
-    d_aq_nh4 = 9.8e-10*1.03**temp
+def diffusivity_NH4(temp,phase):
+    if phase == 'aqueous':
+        d_aq_nh4 = 9.8e-10*1.03**temp
+    elif phase == 'gaseous':
+        temp = temp + 273.15
+        d_aq_nh4 = (1e-3*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
     return d_aq_nh4
 
 ## soil characteristics: tortuosity for diffusion
@@ -283,13 +314,13 @@ def infiltration_rate_method(dailyinfil,theta_sat,theta):
     Ki = (dailyinfil - z_layer*(theta_sat-theta))/(24*3600)
     return Ki
 
-## resistance: resistance for water-air exchange; temp in degC, rhum in per cent
+## resistance: resistance for water-air exchange; temp in degC, rhum in per cent; evap flux in m/s
 def resistance_water_air(temp,rhum,evap_flux):
     T = temp + 273.15
     ## to avoid dividing zero
-    rhum = rhum-0.001
-    ## evap flux in m/s (kg/m^2/s)
-    evap_flux = evap_flux/(1000*24*3600)
+    rhum = rhum-0.00001
+    ## evap flux in m/s (1000 kg/m^2/s; m/s)
+    # evap_flux = evap_flux/(1000*24*3600)
     Q_sat, Q_atm, e_sat, e_vp = humidity_measures(temp, rhum)
     ## molecular weight of air (28.96 g/mol), NH3 (17 g/mol) and water (18 g/mol).
     M_air = 28.96
@@ -306,13 +337,12 @@ def resistance_water_air(temp,rhum,evap_flux):
                  0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
     D_air_H2O = (1e-7*(T)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
                  0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
-    rho_air = 1.2754          ## 1.2754 kg/m^3, density of air;
-    rho_water = 997           ## 997kg/m^3, density of water;
     Rc = (rho_air/rho_water)*((Q_sat-Q_atm)/evap_flux)
     return Rc
 
 ## resistance: resistance for manure in houses and in storage; temp in degC, u in m/s
-def resistance_manure(temp, u):
+##              also return corresponding evaporation
+def resistance_manure(temp, u, rhum):
     ## converting degC to Kelvin
     T = temp + 273.15
     ## avoid dividing zero
@@ -329,7 +359,11 @@ def resistance_manure(temp, u):
     u_correction = u**a/(0.1**a)
     r_correct = r_standard/(T_correction*u_correction)
     r_ab_star = r_correct*24*3600
-    return r_ab_star
+
+    Q_sat, Q_atm, e_sat, e_vp = humidity_measures(temp, rhum)
+    ## evap flux in m/s (1000 kg/m^2/s)
+    evap_flux = (rho_air/rho_water)*((Q_sat-Q_atm)/r_ab_star)
+    return r_ab_star, evap_flux
 
 ## resistance: resistance for aerodynamic and boundary layer resistance; 
 ## temp in degC; rhum in %; u in m/s; H is sensible heat flux in J/(m^2 s); Z is reference height in m; zo is surface roughness in m 
@@ -500,9 +534,29 @@ for ii in np.arange(10):
 ############################
 wind_data_height = 10
 ref_height = 2
-
+## density of air: 1.2754 kg/m3
+rho_air = 1.2754
 ## density of water: 997 kg/m3
 rho_water = 997
-## density of soil: 1500 kg/m3; 1.5 g/cm3
-rho_soil = 1500
+## density of soil particle: 2660 kg/m3; 2.66 g/cm3
+rho_soil = 2660
+## density of manure solids: 1460 kg/m3; 1.46g/cm3
+manure_PD = 1460
+## manure porosity; ref: Khater et al, 2015 cattle manure porosity
+manure_porosity = 0.42
+## manure bulk density
+manure_BD = manure_PD*(1-manure_porosity)
+## NO3- diffusivity scaling factor
+f_DNO3 = 1.3e-8/9.8e-10
+## molar mass of air
+M_air = 28.96
+## molar mass of NH3
+M_NH3 = 17
+## moloar mass of H2O
+M_H2O = 18
+## sigma_v is the value of atomic diffusion volume in [lagoon system] (from Liley et al., 1984;
+## Physical and chemical data)
+sigma_v_air = 20.1
+sigma_v_NH3 = 14.9
+sigma_v_H2O = 12.7
 
