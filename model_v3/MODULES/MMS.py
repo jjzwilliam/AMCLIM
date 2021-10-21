@@ -87,10 +87,10 @@ for mms in MMS_open_liquid_list:
 ##       housing area = 10 km^2 in a grid; barn_solid area = 1 km^2 (1/10) * f_MMS_barn_solid
 ## these values need to be reviewed (?)
 MMS_area_factor = {
-    "mms_barn_solid":0.1,
-    "mms_barn_liquid":1.0,
-    "mms_open_solid":0.1,
-    "mms_open_liquid":0.5}
+    "mms_barn_solid":0.2,
+    "mms_barn_liquid":0.4,
+    "mms_open_solid":1.0,
+    "mms_open_liquid":2.5}
 
 ## areas of each MMS, initial values are None
 MMS_area = {
@@ -112,6 +112,8 @@ zo_manureland = 1.0
 z_manuresurf = 0.02
 ## dry matter (DM) content of solid manure 
 DM_content = solid_m_DM[livestock]
+## dry matter (DM) content of liquid manure is assumed to be 5%
+f_DM_liquid = 0.1
 ## maximum water content of manure
 f_wcmax = 1 - (DM_content/100)/2
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
@@ -138,6 +140,8 @@ f_washoff_nonN = 0.0005
 f_washoff_N = 0.001
 ## anoxic fraction of manure; average of swine (75%) and cow (50%); ref: Wang et al., Sci.Report.2015
 f_manure_anoxic = 0.6
+## lagoon TAN conc; g/mL
+lagoon_TAN_conc = 630.0e-6
 
 ##################################
 ## MMS module
@@ -145,6 +149,8 @@ f_manure_anoxic = 0.6
 class MMS_module:
     def __init__(self,array_shape,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
     TAN_added,water_added,pH_value,area_housing):
+        ## show current config settings, e.g., MMS type
+        print('MMS Module - current MMS is for production system: '+str(MMS_type))
         ## feces input from housing
         self.manure_added = manure_added
         self.manure = np.zeros(array_shape)
@@ -343,16 +349,31 @@ class MMS_module:
             self.T_sim = xr_to_np(self.T_sim)
             self.RH_sim = xr_to_np(self.RH_sim)
             self.u_sim = xr_to_np(self.u_sim)
+            u2m= wind_profile(uref=self.u_sim,height_ref=10,height_out=2,zo=zo_barn)
+
+            # self.evap_sim = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=u2m,zo=zo_barn)
+            # self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim)
+            # ## convert evap from m/s to g/m2/day
+            # self.evap_sim = self.evap_sim*1e6*timestep*3600
+
             if mms_phase == "liquid":
                 ## daily evaporation; aerodynamic method; (m/s)
                 ## Q_vent above pit is set to be 0.6 m/s (full efficiency)
-                self.evap_sim = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_barn)
+                self.evap_sim = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=u2m,zo=zo_barn)
                 self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim)
                 ## convert evap from m/s to g/m2/day
                 self.evap_sim = self.evap_sim*1e6*timestep*3600
+                print('MMS ENV: mms barn (liquid)')
             elif mms_phase == "solid":
-                self.R_star, self.evap_sim = resistance_manure(temp=self.T_sim,u=self.u_sim,rhum=self.RH_sim)
-                self.evap_sim = self.evap_sim*1e6*timestep*3600
+                # self.R_star, self.evap_sim = resistance_manure(temp=self.T_sim,u=u2m,rhum=self.RH_sim)
+                # self.evap_sim = self.evap_sim*1e6*timestep*3600
+                self.evap_sim = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=u2m,zo=zo_barn)
+                self.R_star = resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_sim)
+                ## convert evap from m/s to g/m2/day
+                f_evap_correct = 1.0
+                self.evap_sim = self.evap_sim*1e6*timestep*3600*f_evap_correct
+                print('MMS ENV: mms barn (solid)')
+
         else:
             self.T_sim = groundtemp_data
             self.u_sim = wind_data
@@ -375,6 +396,7 @@ class MMS_module:
                                                         fer_type="manure")*timestep*3600
             self.daily_KNO3[self.daily_KNO3<0] = 0.0
             self.daily_KNO3[np.isnan(self.daily_KNO3)] = 0.0
+            print('MMS ENV: mms open env')
 
         ## mositure equilirium, mositure content of manure
         self.mois_coeff = (-np.log(1.00001-(self.RH_sim/100))/(0.0000534*(self.T_sim+273.15)))**(1/1.41)
@@ -398,6 +420,7 @@ class MMS_module:
     ## Simulation: Cat A manure stored in barns (as liquid)
     ## water pool is transfered from housing to MMS barn 
     def MMS_barn_liquid_sim(self,start_day_idx,end_day_idx):
+        print('current simulation is for: MMS barn (liquid), '+str(livestock))
         ## area of MMS_barn_liquid
         MMS_area["mms_barn_liquid_area"] = self.housingarea*(1.0 - f_loss - f_sold)*f_MMS_barn_liquid*MMS_area_factor['mms_barn_liquid']
         if livestock.lower()=="poultry":
@@ -453,13 +476,13 @@ class MMS_module:
 
                 ## water pool
                 ## Note: the water pool in [MMS barn liquid] is "inheritated" from housing water pool
-                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
-                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
-                                                                self.water_added[dd+1][water_idx>0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"]) -\
-                                                                self.evap_sim[dd][water_idx>0]
-                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0] +\
-                                                                self.water_added[dd+1][water_idx<=0]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
-                                                                
+                # water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
+                # self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] - self.evap_sim[dd][water_idx>0]
+                # self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd+1][water_idx<=0]
+                # self.Total_water_pool[dd+1] = self.Total_water_pool[dd+1] + \
+                #     self.water_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_liquid"])
+                self.Total_water_pool[dd+1] = self.manure_pool[dd+1]/f_DM_liquid                                             
+
                 ## TAN pool
                 TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd]
                 self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
@@ -513,6 +536,7 @@ class MMS_module:
     ##                                      (1/R_manureaq+KNH3*(R_manureg+R_ab))
 
     def MMS_barn_solid_sim(self,start_day_idx,end_day_idx):
+        print('current simulation is for: MMS barn (solid), '+str(livestock))
         MMS_area["mms_barn_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_barn_solid*MMS_area_factor["mms_barn_solid"]
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
@@ -553,6 +577,7 @@ class MMS_module:
                 ## water amount in "solid" manure
                 ## self.manure refers to the DM mass; therefore, total manure mass = DM mass/DM%
                 ## water in the "solid" manure = water% x total manure mass
+                # self.manure_water[dd+1] = self.water_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
                 self.manure_water[dd+1] = (self.manure[dd+1]/(DM_content/100))*(1-DM_content/100)
 
                 ## water amount when mositure content reach equilibrium
@@ -561,12 +586,14 @@ class MMS_module:
                 ## water pool
                 ## Note the difference between the water pool of [MMS barn solid] and [MMS barn liquid]
                 ## water pool of [MMS barn solid] is directly determined by the amount of manure as we assumed a dry matter content
-                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd+1]
-                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
-                                                                self.manure_water[dd+1][water_idx>0] -\
-                                                                self.evap_sim[dd][water_idx>0]
-                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] +\
-                                                                self.manure_water[dd+1][water_idx<=0] 
+                
+                # water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]
+                # self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
+                #                                                 self.manure_water[dd+1][water_idx>0] -\
+                #                                                 self.evap_sim[dd][water_idx>0]
+                # self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] +\
+                #                                                 self.manure_water[dd+1][water_idx<=0] 
+                self.Total_water_pool[dd+1] = self.Total_water_pool[dd] + self.manure_water[dd+1]
                 
                 ## water content of the manure
                 vtotal,manurewc,manure_WFPS = manure_properties(solidmass=self.manure_pool[dd+1],
@@ -584,6 +611,10 @@ class MMS_module:
                 z_total = vtotal
                 self.R_manurel[dd+1] = z_total/(2*self.D_aq_NH4[dd+1]*manure_torl)
                 self.R_manureg[dd+1] = z_total/(2*self.D_air_NH3[dd+1]*manure_torg)
+                # self.R_manureg[dd+1][manure_torg!=0] = z_total[manure_torg!=0]/\
+                #                                     (2*self.D_air_NH3[dd+1][manure_torg!=0]*manure_torg[manure_torg!=0]) 
+                # ## when water content is zero, gaseous diffusion is ceased by infinite resistance
+                # self.R_manureg[dd+1][manure_torg==0] = np.inf
                                                                 
                 ## TAN pool
                 TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.nitrif_NO3_manure[dd]
@@ -693,6 +724,7 @@ class MMS_module:
     ## Note) NO3- pools in bulk manure and soil have similar processes as TAN, which do not include 1) adsorption, 2) gaseous diffustion
     ##       NO3- aqueous diffusion is moderated by a scaling factor regarding the different diffusivity of NO3- from NH4+    
     def MMS_land_sim(self,start_day_idx,end_day_idx):
+        print('current simulation is for: MMS open (land,solid), '+str(livestock))
         MMS_area["mms_open_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_solid*MMS_area_factor["mms_open_solid"]
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
@@ -790,7 +822,11 @@ class MMS_module:
                 ## layer thickness of manure (DM+water) in meter: z = Vmanure
                 z_total = vtotal
                 self.R_manurel[dd+1] = z_total/(2*self.D_aq_NH4[dd+1]*manure_torl)
-                self.R_manureg[dd+1] = z_total/(2*self.D_air_NH3[dd+1]*manure_torg) 
+                self.R_manureg[dd+1] = z_total/(2*self.D_air_NH3[dd+1]*manure_torg)
+                # self.R_manureg[dd+1][manure_torg!=0] = z_total[manure_torg!=0]/\
+                #                                     (2*self.D_air_NH3[dd+1][manure_torg!=0]*manure_torg[manure_torg!=0])  
+                # ## when water content is zero, gaseous diffusion is ceased by infinite resistance
+                # self.R_manureg[dd+1][manure_torg==0] = np.inf
                 
                 ## soil resistance
                 ## soil resistance = thickness of the source layer (z) / (tortuosity for diffusion x diffusivity of the species)
@@ -799,6 +835,10 @@ class MMS_module:
                 tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
                 self.R_soilaq[dd+1] = d_deepsoil/(tor_soil_aq*self.D_aq_NH4[dd+1])
                 self.R_soilg[dd+1] = d_deepsoil/(tor_soil_gas*self.D_air_NH3[dd+1])
+                # self.R_soilg[dd+1][tor_soil_gas!=0] = d_deepsoil/\
+                #                                 (tor_soil_gas[tor_soil_gas!=0]*self.D_air_NH3[dd+1][tor_soil_gas!=0])
+                # ## when water content is zero, gaseous diffusion is ceased by infinite resistance
+                # self.R_soilg[dd+1][tor_soil_gas==0] = np.inf
 
                 ## N input in multiple forms
                 self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
@@ -1042,13 +1082,27 @@ class MMS_module:
     
     ## Simulation: Cat C manure stored in open environment (as solid) //// under development 08/Sep
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
+        print('current simulation is for: MMS open (lagoon,liquid), '+str(livestock))
         MMS_area["mms_open_liquid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_liquid*MMS_area_factor["mms_open_liquid"]
-        # if livestock.lower()=="poultry":
-        #     # for dd in np.arange(start_day_idx,end_day_idx-1):
-        #     print(livestock)
+        if livestock.lower()=="poultry":
+            # for dd in np.arange(start_day_idx,end_day_idx-1):
+            print(livestock)
 
-        # else:
-        #     for dd in np.arange(start_day_idx,end_day_idx-1):
-
-
+        else:
+            for dd in np.arange(start_day_idx,end_day_idx-1):
+                ## 
+                KNH3 = self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1])
+                ## wind speed at 8m
+                u8 = wind_profile(uref=self.u_sim[dd+1],height_ref=10,height_out=8,zo=8e-5)
+                ## mass transfer coefficient in the liquid boundary layer
+                k_aq = k_aq_NH4(wind_8m=u8,temp=self.T_sim[dd+1])
+                ## mass tranfer coefficient in the gas boundary layer
+                k_gas = k_gas_NH3(wind_8m=u8,temp=self.T_sim[dd+1])
+                ## surface TAN conc in mol/L
+                self.TAN_surf_amount_M[dd+1] = ((k_aq*lagoon_TAN_conc)/(KNH3*k_gas+k_aq))/14*1000
+                ## gaseous NH3 conc at surface in mol/L
+                self.NH3_gas_M[dd+1] = KNH3*self.TAN_surf_amount_M[dd+1]
+                ## NH3 conc in g/m3
+                NH3_gas = self.NH3_gas_M[dd+1] *14*1000
+                self.NH3_flux[dd+1] = self.NH3_gas_M[dd+1]*k_gas*timestep*3600
         return

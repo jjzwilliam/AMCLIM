@@ -34,15 +34,35 @@ Months_idx = [0,31,59,90,120,151,181,212,243,273,304,334,365]
 ## specify livestock type and production sytem
 ## livestock_list = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 livestock = 'PIG'
-animal_file_name = 'Pig_FAO_Gleam.nc'       ## input files should be put in AMCLIM/INPUT/
-## production_system_list = ['industrial','intermediate','backyard']
-production_system = 'industrial'
+animal_file_dict = {
+        'PIG':'Pig_FAO_Gleam.nc',
+        'CATTLE':'',
+        'POULTRY':''
+        }
+animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
 ## level index: 
 ## PIG: industrial-0; intermediate-1, backyard-2
 lvl_idx = 0
+production_system_dict = {
+        'PIG':['industrial','intermediate','backyard'],
+        'CATTLE':[],
+        'POULTRY':['broiler','layer','backyard']
+        }
+production_system = production_system_dict[livestock][lvl_idx]
 ## housing_system: 1. insulated building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
-## housing_system_list = ['slat/pit house','barn','poultry_house']
-housing_system = 'slat/pit house'
+## housing_system_list = ['slat/pit house','barn','poultry_house','bck_poultry']
+housing_system_dict = {
+        'PIG':['slat/pit house','barn','barn'],
+        'CATTLE':[],
+        'POULTRY':['poultry_house','poultry_house','bck_poultry']
+        }
+housing_system = housing_system_dict[livestock][lvl_idx]
 ## MMS_type: ind, med, bck
-MMS_type = 'ind'
+MMS_type_dict = {
+        'PIG':['ind','med','bck'],
+        'CATTLE':[],
+        'POULTRY':['bro','lay','bck']
+        }
+MMS_type = MMS_type_dict[livestock][lvl_idx]
+# MMS_file_dict = {}
 MMS_file_name ='ind_MMS.nc'                           ## input files should be put in AMCLIM/INPUT/

@@ -266,12 +266,36 @@ def water_evap_a(temp,rhum,u,zo):
 ## temp in degC
 def diffusivity_NH4(temp,phase):
     if phase == 'aqueous':
-        d_aq_nh4 = 9.8e-10*1.03**temp
+        d_nh4 = 9.8e-10*1.03**temp
     elif phase == 'gaseous':
         temp = temp + 273.15
-        d_aq_nh4 = (1e-3*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+        d_nh4 = (1e-3*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
                  0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
-    return d_aq_nh4
+    return d_nh4
+
+## mass tranfer coefficient for NH4 in liquid boundary layer
+## wind at 8m in m/s; temp in deg C
+def k_aq_NH4(wind_8m,temp):
+    temp = temp + 273.15
+    ## cm/h
+    k_aq0 = 0.6034*np.exp(0.2361*wind_8m)
+    d_aq_nh4 = 6.14526e-15*temp/(np.exp(1622/temp-12.40581))
+    d_aq_O2 = 7.28236e-15*temp/(np.exp(1622/temp-12.40581))
+    kL = k_aq0*((d_aq_nh4/d_aq_O2)**0.57)/3.6e5
+    return kL
+
+## mass transfer coefficient for NH3 in gas boudnary layer
+def k_gas_NH3(wind_8m,temp):
+    temp = temp + 273.15
+    ## cm/h
+    k_gas0 = 18.568 + 703.61 * wind_8m
+    d_gas_NH3 = (1e-3*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
+    d_gas_H2O = (1e-3*(temp)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
+                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
+    ## m/s
+    kG = k_gas0 *((d_gas_NH3/d_gas_H2O)**0.67)/3.6e5
+    return kG
 
 ## soil characteristics: tortuosity for diffusion
 ## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)

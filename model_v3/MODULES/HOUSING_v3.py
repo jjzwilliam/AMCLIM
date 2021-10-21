@@ -13,6 +13,7 @@ from CONFIG.config import *
 from MODULES.PARAMETERS import *
 from MODULES.FUNC import *
 
+
 ######################################
 ## excreted N data
 ######################################
@@ -74,7 +75,10 @@ class HOUSING_MODULE:
     ##               ...
 
     def __init__(self,array_shape,N_input,livestock_name,housing_type):
-        print("Current livestock is: "+str(livestock_name))
+        ## show current config settings, e.g., livestock, production sys, etc.
+        print('HOUSING Module - current livestock is: '+str(livestock))
+        print('HOUSING Module - current production system is: '+str(production_system))
+        print('HOUSING Module - current housing system is: '+str(housing_system))
         ## animal waste info    
         self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc, self.pH = livestock_waste_info(livestock_type=livestock_name, waste_N=N_input)
         self.durine = self.durine * 1000
@@ -273,17 +277,17 @@ class HOUSING_MODULE:
     def sim_env(self,housing_type):
         ## housing environmental conditions
         if housing_type.lower() == 'slat/pit house':
-            print("House with slatted floor")
+            print("HOUSING ENV: House with slatted floor")
             self.T_sim, self.u_sim, self.RH_sim = housing_env(temp_data,rhum_data,livestock,production_system)
         elif housing_type.lower() == 'barn':
-            print("Naturally ventilated barn")
+            print("HOUSING ENV: Naturally ventilated barn")
             self.T_sim, self.u_sim = barn_env(temp_data,wind_data)
             self.RH_sim = rhum_data
         elif housing_type.lower() == 'poultry house':
-            print("Poultry house")
+            print("HOUSING ENV: Poultry house")
             self.T_sim, self.u_sim, self.RH_sim = housing_env(temp_data,rhum_data,livestock,production_system)
         else:
-            print("Other housing systems")
+            print("HOUSING ENV: Other housing systems")
             self.T_sim = temp_data
             self.u_sim = wind_data
             self.RH_sim = rhum_data
@@ -307,7 +311,7 @@ class HOUSING_MODULE:
             F_rcorret = 1.0
             self.R_star_pit = F_rcorret * resistance_water_air(temp=self.T_sim,rhum=self.RH_sim,evap_flux=self.evap_pit)
             ## convert evap from m/s to g/m2/day
-            self.evap_slat = self.evap_slat*1e6*timestep*3600*f_slat
+            self.evap_slat = self.evap_slat*1e6*timestep*3600*self.fslat
             self.evap_pit = self.evap_pit*1e6*timestep*3600
         else:
             ## daily evaporation; aerodynamic method; (m/s)
@@ -704,12 +708,22 @@ class HOUSING_MODULE:
             ## pools: from housing to MMS
             ## Note: by multiplying the housing area, we get the total mass of each pool rather than mass/unit area
             self.manure_pool_pit_to_storage[day_idx] = (self.manure_pool_pit[day_idx]+self.manure_pool_slat[day_idx])*housing_area.values
-            self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]*housing_area.values
-            self.resist_N_pool_pit_to_storage[day_idx] = self.resist_N_pool_pit[day_idx]*housing_area.values
-            self.unavail_N_pool_pit_to_storage[day_idx] = self.unavail_N_pool_pit[day_idx]*housing_area.values
-            self.TAN_pool_pit_to_storage[day_idx] = (self.TAN_pool_pit[day_idx]+self.urea_pool_pit[day_idx])*housing_area.values
-            self.Total_water_pool_pit_to_storage[day_idx] = self.Total_water_pool_pit[day_idx]*housing_area.values
-            
+            # self.avail_N_pool_pit_to_storage[day_idx] = self.avail_N_pool_pit[day_idx]*housing_area.values
+            # self.resist_N_pool_pit_to_storage[day_idx] = self.resist_N_pool_pit[day_idx]*housing_area.values
+            # self.unavail_N_pool_pit_to_storage[day_idx] = self.unavail_N_pool_pit[day_idx]*housing_area.values
+            self.avail_N_pool_pit_to_storage[day_idx] = (self.avail_N_pool_pit[day_idx]+(1-self.daily_Na_decomp_rate[day_idx])*\
+                                                        self.avail_N_pool_slat[day_idx])*housing_area.values
+            self.resist_N_pool_pit_to_storage[day_idx] = (self.resist_N_pool_pit[day_idx]+(1-self.daily_Nr_decomp_rate[day_idx])*\
+                                                        self.resist_N_pool_slat[day_idx])*housing_area.values
+            self.unavail_N_pool_pit_to_storage[day_idx] = (self.unavail_N_pool_pit[day_idx]+self.unavail_N_pool_slat[day_idx])*housing_area.values
+            self.TAN_pool_pit_to_storage[day_idx] = (self.TAN_pool_pit[day_idx]-self.NH3_flux_pit[day_idx]+\
+                                                    (1-self.daily_urea_hydro_rate[day_idx])*+self.urea_pool_pit[day_idx]+\
+                                                    self.TAN_pool_slat[day_idx]-self.NH3_flux_slat[day_idx]+\
+                                                    (1-self.daily_urea_hydro_rate[day_idx])*self.urea_pool_slat[day_idx])*housing_area.values
+            self.Total_water_pool_pit_to_storage[day_idx] = (self.Total_water_pool_pit[day_idx]+self.Total_water_pool_slat[day_idx])*\
+                                                        housing_area.values
+            # self.Total_water_pool_pit_to_storage[day_idx] = self.Total_water_pool_pit[day_idx]*housing_area.values
+
             self.manure_pool_slat[day_idx] = 0.0
             self.manure_pool_pit[day_idx] = 0.0
             self.manure_initwc_slat[day_idx] = 0.0
@@ -738,6 +752,8 @@ class HOUSING_MODULE:
             self.manure_pool_to_storage[day_idx] = self.manure_pool[day_idx]*housing_area.values
             self.avail_N_pool_to_storage[day_idx] = (1 - self.daily_Na_decomp_rate[day_idx])*self.avail_N_pool[day_idx]*housing_area.values
             self.resist_N_pool_to_storage[day_idx] = (1 - self.daily_Nr_decomp_rate[day_idx])*self.resist_N_pool[day_idx]*housing_area.values
+            # self.avail_N_pool_to_storage[day_idx] = self.avail_N_pool[day_idx]*housing_area.values
+            # self.resist_N_pool_to_storage[day_idx] = self.resist_N_pool[day_idx]*housing_area.values
             self.unavail_N_pool_to_storage[day_idx] = self.unavail_N_pool[day_idx]*housing_area.values
             #print("TAN pool: ",self.TAN_pool[day_idx,41,84])
             #print("NH3 flux: ",self.NH3_flux[day_idx,41,84])
@@ -766,6 +782,7 @@ class HOUSING_MODULE:
             if housing_type.lower() == 'barn':
                 #print("barn2")
                 self.urea_pool_to_storage[day_idx] = (1 - self.daily_urea_hydro_rate[day_idx])*self.urea_pool[day_idx]*housing_area.values
+                # self.urea_pool_to_storage[day_idx] = self.urea_pool[day_idx]*housing_area.values
                 self.urea_pool[day_idx] = 0.0
             elif housing_type.lower() == 'poultry house':
                 self.UA_pool_to_storage[day_idx] = self.UA_pool[day_idx]*housing_area.values
@@ -793,6 +810,7 @@ class HOUSING_MODULE:
                 self.UA_pool_to_storage[:] = 0.0
     
     def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency):
+        print('HOUSING Sim - current simulation is for: slat/pit housing, '+str(livestock))
         self.sim_env(housing_type)
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
@@ -807,13 +825,14 @@ class HOUSING_MODULE:
         return
 
     def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency):
+        print('HOUSING Sim - current simulation is for: barn, '+str(livestock))
         self.sim_env(housing_type)
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency+1)
-                self.cleaning_pit(dd+cleaning_frequency,housing_type)
+                # self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.barn_housing_sim(dd,end_idx)
         self.housing_2nd_init(housing_type)
