@@ -35,14 +35,14 @@ Months_idx = [0,31,59,90,120,151,181,212,243,273,304,334,365]
 ## livestock_list = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 livestock = 'PIG'
 animal_file_dict = {
-        'PIG':'Pig_FAO_Gleam.nc',
+        'PIG':'Pig_FAO_Gleam_new.nc',
         'CATTLE':'',
         'POULTRY':''
         }
 animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
 ## level index: 
 ## PIG: industrial-0; intermediate-1, backyard-2
-lvl_idx = 0
+lvl_idx = 2
 production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
         'CATTLE':[],

@@ -19,12 +19,10 @@ from MODULES.FUNC import *
 ######################################
 excretN_info = animal_file['Excreted_N'][lvl_idx]
 animal_head = animal_file['Animal_head'][lvl_idx]
-try:
-    animal_weight = animal_file['Animal_weight'][lvl_idx]
-except:
-    pass
+animal_weight = animal_file['Animal_weight'][lvl_idx]
+
 #print(np.nanmedian(animal_weight.values[np.where(animal_weight!=0)]))
-animal_weight[np.where((animal_head!=0)&(animal_weight==0))] = np.nanmedian(animal_weight.values[np.where(animal_weight!=0)])
+animal_weight.values[np.where((animal_head!=0)&(animal_weight==0)&(~np.isnan(animal_head)))] = np.nanmedian(animal_weight.values[np.where(animal_weight!=0)])
 #animal_Nrate = animal_file['N_rate'][0]
 #print(np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)]))
 #animal_Nrate[np.where((animal_head!=0)&(animal_Nrate==0))] = np.nanmedian(animal_Nrate.values[np.where(animal_Nrate!=0)])
@@ -34,6 +32,7 @@ animal_density = stocking_desity[livestock]
 print(str(livestock)+" stocking density is "+str(animal_density)+" kg/m^2")
 massgrid = animal_head*animal_weight
 housing_area = animal_head*animal_weight/animal_density
+# housing_area = animal_head/2.0  ## test another stocking density
 ## total animal mass per grid
 # massgrid = 1000*excretN_info/(animal_Nrate*365)
 # housing_area = massgrid/animal_density
@@ -43,6 +42,24 @@ housing_area = animal_head*animal_weight/animal_density
 F_Ncorrect = 1.0
 excret_N = F_Ncorrect*excretN_info/housing_area   ## unit: kg N per m^2 per year
 excret_N = xr_to_np(excret_N)
+
+## idealised simulation
+# excretN_info.values[~np.isnan(excretN_info.values)] = np.nanmean(excretN_info.values)
+# animal_head.values[~np.isnan(animal_head.values)] = np.nanmean(animal_head.values)
+# animal_weight.values[~np.isnan(animal_weight.values)] = np.nanmean(animal_weight.values)
+# housing_area = animal_head*animal_weight/animal_density
+# F_Ncorrect = 1.0
+# excret_N = F_Ncorrect*excretN_info/housing_area   ## unit: kg N per m^2 per year
+# excret_N = xr_to_np(excret_N)
+
+# excretN_info.values[~np.isnan(excretN_info.values)] = np.nanmean(excretN_info.values)
+# animal_head.values[~np.isnan(animal_head.values)] = 4730.88477633889
+# animal_weight.values[~np.isnan(animal_weight.values)] = 26.584662622409393
+# housing_area = animal_head*animal_weight/animal_density
+# F_Ncorrect = 1.0
+# excret_N = F_Ncorrect*animal_head*17/housing_area   ## unit: kg N per m^2 per year
+# # excret_N = F_Ncorrect*excretN_info/housing_area 
+# excret_N = xr_to_np(excret_N)
 
 ###################################
 ## housing parameters
@@ -74,13 +91,36 @@ class HOUSING_MODULE:
     ##               3. 'poultry house'
     ##               ...
 
-    def __init__(self,array_shape,N_input,livestock_name,housing_type):
+    def __init__(self,array_shape,N_input,livestock_name,housing_type,idealised_sim=False,idealised_setting=None):
+        if idealised_sim is True:
+            print("NOTICE - This is an idealised simulation.\n Set [idealised_sim=False] for normal simulations.")
+            try:
+                if idealised_setting is not None:
+                    self.idealised_animal_head = animal_head.copy()
+                    self.idealised_animal_head.values[~np.isnan(self.idealised_animal_head.values)] = idealised_setting['head']
+                    self.idealised_animal_weight = animal_weight.copy()
+                    self.idealised_animal_weight.values[~np.isnan(self.idealised_animal_weight.values)] = idealised_setting['weight']
+                    self.idealised_housing_area = self.idealised_animal_head*self.idealised_animal_weight/\
+                                                idealised_setting['density']
+                    self.idealised_N_input = F_Ncorrect*self.idealised_animal_head*idealised_setting['Nexcret_rate']/\
+                                                self.idealised_housing_area
+                    self.idealised_N_input = xr_to_np(self.idealised_N_input)
+                    self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=livestock_name, 
+                                                    waste_N=self.idealised_N_input)
+                else:
+                    raise ValueError('Invalid [idealised settings]')
+            except ValueError as exp:
+                print("Error occurrs! Please check [idealised settings]")
+        else:
+            ## animal waste info    
+            self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=livestock_name, 
+                        waste_N=N_input)
+
         ## show current config settings, e.g., livestock, production sys, etc.
         print('HOUSING Module - current livestock is: '+str(livestock))
         print('HOUSING Module - current production system is: '+str(production_system))
         print('HOUSING Module - current housing system is: '+str(housing_system))
-        ## animal waste info    
-        self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc, self.pH = livestock_waste_info(livestock_type=livestock_name, waste_N=N_input)
+        
         self.durine = self.durine * 1000
         self.manure_wc = self.manure_wc * 1000
         ## pH and H+ ions concentration
@@ -832,7 +872,7 @@ class HOUSING_MODULE:
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency+1)
-                # self.cleaning_pit(dd+cleaning_frequency,housing_type)
+                self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
                 self.barn_housing_sim(dd,end_idx)
         self.housing_2nd_init(housing_type)
