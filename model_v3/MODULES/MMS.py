@@ -428,7 +428,7 @@ class MMS_module:
             print(livestock)
 
         else:
-            for dd in np.arange(start_day_idx,end_day_idx-1):
+            for dd in np.arange(start_day_idx,end_day_idx):
 
                 ## the equations used to represent these pools need to be explained here:
                 ## each pool should be in a unit of, mass/unit area, i.e., g/m^2
@@ -543,7 +543,7 @@ class MMS_module:
             print(livestock)
 
         else:
-            for dd in np.arange(start_day_idx,end_day_idx-1):
+            for dd in np.arange(start_day_idx,end_day_idx):
                 ## note the equations for the pools are similar to "barn liquid sim"; see comments above
                 ## daily manure and urine on per unit area
                 self.manure[dd+1] = self.manure_added[dd+1]/(self.housingarea*MMS_area_factor["mms_barn_solid"])
@@ -731,7 +731,7 @@ class MMS_module:
             print(livestock)
 
         else:
-            for dd in np.arange(start_day_idx,end_day_idx-1):
+            for dd in np.arange(start_day_idx,end_day_idx):
 
                 ## note the equations for the pools are similar to "barn liquid sim"; see comments above
                 ## daily manure and urine on per unit area
@@ -1089,7 +1089,7 @@ class MMS_module:
             print(livestock)
 
         else:
-            for dd in np.arange(start_day_idx,end_day_idx-1):
+            for dd in np.arange(start_day_idx,end_day_idx):
                 ## 
                 KNH3 = self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1])
                 ## wind speed at 8m

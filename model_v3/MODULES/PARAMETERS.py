@@ -81,9 +81,10 @@ def barn_env(temp,wind):
     t_barn[temp<=temp_idx] = Gnd_temp
     t_barn[temp>temp_idx] = temp[temp>temp_idx] + tempdiff
     
-    blocking_factor = 0.8
-    u_barn[temp<=temp_idx] = wind[temp<=temp_idx]
-    u_barn[temp>temp_idx] = (1-blocking_factor)*wind[temp>temp_idx]
+    blocking_factor1 = 0.2
+    blocking_factor2 = 0.8
+    u_barn[temp<=temp_idx] = (1-blocking_factor1)*wind[temp<=temp_idx]
+    u_barn[temp>temp_idx] = (1-blocking_factor2)*wind[temp>temp_idx]
     return t_barn, u_barn
 
 ## rate: uric acid hydrolysis to TAN; temp in degC, rhum in per cent
@@ -357,10 +358,10 @@ def resistance_water_air(temp,rhum,evap_flux):
     sigma_v_H2O = 12.7
     ## pressure in the atmoshpere in pa
     Pressure = 101.3 * 1e3
-    D_air_NH3 = (1e-7*(T)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
-                 0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
-    D_air_H2O = (1e-7*(T)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
-                 0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
+    # D_air_NH3 = (1e-7*(T)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+    #              0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
+    # D_air_H2O = (1e-7*(T)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
+    #              0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
     Rc = (rho_air/rho_water)*((Q_sat-Q_atm)/evap_flux)
     return Rc
 
@@ -556,7 +557,9 @@ for ii in np.arange(10):
 ############################
 ## model variables
 ############################
+## wind speed at 10m
 wind_data_height = 10
+## reference height is 2m
 ref_height = 2
 ## density of air: 1.2754 kg/m3
 rho_air = 1.2754

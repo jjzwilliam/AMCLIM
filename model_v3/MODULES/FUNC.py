@@ -22,3 +22,12 @@ def field_var_fill(sd_template,input_field):
         output_field[dd][(sd_template!=0)&np.isnan(input_field[dd])] = time_fill[dd]        
         output_field[dd][(sd_template!=0)&(input_field[dd]==0)] = time_fill[dd]    
     return output_field
+
+## function: insert an extra slice (time) to array
+def insert_time_slice(input_array):
+    shape = input_array.shape
+    new_time_dim = int(shape[0])+1
+    new_array = np.zeros([new_time_dim,shape[1],shape[2]])
+    new_array[1:,:,:] = input_array
+    new_array[0,:,:] = input_array[-1,:,:]
+    return new_array

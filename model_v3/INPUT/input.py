@@ -57,6 +57,21 @@ persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input
 ram1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=ram1_data)  ## s/m
 rb1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rb1_data)  ## s/m
 
+###############################################
+## insert an extra time slice to met fields
+###############################################
+temp_data = insert_time_slice(temp_data.values)
+groundtemp_data = insert_time_slice(groundtemp_data)
+rhum_data = insert_time_slice(rhum_data)
+wind_data = insert_time_slice(wind_data)
+evap_data = insert_time_slice(wind_data)
+soilmoist_data = insert_time_slice(soilmoist_data)
+persm_data = insert_time_slice(persm_data)
+rain_data = insert_time_slice(rain_data)
+ram1_data = insert_time_slice(ram1_data)
+rb1_data = insert_time_slice(rb1_data)
+
+
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')
 #temp_data = temp_file['air'] - 273.15
