@@ -1,6 +1,11 @@
 import numpy as np
 import xarray as xr
 
+def open_ds(filename):
+    with xr.open_dataset(filename) as ds:
+        ds.load()
+    return ds
+
 def xr_to_np(arrayin):
     try:
         arrayout = arrayin.values

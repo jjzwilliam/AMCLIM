@@ -113,7 +113,7 @@ z_manuresurf = 0.02
 ## dry matter (DM) content of solid manure 
 DM_content = solid_m_DM[livestock]
 ## dry matter (DM) content of liquid manure is assumed to be 5%
-f_DM_liquid = 0.1
+f_DM_liquid = 0.05
 ## maximum water content of manure
 f_wcmax = 1 - (DM_content/100)/2
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
@@ -393,7 +393,7 @@ class MMS_module:
             self.rainfall = xr_to_np(self.rainfall)
             self.R_star = xr_to_np(self.R_star)
             self.daily_KNO3 = nitrification_rate_soil(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm,
-                                                        fer_type="manure")*timestep*3600
+                                                        pH = self.pH,fer_type="manure")*timestep*3600
             self.daily_KNO3[self.daily_KNO3<0] = 0.0
             self.daily_KNO3[np.isnan(self.daily_KNO3)] = 0.0
             print('MMS ENV: mms open env')
@@ -587,13 +587,13 @@ class MMS_module:
                 ## Note the difference between the water pool of [MMS barn solid] and [MMS barn liquid]
                 ## water pool of [MMS barn solid] is directly determined by the amount of manure as we assumed a dry matter content
                 
-                # water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]
-                # self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
-                #                                                 self.manure_water[dd+1][water_idx>0] -\
-                #                                                 self.evap_sim[dd][water_idx>0]
-                # self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] +\
-                #                                                 self.manure_water[dd+1][water_idx<=0] 
-                self.Total_water_pool[dd+1] = self.Total_water_pool[dd] + self.manure_water[dd+1]
+                water_idx = self.Total_water_pool[dd]-self.evap_sim[dd]-self.manure_minwc[dd]
+                self.Total_water_pool[dd+1][water_idx>0] = self.Total_water_pool[dd][water_idx>0] +\
+                                                                self.manure_water[dd+1][water_idx>0] -\
+                                                                self.evap_sim[dd][water_idx>0]
+                self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] +\
+                                                                self.manure_water[dd+1][water_idx<=0] 
+                # self.Total_water_pool[dd+1] = self.Total_water_pool[dd] + self.manure_water[dd+1]
                 
                 ## water content of the manure
                 vtotal,manurewc,manure_WFPS = manure_properties(solidmass=self.manure_pool[dd+1],
@@ -671,7 +671,11 @@ class MMS_module:
                 KNO3_manure[np.isnan(KNO3_manure)] = 0.0
                 ## determining the maximum nitrification of TAN
                 # nitrif_idx = KNO3_manure*self.TAN_pool[dd]
-                nitrif_idx = KNO3_manure*self.TAN_pool[dd]*(1-f_manure_anoxic)
+                ## fraction of [NH4+(aq)]
+                f_NH4 = manurewc/(manurewc+\
+                    KNH3*(manure_porosity-manurewc)+\
+                    (1-manure_porosity)*Kd)*(self.cc_H/(self.cc_H+self.k_NH4[dd+1]))
+                nitrif_idx = KNO3_manure*self.TAN_pool[dd]*f_NH4*(1-f_manure_anoxic)
 
                 ## fluxes from bulk manure to soil interface
                 ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
@@ -773,16 +777,18 @@ class MMS_module:
                                                                         self.qinfil[dd+1][water_idx>0]*timestep*3600*1e6
                 self.Total_water_pool[dd+1][water_idx<=0] = self.manure_minwc[dd][water_idx<=0] + self.rainfall[dd+1][water_idx<=0] + \
                                                                 self.manure_water[dd+1][water_idx<=0] 
-                ## maximum water capcity of the manure pool; assuming manure water holding capcity + maximum infiltration
+                ## maximum water capcity of the manure pool (g/m2); assuming manure water holding capcity + maximum infiltration
                 max_wc = absorb_factor*self.manure_pool[dd] + dailymaxinfil*1e6
                 ## justipy whether current water pool exceeds the maximum water holidng capacity
                 water_idx2 =  max_wc - self.Total_water_pool[dd+1]
                 ## if exceeds: the surplus amount of water acts of "washoff" water, and the water pool equals the maximum wc
-                ## rain available for washoff has the unit of mm (as an accumulation of a day's rainfall in mm)
-                self.rain_avail_washoff[dd+1][water_idx2<0] = (-1)*water_idx2[water_idx2<0]/1000
+                ## rain available for washoff has the unit of m (as an accumulation of a day's rainfall in m)
+                self.rain_avail_washoff[dd+1][water_idx2<0] = (-1)*water_idx2[water_idx2<0]/1e6
                 self.Total_water_pool[dd+1][water_idx2<0] = max_wc[water_idx2<0]
                 ## if not exceeds: "washoff" water is 0 as water is absorbed by the manure
-                self.rain_avail_washoff[dd+1] = 0.0
+                # self.rain_avail_washoff[dd+1] = 0.0
+                self.rain_avail_washoff[dd+1][water_idx2>=0] = 0.0
+                self.rain_avail_washoff[dd+1] = self.rain_avail_washoff[dd+1]/(timestep*3600)
 
                 ## water pool of soil interface
                 water_soil_idx = self.qinfil[dd+1]*timestep*3600+z_soil*self.soilmoist[dd+1] - z_soil*self.persm[dd+1]
@@ -794,14 +800,14 @@ class MMS_module:
 
                 ## washoff: 1) manure, 2) urea, 3) available org N, 4) reistant org N, 5) TAN
                 ## washoff coefficient (m) = washoff water (mm) * washoff (%/mm)
-                nonN_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_nonN
-                N_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_N
-                self.manure_washoff[dd+1] = nonN_washoff_rate*self.manure_pool[dd]
-                self.urea_washoff[dd+1] =  N_washoff_rate*self.urea_pool[dd]
-                self.avail_N_washoff[dd+1] = N_washoff_rate*self.avail_N_pool[dd]
-                self.resist_N_pool[dd+1] = N_washoff_rate*self.resist_N_pool[dd]
-                self.unavail_N_washoff[dd+1] = N_washoff_rate*self.unavail_N_pool[dd]
-                self.NO3_washoff[dd+1] = self.rain_avail_washoff[dd+1]*self.NO3_pool[dd]
+                nonN_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_nonN*1e3
+                N_washoff_rate = self.rain_avail_washoff[dd+1]*f_washoff_N*1e3
+                self.manure_washoff[dd+1] = nonN_washoff_rate*self.manure_pool[dd]*timestep*3600
+                self.urea_washoff[dd+1] =  N_washoff_rate*self.urea_pool[dd]*timestep*3600
+                self.avail_N_washoff[dd+1] = N_washoff_rate*self.avail_N_pool[dd]*timestep*3600
+                self.resist_N_pool[dd+1] = N_washoff_rate*self.resist_N_pool[dd]*timestep*3600
+                self.unavail_N_washoff[dd+1] = N_washoff_rate*self.unavail_N_pool[dd]*timestep*3600
+                self.NO3_washoff[dd+1] = self.rain_avail_washoff[dd+1]*self.NO3_pool[dd]*timestep*3600
 
                 ## manure pool: subtracting washoff
                 manure_idx = self.manure_pool[dd+1] - self.manure_washoff[dd+1]
@@ -829,10 +835,10 @@ class MMS_module:
                 # self.R_manureg[dd+1][manure_torg==0] = np.inf
                 
                 ## soil resistance
-                ## soil resistance = thickness of the source layer (z) / (tortuosity for diffusion x diffusivity of the species)
+                ## soil resistance = distance (z) / (tortuosity for diffusion x diffusivity of the species)
                 ## Note the differences between Vira et al., 2020 GMD and Moring et al., 2016 BG; we used Moring et al.
-                tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
-                tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
+                tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=soilwc,phase="aqueous")
+                tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=soilwc,phase="gaseous")
                 self.R_soilaq[dd+1] = d_deepsoil/(tor_soil_aq*self.D_aq_NH4[dd+1])
                 self.R_soilg[dd+1] = d_deepsoil/(tor_soil_gas*self.D_air_NH3[dd+1])
                 # self.R_soilg[dd+1][tor_soil_gas!=0] = d_deepsoil/\
@@ -919,6 +925,8 @@ class MMS_module:
                 ## final emission flux
                 # self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
                 ## determining the maximum TAN runoff;
+                ## if rain available for runoff already in m/day; don't need to multiply be timestep*3600;
+                ## else need to multiply by timestep*3600
                 runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
                 # if dd+1 == 143:
                 #     print("runoff_idx: ",runoff_idx[130,363]) 
@@ -950,7 +958,11 @@ class MMS_module:
                 KNO3_manure[np.isnan(KNO3_manure)] = 0.0
                 ## determining the maximum nitrification of TAN
                 # nitrif_idx = KNO3_manure*self.TAN_pool[dd]
-                nitrif_idx = KNO3_manure*self.TAN_pool[dd]*(1-f_manure_anoxic)
+                ## fraction of [NH4(aq)]
+                f_NH4_manure = manurewc/(manurewc+\
+                    KNH3*(manure_porosity-manurewc)+\
+                    (1-manure_porosity)*Kd)*(self.cc_H/(self.cc_H+self.k_NH4[dd+1]))
+                nitrif_idx = KNO3_manure*self.TAN_pool[dd]*f_NH4_manure*(1-f_manure_anoxic)
 
 
                 ## fluxes from bulk manure to soil interface
@@ -994,7 +1006,9 @@ class MMS_module:
                 self.NO3_amount[dd+1] = self.NO3_amount[dd+1]*1e6
                 
                 ## diffusive aquous NO3 and infiltration of NO3 from bulk manure to soil interface
-                NO3_diffidx = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd])*(f_DNO3/self.R_manurel[dd+1])*timestep*3600
+                ## the diffusion distance for NO3 is considered to be from the surface (oxygen available zone) to the bottom;
+                ## therefore, 0.5 is applied (double the resistance by doubling the distance)
+                NO3_diffidx = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd])*(0.5*f_DNO3/self.R_manurel[dd+1])*timestep*3600
                 NO3_diffidx[NO3_diffidx<0] = 0.0
                 NO3_diffidx[soilwc==0] = 0.0
                 NO3_infilidx = self.qinfil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
@@ -1036,7 +1050,11 @@ class MMS_module:
                 soildiffgas_idx = self.NH3_gas_soil[dd+1]/self.R_soilg[dd+1]*timestep*3600
                 soildiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
                 soilleaching_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
-                soilnitrif_idx =  self.daily_KNO3[dd+1]*self.TAN_pool_soil[dd]*timestep*3600
+                ## fraction of [NH4+(aq)] in soil
+                f_NH4_soil = soilwc/(soilwc+\
+                    KNH3*(self.persm[dd+1]-soilwc)+\
+                    (1-self.persm[dd+1])*Kd)*(self.cc_H/(self.cc_H+self.k_NH4[dd+1]))
+                soilnitrif_idx =  self.daily_KNO3[dd+1]*self.TAN_pool_soil[dd]*f_NH4_soil
                 soilall_loss = soildiffaq_idx + soildiffgas_idx + soilleaching_idx + soilnitrif_idx
                 soilloss_idx = self.TAN_pool_soil[dd+1] - soilall_loss
                 self.diffusivefluxsoil_aq[dd+1][soilloss_idx>=0] = soildiffaq_idx[soilloss_idx>=0]

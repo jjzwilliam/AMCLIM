@@ -14,7 +14,8 @@ from MODULES.FUNC import *
 file_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/' 
 animal_data_path = 'animal_data/'
 met_data_path = 'met_data/'
-
+crop_data_path = 'crop_data/'
+soil_data_path ='soil_data/'
 ## Open animal data files and meteorological files
 animal_file = xr.open_dataset(file_path+animal_data_path+animal_file_name)
 
@@ -32,6 +33,8 @@ soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACT
 # sshf_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_sshf05.nc')
 rain_file = xr.open_dataset(file_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
 ratm_file = xr.open_dataset(file_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
+runoff_file = xr.open_dataset(file_path+met_data_path+'era5_2018d_surface_runoff-05.nc')
+subrunoff_file = xr.open_dataset(file_path+met_data_path+'era5_2018d_subsurface_runoff-05.nc')
 
 temp_data = temp_file['t2m'] - 273.15  ## degC
 groundtemp_data = groundtemp_file['stl1'] - 273.15  ## degC
@@ -44,6 +47,8 @@ persm_data = soilsm_file['sm']  ## per cent
 rain_data = rain_file['tcrw']*1000  ## g/m2
 ram1_data = ratm_file['RAM1']  ## s/m
 rb1_data = ratm_file['RB1']  ## s/m
+runoff_data = runoff_file['sro']  ## m/day
+subrunoff_data = subrunoff_file['ssro']  ## m/day
 
 ##################################
 ## fill land input data
@@ -56,6 +61,8 @@ soilmoist_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],i
 persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=persm_data)  ## per cent
 ram1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=ram1_data)  ## s/m
 rb1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rb1_data)  ## s/m
+runoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=runoff_data)  ## m/day
+subrunoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=subrunoff_data)  ## m/day
 
 ###############################################
 ## insert an extra time slice to met fields
@@ -64,13 +71,14 @@ temp_data = insert_time_slice(temp_data.values)
 groundtemp_data = insert_time_slice(groundtemp_data)
 rhum_data = insert_time_slice(rhum_data)
 wind_data = insert_time_slice(wind_data)
-evap_data = insert_time_slice(wind_data)
+evap_data = insert_time_slice(evap_data)
 soilmoist_data = insert_time_slice(soilmoist_data)
 persm_data = insert_time_slice(persm_data)
 rain_data = insert_time_slice(rain_data)
 ram1_data = insert_time_slice(ram1_data)
 rb1_data = insert_time_slice(rb1_data)
-
+runoff_data = insert_time_slice(runoff_data)
+subrunoff_data = insert_time_slice(subrunoff_data)
 
 #temp_file = xr.open_dataset(file_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(file_path+met_data_path+'Regridded_rhum_2010.nc')
@@ -85,3 +93,20 @@ try:
     #MMS_data = MMS_file[MMS_type]
 except:
     pass
+
+#################################
+## crop and fertilizer data
+#################################
+fertfilename = 'IFA_country_level_fertinfo.nc'
+cropfileformat = '_cropping_info.nc'
+crop_filledcalendar = 'ALL_CROPS_netCDF_0.5deg_filled_dir/'
+crop_unfilledcalendar = 'ALL_CROPS_netCDF_0.5deg_unfilled_dir/'
+crop_filledcalendarformat = '.crop.calendar.fill.nc'
+crop_unfilledcalendarformat = '.crop.calendar.nc'
+
+##################################
+## soil data
+##################################
+soilpHfile = 'topsoil_pH_H2O.nc'
+soilCECfile = 'topsoil_CEC_clay.nc'
+

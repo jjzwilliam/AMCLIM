@@ -2,6 +2,7 @@
 ## import python packages
 ####################################
 import numpy as np
+from numpy.lib.function_base import piecewise
 import xarray as xr
 import pandas as pd
 from collections import defaultdict
@@ -136,7 +137,7 @@ def N_pools_decomp_rate(temp,delta_t):
 ## rate: nitrification rate in soils
 ## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
 ## ground temp in degC; theta in m3/m3, theta_sat in m3/m3
-def nitrification_rate_soil(ground_temp,theta,theta_sat,fer_type):
+def nitrification_rate_soil(ground_temp,theta,theta_sat,pH,fer_type):
     ## convert degC to K
     ground_temp = ground_temp + 273.15
     ## maximum  temp for microbial activity
@@ -167,18 +168,20 @@ def nitrification_rate_soil(ground_temp,theta,theta_sat,fer_type):
     # func_soilwc = 1 - np.exp(-(soilwc/mcrit)**b)
     ## soil WFPS
     WFPS = theta/theta_sat
-    ## WFPS response function; a 4th order polynomial regression
+    ## WFPS response function; 
     a = 0.55
     b = 1.7
     c = -0.007
     d = 3.22
     func_wfps = (((WFPS-b)/(a-b))**(d*(b-a)/(a-c)))*(((WFPS-c)/(a-c))**d)
+    ## soil pH responce function
+    func_pH = 0.56+(np.arctan(np.pi*0.45*(-5+pH))/np.pi)
     ## maximum rate of nitrification; s^-1
     rmax = 1.16e-6
     # rmax = 1.16e-6/2   ## test rmax
     ## nitrification rate; per second
     # nitrif_rate = (2*rmax*func_tg*func_wfps)/(func_tg+func_wfps)
-    nitrif_rate = rmax*func_tg*func_wfps
+    nitrif_rate = rmax*func_tg*func_wfps*func_pH
     return nitrif_rate
 
 ## rate: nitrification rate of manure (analogy to nitrification rate in soils)
@@ -213,6 +216,12 @@ def nitrification_rate_manure(manure_temp,WFPS):
     # nitrif_rate = (2*rmax*func_tg*func_wfps)/(func_tg+func_wfps)
     nitrif_rate = rmax*func_tg*func_wfps
     return nitrif_rate
+
+## plant N uptake rate
+##
+def plant_N_uptake():
+    
+    return
 
 ## manure characteristics: manure 1) volumetric water content 2) porosity 3) water-filled pore space (WFPS)
 ## solid mass in g/m2; water mass in g/m2; rho_manure in g/cm3
@@ -270,7 +279,7 @@ def diffusivity_NH4(temp,phase):
         d_nh4 = 9.8e-10*1.03**temp
     elif phase == 'gaseous':
         temp = temp + 273.15
-        d_nh4 = (1e-3*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+        d_nh4 = (1e-7*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
                  0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
     return d_nh4
 
@@ -290,9 +299,9 @@ def k_gas_NH3(wind_8m,temp):
     temp = temp + 273.15
     ## cm/h
     k_gas0 = 18.568 + 703.61 * wind_8m
-    d_gas_NH3 = (1e-3*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+    d_gas_NH3 = (1e-7*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
                  0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
-    d_gas_H2O = (1e-3*(temp)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
+    d_gas_H2O = (1e-7*(temp)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
                  0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
     ## m/s
     kG = k_gas0 *((d_gas_NH3/d_gas_H2O)**0.67)/3.6e5
@@ -338,6 +347,22 @@ def infiltration_rate_method(dailyinfil,theta_sat,theta):
     ## infiltration rate; m/s
     Ki = (dailyinfil - z_layer*(theta_sat-theta))/(24*3600)
     return Ki
+
+## soil characteristics: soil pH after manure/fertilizer application
+## soil pH will increase due to application of urea, peak within 24-48 h, then decrease
+## urea decomposition consumes H+ ion, which leads to pH increase
+## [app_timing_app] is an indexing map that remarks the timing of fertilizer application with  a shape of [time,lat,lon]
+def soil_pH_postapp(base_pH,app_timing_map,fert_pH):
+    pH_postapp = np.zeros(mtrx2)
+    for tt in np.arange(base_pH.shape[0]-3):
+        pH_postapp[tt+1][app_timing_map[tt]==1] = fert_pH
+        pH_postapp[tt+2][app_timing_map[tt]==1] = fert_pH - (1/3)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+3][app_timing_map[tt]==1] = fert_pH - (2/3)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+    return pH_postapp
+
+## plant N uptake
+def plant_N_uptake():
+    return
 
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent; evap flux in m/s
 def resistance_water_air(temp,rhum,evap_flux):
