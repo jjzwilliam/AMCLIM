@@ -226,6 +226,11 @@ class LAND_module:
         self.diffusivefluxsoil_aq = np.zeros(array_shape)
         ## diffusion of gaseous NH3 from the top soil layer to the deeper soil
         self.diffusivefluxsoil_gas = np.zeros(array_shape)
+        ## upward diffusion of aqueous TAN: from the top soil layer to the source layer 
+        self.diffusivefluxup_aq = np.zeros(array_shape)
+        ## upward diffusion of gaseous NH3: from the top soil layer to the  source layer
+        self.diffusivefluxup_gas = np.zeros(array_shape)
+
         ## infiltration of aqueous TAN to soil interface
         self.infilflux = np.zeros(array_shape)
         ## uptake of ammonium nitrogen by plants
@@ -1212,11 +1217,11 @@ class LAND_module:
                 TAN_soil_idx = self.TAN_pool_soil[dd] - self.diffusivefluxsoil_aq[dd] - self.diffusivefluxsoil_gas[dd] - \
                     self.leachingflux[dd] - self.nitrif_NO3_soil[dd] - self.ammN_uptake[dd]
                 self.TAN_pool_soil[dd+1][TAN_soil_idx>0] = TAN_soil_idx[TAN_soil_idx>0] + self.infilflux[dd+1][TAN_soil_idx>0] + \
-                                                            self.diffusivefluxsourcelayer_aq[dd][TAN_soil_idx>0] + \
-                                                            self.diffusivefluxsourcelayer_gas[dd][TAN_soil_idx>0]
+                                                            self.diffusivefluxsourcelayer_aq[dd+1][TAN_soil_idx>0] + \
+                                                            self.diffusivefluxsourcelayer_gas[dd+1][TAN_soil_idx>0]
                 self.TAN_pool_soil[dd+1][TAN_soil_idx<=0] =  self.infilflux[dd+1][TAN_soil_idx<=0]+ \
-                                                                self.diffusivefluxsourcelayer_aq[dd][TAN_soil_idx<=0] +\
-                                                                self.diffusivefluxsourcelayer_gas[dd][TAN_soil_idx<=0]
+                                                                self.diffusivefluxsourcelayer_aq[dd+1][TAN_soil_idx<=0] +\
+                                                                self.diffusivefluxsourcelayer_gas[dd+1][TAN_soil_idx<=0]
 
                 ## TAN conc at the soil surface/interface between sourcelayer and land (soil); g/m3
                 self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
@@ -1236,6 +1241,12 @@ class LAND_module:
                 soildiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
                 soildiffgas_idx = self.NH3_gas_soil[dd+1]/(self.R_soilg_down[dd+1]*timestep*3600)
                 soildiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+
+                # soilupdiffaq_idx = 
+                # soilupdiffaq_idx[] = 
+                # soilupdiffgas_idx =
+                # soilupdiffgas_idx[] = 
+
                 soilleaching_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
                 soilnitrif_idx =  KNO3_soil*self.TAN_pool_soil[dd]*f_NH4
 

@@ -1025,11 +1025,11 @@ class MMS_module:
                 TAN_soil_idx = self.TAN_pool_soil[dd] - self.diffusivefluxsoil_aq[dd] - self.diffusivefluxsoil_gas[dd] - \
                     self.leachingflux[dd] - self.nitrif_NO3_soil[dd] 
                 self.TAN_pool_soil[dd+1][TAN_soil_idx>0] = TAN_soil_idx[TAN_soil_idx>0] + self.infilflux[dd+1][TAN_soil_idx>0] + \
-                                                            self.diffusivefluxmanure_aq[dd][TAN_soil_idx>0] + \
-                                                            self.diffusivefluxmanure_gas[dd][TAN_soil_idx>0]
+                                                            self.diffusivefluxmanure_aq[dd+1][TAN_soil_idx>0] + \
+                                                            self.diffusivefluxmanure_gas[dd+1][TAN_soil_idx>0]
                 self.TAN_pool_soil[dd+1][TAN_soil_idx<=0] =  self.infilflux[dd+1][TAN_soil_idx<=0]+ \
-                                                                self.diffusivefluxmanure_aq[dd][TAN_soil_idx<=0] +\
-                                                                 self.diffusivefluxmanure_gas[dd][TAN_soil_idx<=0]
+                                                                self.diffusivefluxmanure_aq[dd+1][TAN_soil_idx<=0] +\
+                                                                 self.diffusivefluxmanure_gas[dd+1][TAN_soil_idx<=0]
 
                 ## TAN conc at the soil surface/interface between manure and land (soil); g/m3
                 self.TAN_soil_amount[dd+1][self.water_pool_soil[dd+1]==0] = 0.0
