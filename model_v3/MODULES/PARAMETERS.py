@@ -218,10 +218,27 @@ def nitrification_rate_manure(manure_temp,WFPS):
     return nitrif_rate
 
 ## plant N uptake rate
-##
-def plant_N_uptake():
-    
-    return
+## Ammonium and Nitrate N in g/m2; soil C in gC
+def plant_N_uptake(Namm,Nnit,temp,substrateC=0.04,substrateN=0.004):
+    ## root activity weighting parameters
+    v1,v2,v3,v4 = 1.0,0.5,0.25,0.1
+    ## root structural dry matter components; g/m2
+    Wr1,Wr2,Wr3,Wr4 = 20,40,60,80
+    ## root activity paramter; gN/(g root day)
+    sigmaN20 = 0.05
+    ## root activity parameters; [C], [N], gN/m2
+    K_C, J_N, K_Neff = 0.05, 0.005, 5
+    ## temperature response
+    func_temp = 0.25*np.exp(0.0693*temp)
+    func_temp[func_temp>1.0] = 1.0
+    ## soil mineral concentration; 
+    Neff = Namm + func_temp*Nnit
+    ## non-linear relationship between N uptake and effective soil mineral concentration
+    NC_factor = 1/(1+K_C/substrateC*(1+substrateN/J_N))
+    ## gN/m2 day
+    UammN = sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(Namm/(Neff+K_Neff))*NC_factor
+    UnitN = sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(func_temp*Nnit/(Neff+K_Neff))*NC_factor
+    return UammN, UnitN
 
 ## manure characteristics: manure 1) volumetric water content 2) porosity 3) water-filled pore space (WFPS)
 ## solid mass in g/m2; water mass in g/m2; rho_manure in g/cm3
@@ -360,9 +377,12 @@ def soil_pH_postapp(base_pH,app_timing_map,fert_pH):
         pH_postapp[tt+3][app_timing_map[tt]==1] = fert_pH - (2/3)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
     return pH_postapp
 
-## plant N uptake
-def plant_N_uptake():
-    return
+## soil characteristics: adsorption coefficient of NH4+ on soil particles
+## clay_content in %
+def ammonium_adsorption(clay_content):
+    clay = clay_content/100
+    kd = 0.5*(7.2733*clay**3-11.22*clay**2) + 5.7198*clay + 0.0263
+    return kd
 
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent; evap flux in m/s
 def resistance_water_air(temp,rhum,evap_flux):

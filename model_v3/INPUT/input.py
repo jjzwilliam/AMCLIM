@@ -109,4 +109,5 @@ crop_unfilledcalendarformat = '.crop.calendar.nc'
 ##################################
 soilpHfile = 'topsoil_pH_H2O.nc'
 soilCECfile = 'topsoil_CEC_clay.nc'
+soilclayfile = 'topsoil_clay.nc'
 

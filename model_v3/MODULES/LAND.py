@@ -228,6 +228,10 @@ class LAND_module:
         self.diffusivefluxsoil_gas = np.zeros(array_shape)
         ## infiltration of aqueous TAN to soil interface
         self.infilflux = np.zeros(array_shape)
+        ## uptake of ammonium nitrogen by plants
+        self.ammN_uptake = np.zeros(array_shape)
+        ## uptake of nitrate nitrogen by plants
+        self.nitN_uptake = np.zeros(array_shape)
 
         ## temp
         self.T_sim = np.zeros(array_shape)
@@ -980,7 +984,9 @@ class LAND_module:
 
     def chem_fert_sim_test(self,start_day_idx,end_day_idx,chem_fert_type):
         print('current simulation is for: '+str(chem_fert_type))
-
+        soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
+        soilclay = soilclayds.T_CLAY.values
+        Kd = ammonium_adsorption(clay_content=soilclay)
         if chem_fert_type == 'nitrate':
             print('chemical fertilizer applied: nitrate')
             self.NO3 = self.NO3_added
@@ -1093,7 +1099,7 @@ class LAND_module:
                     (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
                     KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
                         self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd))
+                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
                 ## TAN molar conc; mol/L
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
                 ## NH3 conc in bulk sourcelayer
@@ -1204,7 +1210,7 @@ class LAND_module:
 
                 ## TAN pool in top soil layer
                 TAN_soil_idx = self.TAN_pool_soil[dd] - self.diffusivefluxsoil_aq[dd] - self.diffusivefluxsoil_gas[dd] - \
-                    self.leachingflux[dd] - self.nitrif_NO3_soil[dd] 
+                    self.leachingflux[dd] - self.nitrif_NO3_soil[dd] - self.ammN_uptake[dd]
                 self.TAN_pool_soil[dd+1][TAN_soil_idx>0] = TAN_soil_idx[TAN_soil_idx>0] + self.infilflux[dd+1][TAN_soil_idx>0] + \
                                                             self.diffusivefluxsourcelayer_aq[dd][TAN_soil_idx>0] + \
                                                             self.diffusivefluxsourcelayer_gas[dd][TAN_soil_idx>0]
@@ -1218,7 +1224,7 @@ class LAND_module:
                     (z_topsoil*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
                     KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
                     self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd))
+                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
                 ## NH3 concentration in the soil pore space
                 self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
                 ## NH3 conc is zero when soil moisture content reaches the saturation
@@ -1232,12 +1238,18 @@ class LAND_module:
                 soildiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
                 soilleaching_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
                 soilnitrif_idx =  KNO3_soil*self.TAN_pool_soil[dd]*f_NH4
-                soilall_loss = soildiffaq_idx + soildiffgas_idx + soilleaching_idx + soilnitrif_idx
+
+                soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool_soil[dd]*f_NH4,\
+                                        Nnit=self.NO3_pool_soil[dd],temp=self.T_sim[dd+1])
+
+                soilall_loss = soildiffaq_idx + soildiffgas_idx + soilleaching_idx + soilnitrif_idx +\
+                                soilammNuptake_idx
                 soilloss_idx = self.TAN_pool_soil[dd+1] - soilall_loss
                 self.diffusivefluxsoil_aq[dd+1][soilloss_idx>=0] = soildiffaq_idx[soilloss_idx>=0]
                 self.diffusivefluxsoil_gas[dd+1][soilloss_idx>=0] = soildiffgas_idx[soilloss_idx>=0]
                 self.leachingflux[dd+1][soilloss_idx>=0] = soilleaching_idx[soilloss_idx>=0]
                 self.nitrif_NO3_soil[dd+1][soilloss_idx>=0] = soilnitrif_idx[soilloss_idx>=0]
+                self.ammN_uptake[dd+1][soilloss_idx>=0] = soilammNuptake_idx[soilloss_idx>=0]
                 self.diffusivefluxsoil_aq[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
                                                                     soildiffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
                 self.diffusivefluxsoil_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
@@ -1246,13 +1258,16 @@ class LAND_module:
                                                                     soilleaching_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
                 self.nitrif_NO3_soil[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
                                                                     soilnitrif_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+                self.ammN_uptake[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                    soilammNuptake_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
 
                 ## NO3- pool of soil interface
-                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] + self.NO3_diffusivesourcelayer[dd]
+                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] -\
+                                self.nitN_uptake[dd] 
                 self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0] + \
-                                                self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] 
+                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] + self.NO3_diffusivesourcelayer[dd+1]
                 self.NO3_pool_soil[dd+1][NO3_soil_idx<=0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<=0] + \
-                                                self.NO3_infilsourcelayer[dd+1][NO3_soil_idx<=0] 
+                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx<=0] + self.NO3_diffusivesourcelayer[dd+1]
 
                 ## NO3- conc of soil interface; g/mL
                 self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
@@ -1264,13 +1279,29 @@ class LAND_module:
                 ## NO3 loss through aqueous diffusion and leaching to deeper soil
                 NO3_soildiffidx = self.NO3_soil_amount[dd+1]*(f_DNO3/self.R_soilaq[dd+1])*timestep*3600
                 NO3_soilleachingidx = self.qpsoil[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
-                NO3_soilall_loss = NO3_soildiffidx + NO3_soilleachingidx
-                soilloss_idx = self.NO3_pool_soil[dd+1] - (self.NO3_soil_amount[dd+1]*(f_DNO3/self.R_soilaq_down[dd+1] + self.qpsoil[dd+1])*timestep*3600)
+                
+                NO3_soilall_loss = NO3_soildiffidx + NO3_soilleachingidx + soilnitNuptake_idx
+                soilloss_idx = self.NO3_pool_soil[dd+1] - NO3_soilall_loss
                 self.NO3_diffusivesoil[dd+1][soilloss_idx>=0] = NO3_soildiffidx[soilloss_idx>=0]
                 self.NO3_leaching[dd+1][soilloss_idx>=0] = NO3_soilleachingidx[soilloss_idx>=0]
+                self.nitN_uptake[dd+1][soilloss_idx>=0] = soilnitNuptake_idx[soilloss_idx>=0]
                 self.NO3_diffusivesoil[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
                                                                 NO3_soildiffidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
                 self.NO3_leaching[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
                                                             NO3_soilleachingidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+                self.nitN_uptake[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                    soilnitNuptake_idx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
                 
+                # if dd+1 == 347:
+                #     print('Day: '+str(dd+1))
+                #     print('nit uptake idx',soilnitNuptake_idx[183,201])
+                #     print('nit uptake',self.nitN_uptake[dd+1,183,201])
+                #     print('NO3 soil pool all loss idx',NO3_soilall_loss[183,201])
+                #     print('NO3 soil pool idx',soilloss_idx[183,201])
+                # elif dd+1 == 348:
+                #     print('Day: '+str(dd+1))
+                #     print('nit uptake idx',soilnitNuptake_idx[183,201])
+                #     print('nit uptake',self.nitN_uptake[dd+1,183,201])
+                #     print('NO3 soil pool all loss idx',NO3_soilall_loss[183,201])
+                #     print('NO3 soil pool idx',soilloss_idx[183,201])
         return

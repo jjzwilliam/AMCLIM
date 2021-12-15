@@ -1071,11 +1071,11 @@ class MMS_module:
                                                                     soilnitrif_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
 
                 ## NO3- pool of soil interface
-                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] + self.NO3_diffusivemanure[dd]
+                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] 
                 self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0] + \
-                                                self.NO3_infilmanure[dd+1][NO3_soil_idx>0] 
+                                                self.NO3_infilmanure[dd+1][NO3_soil_idx>0] + self.NO3_diffusivemanure[dd+1]
                 self.NO3_pool_soil[dd+1][NO3_soil_idx<=0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<=0] + \
-                                                self.NO3_infilmanure[dd+1][NO3_soil_idx<=0] 
+                                                self.NO3_infilmanure[dd+1][NO3_soil_idx<=0] + self.NO3_diffusivemanure[dd+1]
 
                 ## NO3- conc of soil interface; g/mL
                 self.NO3_soil_amount[dd+1][self.water_pool_soil[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.water_pool_soil[dd+1]!=0]/\
@@ -1098,7 +1098,7 @@ class MMS_module:
                 
         return
     
-    ## Simulation: Cat C manure stored in open environment (as solid) //// under development 08/Sep
+    ## Simulation: Cat D manure stored in open environment (as solid) //// under development 08/Sep
     def MMS_liquid_sim(self,start_day_idx,end_day_idx):
         print('current simulation is for: MMS open (lagoon,liquid), '+str(livestock))
         MMS_area["mms_open_liquid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_open_liquid*MMS_area_factor["mms_open_liquid"]
