@@ -1265,9 +1265,9 @@ class LAND_module:
                 NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] -\
                                 self.nitN_uptake[dd] 
                 self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0] + \
-                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] + self.NO3_diffusivesourcelayer[dd+1]
+                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx>0]
                 self.NO3_pool_soil[dd+1][NO3_soil_idx<=0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<=0] + \
-                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx<=0] + self.NO3_diffusivesourcelayer[dd+1]
+                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx<=0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx<=0]
 
                 ## NO3- conc of soil interface; g/mL
                 self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
