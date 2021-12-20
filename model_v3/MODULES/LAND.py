@@ -811,13 +811,18 @@ class LAND_module:
         if chem_fert_type == 'nitrate':
             print('chemical fertilizer applied: nitrate')
             self.NO3 = self.NO3_added
+            sim_pH = self.pH
+            sim_ccH = self.cc_H
         elif chem_fert_type == 'ammonium':
             self.TAN = self.TAN_added
             print('chemical fertilizer applied: ammonium')
+            sim_pH = self.pH
+            sim_ccH = self.cc_H
         elif chem_fert_type == 'urea':
             self.urea = self.urea_added
             print('chemical fertilizer applied: urea')
-
+            sim_pH = self.soil_pH
+            sim_ccH = self.soil_ccH
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
             print(livestock)
@@ -850,8 +855,8 @@ class LAND_module:
                 ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) diffusion to soil (aq+gas), 
                 ##                         3) infiltration (subsurface leaching) to soil, and 4) nitrification
                 ##       only aqueous phase diffusion is considered, and gaseous diffusion is not considered in this study
-                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusiveflux_aq[dd] - self.diffusiveflux_gas[dd]-\
-                    self.leachingflux[dd] - self.nitrif_NO3[dd] - self.TAN_washoff[dd]
+                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsoil_aq[dd] - self.diffusivefluxsoil_gas[dd]-\
+                    self.leachingflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd] - self.ammN_uptake[dd]
                 self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
                 self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
                 ## TAN pool in ug
@@ -869,7 +874,7 @@ class LAND_module:
                 ## NH3(g) = KNH3*[TAN(aq)]
                 ## MTAN = Vmanure*(theta*[TAN(aq)]+(epsilon-theta)*NH3(g)+(1-epsilon)*[TAN(s)])
                 ## so, [TAN(aq)] = MTAN/Vmanure * (1/(theta+KNH3*(epsilon-theta)+Kd*(1-epsilon)))
-                KNH3 = self.Henry_constant[dd+1]/(self.cc_H + self.k_NH4[dd+1])
+                KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
                 self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
                 self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
                     (z_soil*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
@@ -888,7 +893,7 @@ class LAND_module:
                         (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_soilg[dd+1])+1/self.R_soilaq[dd+1]))/\
                             (14*1000)
                 ## TAN surface conc in g/m3
-                # TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
+                TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
                 ## Gaseous NH3 at the surface
                 self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
                 ## in ug
@@ -901,7 +906,7 @@ class LAND_module:
                 ## final emission flux
                 # self.NH3_flux[dd+1] = self.modelled_emiss[dd+1]/1e6
                 ## determining the maximum TAN runoff;
-                runoff_idx = self.rain_avail_washoff[dd+1]*self.TAN_surf_amount*timestep*3600
+                runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
                 # if dd+1 == 143:
                 #     print("runoff_idx: ",runoff_idx[130,363]) 
                 ## determining the maximum TAN aqueous diffusion to soil interface;
@@ -926,18 +931,23 @@ class LAND_module:
 
                 ## nirification rate of TAN in bulk manure; daily maximum nitrification rate is 0.1 per day
                 KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
-                                            theta_sat=self.persm[dd+1],fer_type='mineral')*timestep*3600
+                                                theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
                 KNO3_soil[KNO3_soil>0.1] = 0.1
                 ## correction for WPFS response
                 KNO3_soil[KNO3_soil<0.0] = 0.0
                 KNO3_soil[np.isnan(KNO3_soil)] = 0.0
                 ## determining the maximum nitrification of TAN
                 # nitrif_idx = KNO3_manure*self.TAN_pool[dd]
-                nitrif_idx = KNO3_soil*self.TAN_pool[dd]
+                f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
+                    KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
+                    (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
+                nitrif_idx = KNO3_soil*self.TAN_pool[dd]*f_NH4
+                soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool[dd]*f_NH4,\
+                                        Nnit=self.NO3_pool[dd],temp=self.T_sim[dd+1])
 
                 ## fluxes from bulk soil to deeper soil and chemical loss
                 ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
-                all_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + leaching_idx + nitrif_idx
+                all_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + leaching_idx + nitrif_idx + soilammNuptake_idx
                 # if dd+1 == 143:
                 #     print("manureall_loss: ",manureall_loss[130,363]) 
                 loss_idx = self.TAN_pool[dd+1] - all_loss
@@ -945,29 +955,33 @@ class LAND_module:
                 #     print("manureloss_idx: ",manureloss_idx[130,363]) 
                 self.NH3_flux[dd+1][loss_idx>=0] = emiss_idx[loss_idx>=0]
                 self.TAN_washoff[dd+1][loss_idx>=0] = runoff_idx[loss_idx>=0]
-                self.diffusiveflux_aq[dd+1][loss_idx>=0] = diffaq_idx[loss_idx>=0]
-                self.diffusiveflux_gas[dd+1][loss_idx>=0] = diffgas_idx[loss_idx>=0]
+                self.diffusivefluxsoil_aq[dd+1][loss_idx>=0] = diffaq_idx[loss_idx>=0]
+                self.diffusivefluxsoil_gas[dd+1][loss_idx>=0] = diffgas_idx[loss_idx>=0]
                 self.leachingflux[dd+1][loss_idx>=0] = leaching_idx[loss_idx>=0]
-                self.nitrif_NO3[dd+1][loss_idx>=0] = nitrif_idx[loss_idx>=0]
+                self.nitrif_NO3_sourcelayer[dd+1][loss_idx>=0] = nitrif_idx[loss_idx>=0]
+                self.ammN_uptake[dd+1][loss_idx>=0] = soilammNuptake_idx[loss_idx>=0]
                 ## otherwise, we use a weighted distribution
                 self.NH3_flux[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
                                                             (emiss_idx[loss_idx<0]/all_loss[loss_idx<0])
                 self.TAN_washoff[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
                                                             (runoff_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.diffusiveflux_aq[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
+                self.diffusivefluxsoil_aq[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
                                                             (diffaq_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.diffusiveflux_gas[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
+                self.diffusivefluxsoil_gas[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
                                                             (diffgas_idx[loss_idx<0]/all_loss[loss_idx<0])
                 self.leachingflux[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
                                                             (leaching_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.nitrif_NO3[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
+                self.nitrif_NO3_sourcelayer[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
                                                             (nitrif_idx[loss_idx<0]/all_loss[loss_idx<0])
+                self.ammN_uptake[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
+                                                            (soilammNuptake_idx[loss_idx<0]/all_loss[loss_idx<0])
 
                 ## NO3- pool of soil layer
-                NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusive[dd] - self.NO3_washoff[dd+1]
-                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3[dd+1][NO3_idx>0] + \
+                NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] - self.NO3_washoff[dd+1] - \
+                            self.nitN_uptake[dd]
+                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + \
                                                     self.NO3[dd+1][NO3_idx>0]
-                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0]
+                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0]
 
                 ## NO3- conc of soil layer; g/m3
                 self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
@@ -979,14 +993,17 @@ class LAND_module:
                 NO3_diffidx[NO3_diffidx<0] = 0.0
                 NO3_diffidx[self.soilmoist[dd+1]==0] = 0.0
                 NO3_leachingidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
-                NO3_lossall = NO3_diffidx + NO3_leachingidx 
-                loss_idx = self.NO3_pool[dd+1] - NO3_lossall
-                self.NO3_diffusive[dd+1][loss_idx>=0] = NO3_diffidx[loss_idx>=0]
+                NO3_lossall = NO3_diffidx + NO3_leachingidx + soilnitNuptake_idx
+                loss_idx = self.NO3_pool[dd+1] - NO3_lossall 
+                self.NO3_diffusivesoil[dd+1][loss_idx>=0] = NO3_diffidx[loss_idx>=0]
                 self.NO3_leaching[dd+1][loss_idx>=0] = NO3_leachingidx[loss_idx>=0]
-                self.NO3_diffusive[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                self.nitN_uptake[dd+1][loss_idx>=0] = soilnitNuptake_idx[loss_idx>=0]
+                self.NO3_diffusivesoil[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
                                                                         NO3_diffidx[loss_idx<0]/NO3_lossall[loss_idx<0]                                           
                 self.NO3_leaching[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
-                                                                        NO3_leachingidx[loss_idx<0]/NO3_lossall[loss_idx<0]                                         
+                                                                        NO3_leachingidx[loss_idx<0]/NO3_lossall[loss_idx<0]   
+                self.nitN_uptake[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                                                                       soilnitNuptake_idx[loss_idx<0]/NO3_lossall[loss_idx<0]                                      
                 
         return
 
