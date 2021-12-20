@@ -371,10 +371,14 @@ def infiltration_rate_method(dailyinfil,theta_sat,theta):
 ## [app_timing_app] is an indexing map that remarks the timing of fertilizer application with  a shape of [time,lat,lon]
 def soil_pH_postapp(base_pH,app_timing_map,fert_pH):
     pH_postapp = np.zeros(mtrx2)
-    for tt in np.arange(base_pH.shape[0]-3):
+    for tt in np.arange(base_pH.shape[0]-6):
         pH_postapp[tt+1][app_timing_map[tt]==1] = fert_pH
-        pH_postapp[tt+2][app_timing_map[tt]==1] = fert_pH - (1/3)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
-        pH_postapp[tt+3][app_timing_map[tt]==1] = fert_pH - (2/3)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+2][app_timing_map[tt]==1] = fert_pH
+        pH_postapp[tt+3][app_timing_map[tt]==1] = fert_pH - (1/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+4][app_timing_map[tt]==1] = fert_pH - (2/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+5][app_timing_map[tt]==1] = fert_pH - (3/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+6][app_timing_map[tt]==1] = fert_pH - (4/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+    pH_postapp[pH_postapp<base_pH] = base_pH[pH_postapp<base_pH]
     return pH_postapp
 
 ## soil characteristics: adsorption coefficient of NH4+ on soil particles
