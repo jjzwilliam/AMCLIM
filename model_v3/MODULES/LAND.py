@@ -8,6 +8,7 @@ import sys
 ###################################
 ## Crop info
 ###################################
+## major crops
 crop_list = ['barley',
             'cassava',
             'cotton',
@@ -30,12 +31,6 @@ crop_idx = {}
 ###################################
 ## LAND parameters
 ###################################
-## assuming the roughness height of xxx is ~ xxxm (<ref height of 2m)
-# zo_xxx = xxx
-## assuming the roughness height of manure pile (open land) is ~ 1.0m (<ref height of 2m)
-zo_manureland = 1.0
-## manure surface thickness is set to be 2 cm
-z_manuresurf = 0.02
 ## dry matter (DM) content of solid manure 
 DM_content = solid_m_DM[livestock]
 ## dry matter (DM) content of liquid manure is assumed to be 5%
@@ -44,21 +39,12 @@ f_DM_liquid = 0.1
 f_wcmax = 1 - (DM_content/100)/2
 ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
 manure_density = rho_m[livestock]
-## thickness of the source layer: 2cm; mid point 1cm
-z_sourcelayer = 0.02
-p_sourcelayer = 0.01
 ## thickness of the topsoil layer: 7cm; mide point 3.5cm
 z_topsoil = 0.07
 p_topsoil = 0.035
 ## thickness of the 2nd soil layer (under topsoil); mid point 17.5cm
 z_2ndsoil = 0.21
 p_2ndsoil = 0.175
-## assuming soil interface (source layer) of 4mm
-# z_soil = 0.004
-z_soil = 0.1 ## test
-## distance to deeper soil; 2cm 
-# d_deepsoil = 0.02
-d_deepsoil = 0.1 ## test
 ## assuming infiltration of manure water to the soil is 10mm/day (1cm/day; 10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
 # dailymaxinfil = 0.01
 dailymaxinfil = 0.003 ## test: 3mm /day
@@ -67,18 +53,9 @@ absorb_factor = 3.0
 # dailymaxinfil = 0.0 ## test: shut down infiltration
 ## infiltration flux within manure (m/s)
 qpsoil_manure = (dailymaxinfil/1e6)/(24*3600)
-## assuming soil characteristics: 1) sand (%), 2) clay (%), 3) bulk density (g/cm^3), 4) particle density (g/cm^3)
-soil_sand = 80
-soil_clay = 8
-soil_bd = 1.5
-soil_pd = 2.66
 ## washoff coefficients: 0.1%/mm water for N species, and 0.05%/mm water for non N species (manure)
 f_washoff_nonN = 0.0005
 f_washoff_N = 0.001
-## anoxic fraction of manure; average of swine (75%) and cow (50%); ref: Wang et al., Sci.Report.2015
-f_manure_anoxic = 0.6
-## lagoon TAN conc; g/mL
-lagoon_TAN_conc = 630.0e-6
 
 class LAND_module:
     def __init__(self,array_shape,fert_type,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
@@ -86,7 +63,7 @@ class LAND_module:
         
         print('LAND Module - current fertilizer application is: '+str(fert_type))
         if fert_type == 'manure':
-            ## feces input from MMS
+            ## feces input from MMS/HOUSING
             self.manure_added = manure_added
             self.manure = np.zeros(array_shape)
             ## feces pool
@@ -98,12 +75,6 @@ class LAND_module:
             ## i.e., without drying processes
             self.manure_water = np.zeros(array_shape)
             self.manure_minwc = np.zeros(array_shape)
-            ## water amount in fresh feces
-            # self.manure_initwc = np.zeros(array_shape)
-            ## urine input from housing
-            # self.urine_added = np.zeros(array_shape)
-            # self.urine = np.zeros(array_shape)
-            ## urea input from housing
         else:
             ## cropping area for nitrate N fertilizer
             self.nitN_area = np.zeros(array_shape[1:])
@@ -112,120 +83,101 @@ class LAND_module:
             ## cropping area for urea N fertilizer
             self.ureaN_area = np.zeros(array_shape[1:])
 
-        if application_method_index == 'deep injection':
-            ## upward diffusion of aqueous TAN: from the top soil layer to the source layer 
-            self.diffusivefluxdown_aq = np.zeros(array_shape)
-            ## upward diffusion of gaseous NH3: from the top soil layer to the  source layer
-            self.diffusivefluxdown_gas = np.zeros(array_shape)
-            ## infiltration of NO3 from the top soil layer to the source layer; downwards
-            self.NO3_infilsoil = np.zeros(array_shape)
-            ## diffusive aqueous NO3- from the source layer to the top soil layer; upwards
-            self.NO3_diffusiveup = np.zeros(array_shape)
-            ## diffusive aqueous NO3- from the source layer to the deeper soil; downwards
-            self.NO3_diffusivedown = np.zeros(array_shape)
-            ##
-            self.ammN_uptake_sourcelayer = np.zeros(array_shape)
-            ##
-            self.nitN_uptake_sourcelayer = np.zeros(array_shape)
-
+        ## urea input
         self.urea_added = urea_added
         self.urea = np.zeros(array_shape)
         ## urea pool
         self.urea_pool = np.zeros(array_shape)
         ## washoff flux of urea
         self.urea_washoff = np.zeros(array_shape)
-        ## uric acid input from housing
+        ## uric acid input from MMS/HOUSING
         self.UA_added = UA_added
         self.UA = np.zeros(array_shape)
         ## uric acid pool
         self.UA_pool = np.zeros(array_shape)
         ## washoff flux of UA
         self.UA_washoff = np.zeros(array_shape)
-        ## input of available N component from housing
+        ## input of available N component from MMS/HOUSING
         self.avail_N_added = avail_N_added
         self.avail_N = np.zeros(array_shape)
         ## Nitrogen pool that is available (easily) to form TAN
         self.avail_N_pool = np.zeros(array_shape)
         ## washoff flux of available org N 
         self.avail_N_washoff = np.zeros(array_shape)
-        ## input of resistant N component from housing
+        ## input of resistant N component from MMS/HOUSING
         self.resist_N_added = resist_N_added
         self.resist_N = np.zeros(array_shape)
         ## Nitrogen pool that is resistant (slowly) to form TAN
         self.resist_N_pool = np.zeros(array_shape)
         ## washoff flux of resistant org N 
         self.resist_N_washoff = np.zeros(array_shape)
-        ## input of unavailable N component from housing
+        ## input of unavailable N component from MMS/HOUSING
         self.unavail_N_added = unavail_N_added
         self.unavail_N = np.zeros(array_shape)
         ## Nitrogen pool that is unavailable (cannot) to form TAN
         self.unavail_N_pool = np.zeros(array_shape)
         ## washoff flux of unavailable org N 
         self.unavail_N_washoff = np.zeros(array_shape)
-        ## TAN added from housing
+        ## TAN added from MMS/HOUSING
         self.TAN_added = TAN_added
         self.TAN = np.zeros(array_shape)
         ## TAN production from urea hydrolysis, conversion from N_avail and N_resist pool
         self.TAN_prod = np.zeros(array_shape)
-        ## TAN pool (main soil layer)
+        ## TAN pool (layer where major N input is; source layer)
         self.TAN_pool = np.zeros(array_shape)
-        ## TAN pool of soil interface
+        ## TAN pool of the topsoil layer
         self.TAN_pool_soil = np.zeros(array_shape)
-        ## washoff flux of TAN 
+        ## surface washoff flux of TAN 
         self.TAN_washoff = np.zeros(array_shape)
-        ## TAN pool in ug/m2
-        # self.TAN_pool_ug = np.zeros(array_shape)
         ## TAN pool conc (aqueous phase)
         self.TAN_amount = np.zeros(array_shape)
         ## TAN pool in molar concentration
         self.TAN_amount_M = np.zeros(array_shape)
-        ## TAN conc at the surface; for [MMS (barn,open) solid]
+        ## TAN conc at the surface; 
         self.TAN_surf_amount_M = np.zeros(array_shape)
-        ## TAN conc at the soil surface/interface between manure and land (soil); for [MMS open solid]
+        ## TAN conc at the topsoil layer
         self.TAN_soil_amount = np.zeros(array_shape)
         ## NO3 from manure/mineral fertilizer
         self.NO3 = np.zeros(array_shape)
         ## NO3 from manure/mineral fertilizer
         self.NO3_added = NO3_added
-        ## NO3- from nitrification in bulk manrue 
+        ## NO3- from nitrification in the source layer
         self.nitrif_NO3_sourcelayer = np.zeros(array_shape)
-        ## NO3- washoff 
+        ## NO3- washoff at the surface
         self.NO3_washoff = np.zeros(array_shape)
-        ## NO3- pool in soil layer
+        ## NO3- pool in the source layer
         self.NO3_pool = np.zeros(array_shape)
-        ## NO3- conc in soil layer
+        ## NO3- conc in the source layer
         self.NO3_amount = np.zeros(array_shape)
-        ## NO3- from nitrification in soil interface
+        ## NO3- from nitrification in the topsoil layer
         self.nitrif_NO3_soil = np.zeros(array_shape)
-        ## NO3- pool in soil interface
+        ## NO3- pool in the top soil layer
         self.NO3_pool_soil = np.zeros(array_shape)
-        ## NO3- conc in soil interface
+        ## NO3- conc in the topsoil layer
         self.NO3_soil_amount = np.zeros(array_shape)
-        ## infiltration of NO3 from the source layer to the top soil layer
+        ## infiltration of NO3 from the source layer to the topsoil layer
         self.NO3_infilsourcelayer = np.zeros(array_shape)
-        ## diffusive aqueous NO3- from the source layer to the top soil layer
+        ## diffusive aqueous NO3- from the source layer to the topsoil layer
         self.NO3_diffusivesourcelayer = np.zeros(array_shape)
         ## NO3- leaching to deeper soil
         self.NO3_leaching = np.zeros(array_shape)
         ## diffusive aqueous NO3- to deeper soil
-        self.NO3_diffusivesoil = np.zeros(array_shape)
-        ## water added from housing
+        self.NO3_diffusivedeep = np.zeros(array_shape)
+        ## water added from MMS/HOUSING
         self.water_added = water_added
         self.water = np.zeros(array_shape)
-        ## total water pool of the system (manure water; urine+manure water+[washing water])
+        ## total water pool of the system (soil water; manure water+soil water)
         self.Total_water_pool = np.zeros(array_shape)
-        ## total pool of the soil interface
+        ## total pool of the topsoil layer
         self.water_pool_soil = np.zeros(array_shape)
         ## ratio of [NH4+]/[H+] in the system
         self.Gamma_manure = np.zeros(array_shape)
         ## surface NH3 concentrtion at equilirium (in molar mass)
         self.NH3_gas_M = np.zeros(array_shape)
-        ## NH3 concentration in soil layer
+        ## NH3 concentration in the source layer
         self.NH3_gas_bulk = np.zeros(array_shape)
-        ## soil NH3 concentration
+        ## topsoil layer NH3 concentration
         self.NH3_gas_soil = np.zeros(array_shape)
-        ## surface NH3 concentrtion at equilirium (in ug)
-        # self.NH3_gas_ug = np.zeros(array_shape)
         ## emission potential
         self.modelled_emiss = np.zeros(array_shape)
         ## final emission
@@ -236,27 +188,52 @@ class LAND_module:
         self.NH3_flux = np.zeros(array_shape)
         ## leaching of aqueous TAN to deeper soil (not diffusive)
         self.leachingflux = np.zeros(array_shape)
-        ## diffusion of aqueous TAN from the source layer to the top soil layer
+
+        ## the following fluxes are valid when source layer refers to the whole topsoil layer (broadcasting-disk)
+        ## OR the source layer is above the topsoil layer (e.g., broadcasting-topdressed)
+        ## diffusion of aqueous TAN from the source layer to the topsoil layer
         self.diffusivefluxsourcelayer_aq = np.zeros(array_shape)
-        ## diffusion of gaseous NH3 from the source layer to the top soil layer
+        ## diffusion of gaseous NH3 from the source layer to the topsoil layer
         self.diffusivefluxsourcelayer_gas = np.zeros(array_shape)
-        ## diffusion of aqueous TAN from the top soil layer to the deeper soil
+        ## diffusion of aqueous TAN from the topsoil layer to the deeper soil
         self.diffusivefluxsoil_aq = np.zeros(array_shape)
-        ## diffusion of gaseous NH3 from the top soil layer to the deeper soil
+        ## diffusion of gaseous NH3 from the topsoil layer to the deeper soil
         self.diffusivefluxsoil_gas = np.zeros(array_shape)
-        ## upward diffusion of aqueous TAN: from the top soil layer to the source layer 
+        ## upward diffusion of aqueous TAN: from the topsoil layer to the source layer 
         self.diffusivefluxup_aq = np.zeros(array_shape)
-        ## upward diffusion of gaseous NH3: from the top soil layer to the  source layer
+        ## upward diffusion of gaseous NH3: from the topsoil layer to the  source layer
         self.diffusivefluxup_gas = np.zeros(array_shape)
 
         ## infiltration of aqueous TAN to soil interface
         self.infilflux = np.zeros(array_shape)
-        ## uptake of ammonium nitrogen by plants
+        ## Note that when there is a thin source layer above (within) the topsoil layer, 
+        ## there is no N uptake taken place in the source layer,
+        ## because N uptake occurrs in the soil layer where the seedling zone is
+        ## uptake of ammonium nitrogen by plants in the topsoil layer
         self.ammN_uptake = np.zeros(array_shape)
-        ## uptake of nitrate nitrogen by plants
+        ## uptake of nitrate nitrogen by plants in the topsoil layer
         self.nitN_uptake = np.zeros(array_shape)
 
-        ## temp
+        ## [deep injection] technique:
+        ## vertical soil profile in the model (from top to the bottom):
+        ## surface (0 cm) - topsoil layer (0 - 7 cm) - source layer (7 - 13 cm) - deeper soil
+        if application_method_index == 'deep injection':
+            ## downward diffusion of aqueous TAN: from the topsoil layer to the source layer 
+            self.diffusivefluxdown_aq = np.zeros(array_shape)
+            ## downward diffusion of gaseous NH3: from the topsoil layer to the  source layer
+            self.diffusivefluxdown_gas = np.zeros(array_shape)
+            ## infiltration of NO3 from the top soillayer to the source layer; downwards
+            self.NO3_infilsoil = np.zeros(array_shape)
+            ## diffusive aqueous NO3- from the source layer to the topsoil layer; upwards
+            self.NO3_diffusiveup = np.zeros(array_shape)
+            ## diffusive aqueous NO3- from the source layer to the deeper soil; downwards
+            self.NO3_diffusivedown = np.zeros(array_shape)
+            ## ammonium N uptake by plants in the source layer
+            self.ammN_uptake_sourcelayer = np.zeros(array_shape)
+            ## nitrate N uptake by plants in the source layer
+            self.nitN_uptake_sourcelayer = np.zeros(array_shape)
+
+        ## temperature
         self.T_sim = np.zeros(array_shape)
         ## wind/ventilation
         self.u_sim = np.zeros(array_shape)
@@ -274,17 +251,17 @@ class LAND_module:
         self.rain_avail_washoff = np.zeros(array_shape)
         ## atmospheric resistances: 1) aerodynamic resistance, 2) boundary layer resistance
         self.R_atm = np.zeros(array_shape)
-        ## soil resistance of the source layer
+        ## soil resistance of the source layer; distances may vary
         self.R_sourcelayer_aq = np.zeros(array_shape)
-        ## soil resistance of the source layer
+        ## soil resistance of the source layer; distances may vary
         self.R_sourcelayer_gas = np.zeros(array_shape)
-        ## soil resistance for aqueous diffusion
+        ## soil resistance for aqueous diffusion; distances may vary
         self.R_soilaq = np.zeros(array_shape)
-        ## soil resistance for gaseous diffusion
+        ## soil resistance for gaseous diffusion; distances may vary
         self.R_soilg = np.zeros(array_shape)
-        ## soil resistance for downward aqueous diffusion
+        ## soil resistance for downward aqueous diffusion; distances may vary
         self.R_soilaq_down = np.zeros(array_shape)
-        ## soil resistance for downward gaseous diffusion
+        ## soil resistance for downward gaseous diffusion; distances may vary
         self.R_soilg_down = np.zeros(array_shape)
         ## mositure equilirium, mositure content of manure
         self.mois_coeff = np.zeros(array_shape)
@@ -305,8 +282,6 @@ class LAND_module:
         self.D_aq_NH4 = np.zeros(array_shape)
         ## molecular diffusivity of NH3 in the air
         self.D_air_NH3 = np.zeros(array_shape)
-        ## tortuosity for diffusion
-        # self.tor_soil = np.zeros(array_shape)
         ## percolation flux; m/s
         self.qpsoil = np.zeros(array_shape)
         ## pH and H+ ions concentration
@@ -348,6 +323,7 @@ class LAND_module:
         self.qpsoil[366:] = subrunoff_data[1:]/(timestep*3600)
         self.R_atm[:366] = ram1_data+rb1_data
         self.R_atm[366:] = ram1_data[1:]+rb1_data[1:]
+        ## numpy arrays (not xarrays)
         self.T_sim = xr_to_np(self.T_sim)
         self.RH_sim = xr_to_np(self.RH_sim)
         self.u_sim = xr_to_np(self.u_sim)
@@ -357,10 +333,6 @@ class LAND_module:
         self.persm[self.persm>1.0] = 0.9999
         self.rainfall = xr_to_np(self.rainfall)
         self.R_atm = xr_to_np(self.R_atm)
-        # self.daily_KNO3 = nitrification_rate_soil(ground_temp=self.T_sim,theta=self.soilmoist,theta_sat=self.persm,
-        #                                             fer_type="manure")*timestep*3600
-        # self.daily_KNO3[self.daily_KNO3<0] = 0.0
-        # self.daily_KNO3[np.isnan(self.daily_KNO3)] = 0.0
         print('LAND ENV: open env')
 
         ## mositure equilirium, mositure content of manure
@@ -385,7 +357,7 @@ class LAND_module:
     def spreading_time(self,fert_type='manure',
                         crop_type=None,N_input=None,plant_calendar=None,harvest_calendar=None,
                         fert_freq=None,soil_pH=None):
-        # times = mtrx[0]
+        ## lats and lons
         lats = mtrx2[1]
         lons = mtrx2[2]
         N_app = np.zeros(mtrx2)
@@ -401,10 +373,11 @@ class LAND_module:
             print(crop_type)
             for lat in np.arange(lats):
                 for lon in np.arange(lons):
+                    ## timing of planting and harvesting
                     plt_time = plant_calendar[lat,lon]
                     har_time = harvest_calendar[lat,lon]
+                    ## how many times that N is applied on fields in an annual cycle
                     app_freq = fert_freq[lat,lon]
-            #         print(lat,lon)
                     ## harvesting goes into the next year
                     if ~np.isnan(app_freq):
                         if ~np.isnan(plt_time):
@@ -413,14 +386,20 @@ class LAND_module:
                                     har_time = har_time+365
                                 if app_freq <=1.0:
                                     N_app[int(plt_time),lat,lon] = N_input[lat,lon]*app_freq
+                                    ## mark up the N application
                                     N_app_mark[int(plt_time),lat,lon] = 1 
                                 elif app_freq>1.0:
+                                    ## get the integer times of N application
                                     tapp = np.floor(app_freq)
+                                    ## application intervals
                                     app_int = int(abs(int(har_time)-int(plt_time))/(tapp+1))
+                                    ## index for application
                                     app_idx = np.arange(int(plt_time),int(har_time)-1,app_int)
+                                    ## in tapp times, the application rate equals the readed applcation rates
                                     for idx in app_idx[:-1]:
                                         N_app[int(idx),lat,lon] = N_input[lat,lon]
                                         N_app_mark[int(idx),lat,lon] = 1
+                                    ## the residual of N application rates
                                     N_app[int(app_idx[-1]),lat,lon] = (app_freq-tapp)*N_input[lat,lon]
                                     N_app_mark[int(app_idx[-1]),lat,lon] = 1
         
@@ -432,24 +411,28 @@ class LAND_module:
         return N_app
 
     def chem_fert_type(self):
+        ## country level chemical fertilizer use: 1) ammonium N, 2) nitrate N, 3) urea N
         fertds = open_ds(file_path+crop_data_path+fertfilename)
         nitN = fertds.nitrate_fert.values
         ammN = fertds.ammonium_fert.values
         ureaN = fertds.urea_fert.values
         totalN = nitN + ammN
         fnitN = nitN/totalN
+        ## urea N is a subcategory of ammonium N in the readed dataset
         fammN = (ammN-ureaN)/totalN
         fureaN = ureaN/totalN
         return fnitN, fammN, fureaN
 
     def chem_fert_input(self,crop):
+        ## read N application rates dataset for crops
         fertds = open_ds(file_path+crop_data_path+crop+cropfileformat)
+        ## crop calendar dataset
         cropcalds = open_ds(file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
+        ## base soil pH dataset
         soilpHds = open_ds(file_path+soil_data_path+soilpHfile)
 
         totalN = fertds.TotalN.values*1e3
         ## N application rate is interpolated;
-        ##  
         rateN = fertds.Nrate.values*1e3/1e4
         croparea = fertds.croparea.values*1e4
         croparea[totalN!=0] = totalN[totalN!=0]/rateN[totalN!=0]
@@ -474,6 +457,9 @@ class LAND_module:
         fnitN[(np.isnan(fnitN))&(totalN!=0)] = 0.27
         fammN[(np.isnan(fammN))&(totalN!=0)] = 0.24
         fureaN[(np.isnan(fureaN))&(totalN!=0)] = 0.49
+        ## N rate of three types of fertilizer;
+        ## the fraction of usage is represented by the 
+        ## fractional cropping area that uses the corresponding N fertilizer
         self.NO3_added = chem_N_tocrop
         self.nitN_area = fnitN * croparea
         self.TAN_added = chem_N_tocrop
@@ -817,13 +803,15 @@ class LAND_module:
                 
         return'''
 
-    
+    ## Simulation: BROADCASTING - Incorporated disk scheme
+    ## 
     def chem_fert_bcdisk_sim(self,start_day_idx,end_day_idx,chem_fert_type,disk_depth):
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is [broadcasting - incorporated disk], fertilizer placement depth is: '+str(disk_depth*100)+' cm')
         soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
         Kd = ammonium_adsorption(clay_content=soilclay)
+        z_sourcelayer = disk_depth
         if chem_fert_type == 'nitrate':
             print('chemical fertilizer applied: nitrate')
             self.NO3 = self.NO3_added
@@ -893,10 +881,10 @@ class LAND_module:
                 KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
                 self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
                 self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                    (z_soil*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                    (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
                     KNH3[self.soilmoist[dd+1]!=0]*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]-\
                         self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])*Kd))
+                    (1-self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
                 ## TAN molar conc; mol/L
                 self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
                 ## NH3 conc in soil pool
@@ -993,7 +981,7 @@ class LAND_module:
                                                             (soilammNuptake_idx[loss_idx<0]/all_loss[loss_idx<0])
 
                 ## NO3- pool of soil layer
-                NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] - self.NO3_washoff[dd+1] - \
+                NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusivedeep[dd] - self.NO3_washoff[dd+1] - \
                             self.nitN_uptake[dd]
                 self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + \
                                                     self.NO3[dd+1][NO3_idx>0]
@@ -1001,7 +989,7 @@ class LAND_module:
 
                 ## NO3- conc of soil layer; g/m3
                 self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                                                            (z_soil*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
+                                                            (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
                 self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
                 
                 ## diffusive aquous NO3 and infiltration of NO3 from bulk manure to soil interface
@@ -1011,10 +999,10 @@ class LAND_module:
                 NO3_leachingidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
                 NO3_lossall = NO3_diffidx + NO3_leachingidx + soilnitNuptake_idx
                 loss_idx = self.NO3_pool[dd+1] - NO3_lossall 
-                self.NO3_diffusivesoil[dd+1][loss_idx>=0] = NO3_diffidx[loss_idx>=0]
+                self.NO3_diffusivedeep[dd+1][loss_idx>=0] = NO3_diffidx[loss_idx>=0]
                 self.NO3_leaching[dd+1][loss_idx>=0] = NO3_leachingidx[loss_idx>=0]
                 self.nitN_uptake[dd+1][loss_idx>=0] = soilnitNuptake_idx[loss_idx>=0]
-                self.NO3_diffusivesoil[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                self.NO3_diffusivedeep[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
                                                                         NO3_diffidx[loss_idx<0]/NO3_lossall[loss_idx<0]                                           
                 self.NO3_leaching[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
                                                                         NO3_leachingidx[loss_idx<0]/NO3_lossall[loss_idx<0]   
@@ -1031,6 +1019,9 @@ class LAND_module:
         soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
         Kd = ammonium_adsorption(clay_content=soilclay)
+        ## thickness of the default source layer: 2cm; mid point 1cm
+        z_sourcelayer = 0.02
+        p_sourcelayer = 0.01
         if chem_fert_type == 'nitrate':
             print('chemical fertilizer applied: nitrate')
             self.NO3 = self.NO3_added
@@ -1360,7 +1351,7 @@ class LAND_module:
 
 
                 ## NO3- pool of soil interface
-                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivesoil[dd] -\
+                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivedeep[dd] -\
                                 self.nitN_uptake[dd] 
                 self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0] + \
                         self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx>0]
@@ -1380,10 +1371,10 @@ class LAND_module:
                 
                 NO3_soilall_loss = NO3_soildiffidx + NO3_soilleachingidx + soilnitNuptake_idx
                 soilloss_idx = self.NO3_pool_soil[dd+1] - NO3_soilall_loss
-                self.NO3_diffusivesoil[dd+1][soilloss_idx>=0] = NO3_soildiffidx[soilloss_idx>=0]
+                self.NO3_diffusivedeep[dd+1][soilloss_idx>=0] = NO3_soildiffidx[soilloss_idx>=0]
                 self.NO3_leaching[dd+1][soilloss_idx>=0] = NO3_soilleachingidx[soilloss_idx>=0]
                 self.nitN_uptake[dd+1][soilloss_idx>=0] = soilnitNuptake_idx[soilloss_idx>=0]
-                self.NO3_diffusivesoil[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                self.NO3_diffusivedeep[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
                                                                 NO3_soildiffidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
                 self.NO3_leaching[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
                                                             NO3_soilleachingidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
@@ -1843,7 +1834,7 @@ class LAND_module:
             chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
             print('NO3 leaching: '+str(chemfert_NO3leaching))
 
-            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivesoil*sim_area)/1e9
+            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
             print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))
                 
         elif fert_method == 'broadcasting-disk':
@@ -1869,7 +1860,7 @@ class LAND_module:
             chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
             print('NO3 leaching: '+str(chemfert_NO3leaching))
 
-            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivesoil*sim_area)/1e9
+            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
             print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))    
 
         elif fert_method == 'deep injection':
