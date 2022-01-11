@@ -1095,3 +1095,7 @@ class MMS_module:
                 NH3_gas = self.NH3_gas_M[dd+1] *14*1000
                 self.NH3_flux[dd+1] = NH3_gas*k_gas*timestep*3600
         return
+
+    def MMS_sim_main():
+        
+        return

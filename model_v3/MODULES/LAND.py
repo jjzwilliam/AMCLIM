@@ -1780,51 +1780,36 @@ class LAND_module:
 
         chemfert_TANwashoff = np.nansum(self.TAN_washoff*sim_area)/1e9
         print('TAN washoff: '+ str(chemfert_TANwashoff))
-
         chemfert_leaching = np.nansum(self.leachingflux*sim_area)/1e9
         print('NH4 leaching: '+ str(chemfert_leaching))
 
         if fert_method == 'broadcasting-surf':
-
             chemfert_diffaq = np.nansum(self.diffusivefluxsourcelayer_aq*sim_area)/1e9
             print('TAN diff aq to topsoil: '+ str(chemfert_diffaq))
-
             chemfert_diffgas = np.nansum(self.diffusivefluxsourcelayer_gas*sim_area)/1e9
             print('TAN diff gas to topsoil: '+ str(chemfert_diffgas))
-
             chemfert_updiffaq = np.nansum(self.diffusivefluxup_aq*sim_area)/1e9
             print('TAN diff aq upwards to source layer: '+ str(chemfert_updiffaq))
-
             chemfert_updiffgas = np.nansum(self.diffusivefluxup_gas*sim_area)/1e9
             print('TAN diff gas upwards to source layer: '+ str(chemfert_updiffgas))
-
             chemfert_infil = np.nansum(self.infilflux*sim_area)/1e9
             print('NH4 infiltration to topsoil: '+ str(chemfert_infil))
-
             chemfert_nitrif = np.nansum(self.nitrif_NO3_sourcelayer*sim_area)/1e9
-            print('TAN nitrification: '+ str(chemfert_nitrif))
-
+            print('NH4 nitrification (surf source layer): '+ str(chemfert_nitrif))
             chemfert_diffaqdown = np.nansum(self.diffusivefluxsoil_aq*sim_area)/1e9
             print('TAN diff aq to deeper soil: '+ str(chemfert_diffaqdown))
-
             chemfert_diffgasdown = np.nansum(self.diffusivefluxsoil_gas*sim_area)/1e9
             print('TAN diff gas to deeper soil: '+ str(chemfert_diffgasdown))
-
             chemfert_nitrif_soil = np.nansum(self.nitrif_NO3_soil*sim_area)/1e9
-            print('NH4 nitrif: '+ str(chemfert_nitrif_soil))
-
+            print('NH4 nitrif (topsoil layer): '+ str(chemfert_nitrif_soil))
             chemfert_ammN_uptake = np.nansum(self.ammN_uptake*sim_area)/1e9
             print('NH4 uptake by plants: '+ str(chemfert_ammN_uptake))
-
             chemfert_nitN_uptake = np.nansum(self.nitN_uptake*sim_area)/1e9
             print('NO3 uptake by plants: '+ str(chemfert_nitN_uptake))
-
             chemfert_NO3diffusive = np.nansum(self.NO3_diffusivesourcelayer*sim_area)/1e9
             print('NO3 diffusion from source layer to soil pool: '+ str(chemfert_NO3diffusive))
-
             chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
             print('NO3 leaching: '+str(chemfert_NO3leaching))
-
             chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
             print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))
                 
@@ -1832,25 +1817,18 @@ class LAND_module:
 
             chemfert_nitrif = np.nansum(self.nitrif_NO3_sourcelayer*sim_area)/1e9
             print('TAN nitrification: '+ str(chemfert_nitrif))
-
             chemfert_diffaqdown = np.nansum(self.diffusivefluxsoil_aq*sim_area)/1e9
             print('TAN diff aq to deeper soil: '+ str(chemfert_diffaqdown))
-
             chemfert_diffgasdown = np.nansum(self.diffusivefluxsoil_gas*sim_area)/1e9
             print('TAN diff gas to deeper soil: '+ str(chemfert_diffgasdown))
-
             chemfert_ammN_uptake = np.nansum(self.ammN_uptake*sim_area)/1e9
             print('NH4 uptake by plants: '+ str(chemfert_ammN_uptake))
-
             chemfert_nitN_uptake = np.nansum(self.nitN_uptake*sim_area)/1e9
             print('NO3 uptake by plants: '+ str(chemfert_nitN_uptake))
-
             chemfert_NO3diffusive = np.nansum(self.NO3_diffusivesourcelayer*sim_area)/1e9
             print('NO3 diffusion from source layer to soil pool: '+ str(chemfert_NO3diffusive))
-
             chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
             print('NO3 leaching: '+str(chemfert_NO3leaching))
-
             chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
             print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))    
 
@@ -1858,53 +1836,44 @@ class LAND_module:
 
             chemfert_nitrif = np.nansum(self.nitrif_NO3_sourcelayer*sim_area)/1e9
             print('NH4 nitrification (source layer): '+ str(chemfert_nitrif))
-
             chemfert_diffaqdown = np.nansum(self.diffusivefluxsoil_aq*sim_area)/1e9
             print('TAN diff aq to deeper soil: '+ str(chemfert_diffaqdown))
-
             chemfert_diffgasdown = np.nansum(self.diffusivefluxsoil_gas*sim_area)/1e9
             print('TAN diff gas to deeper soil: '+ str(chemfert_diffgasdown))
-
             chemfert_nitrif_soil = np.nansum(self.nitrif_NO3_soil*sim_area)/1e9
             print('NH4 nitrif (topsoil layer): '+ str(chemfert_nitrif_soil))
-
             chemfert_ammN_uptakesl = np.nansum(self.ammN_uptake_sourcelayer*sim_area)/1e9
             print('NH4 uptake by plants (source layer): '+ str(chemfert_ammN_uptakesl))
-
             chemfert_ammN_uptake = np.nansum(self.ammN_uptake*sim_area)/1e9
             print('NH4 uptake by plants (topsoil layer): '+ str(chemfert_ammN_uptake))
-
             chemfert_nitN_uptakesl = np.nansum(self.nitN_uptake_sourcelayer*sim_area)/1e9
             print('NO3 uptake by plants (source layer): '+ str(chemfert_nitN_uptakesl))
-
             chemfert_nitN_uptake = np.nansum(self.nitN_uptake*sim_area)/1e9
             print('NO3 uptake by plants (topsoil layer): '+ str(chemfert_nitN_uptake))
-
             chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
             print('NO3 leaching: '+str(chemfert_NO3leaching))
-
             chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
             print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))
-
         return
 
     def chem_fert_main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,fert_depth,sim_stat=False):
+        
         self.sim_env()
+
         if fert_method == 'broadcasting-surf':
             self.chem_fert_input(crop=crop_item)
             self.app_method(application_method=None)
-            self.chem_fert_bcsurf_sim(start_day_idx,end_day_idx,chem_fert_type)
-            
-                
+            self.chem_fert_bcsurf_sim(start_day_idx,end_day_idx,chem_fert_type)              
         elif fert_method == 'broadcasting-disk':
             self.chem_fert_input(crop=crop_item)
             self.app_method(application_method=None)
             self.chem_fert_bcdisk_sim(start_day_idx,end_day_idx,chem_fert_type,fert_depth)
-
         elif fert_method == 'deep injection':
             self.chem_fert_input(crop=crop_item)
             self.app_method(application_method=None)
             self.chem_fert_deepinjec_sim(start_day_idx,end_day_idx,chem_fert_type,fert_depth)
+        else:
+            print('Error: fertilization method')
 
         if sim_stat is True:
             self.N_stat(fert_method,chem_fert_type)
