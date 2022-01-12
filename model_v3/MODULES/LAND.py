@@ -420,12 +420,23 @@ class LAND_module:
         fammN = (ammN-ureaN)/totalN
         fureaN = ureaN/totalN
         return fnitN, fammN, fureaN
+    
+    def crop_calendar(self,filepath):
+        ## crop calendar dataset
+        cropcalds = open_ds(filepath)
+        ## read planting and harvesting dates
+        plantdate = cropcalds['plant.start'].values
+        harvestdate = cropcalds['harvest.start'].values
+        ## harvesting date goes into next year
+        harvestdate[harvestdate<plantdate] = harvestdate[harvestdate<plantdate]+365
+        return plantdate,harvestdate
 
     def chem_fert_input(self,crop):
         ## read N application rates dataset for crops
         fertds = open_ds(file_path+crop_data_path+crop+cropfileformat)
         ## crop calendar dataset
-        cropcalds = open_ds(file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
+        cropcalspath = file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+        # cropcalds = open_ds(file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
         ## base soil pH dataset
         soilpHds = open_ds(file_path+soil_data_path+soilpHfile)
 
@@ -438,8 +449,10 @@ class LAND_module:
         ## the maximum application frequency in a year is 5
         app_freq[app_freq>5] = 5
 
-        plantidx = cropcalds['plant.start'].values
-        harvestidx = cropcalds['harvest.start'].values
+        ## read planting and harvesting dates
+        plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
+        # plantidx = cropcalds['plant.start'].values
+        # harvestidx = cropcalds['harvest.start'].values
 
         soilph = np.zeros(mtrx2)
         soilph[:] = soilpHds.T_PH_H2O.values
@@ -806,7 +819,7 @@ class LAND_module:
     ## fluxes: 1. surface runoff  2. NH3 volatilization
     ##         3. percolation flux (subsurface runoff/infiltration)  4. diffusion (aq,gas)
     ## pathways/processes: 1. nitrification  2. plant N uptake inc. ammonium and nitrate   
-    def chem_fert_bcdisk_sim(self,start_day_idx,end_day_idx,chem_fert_type,disk_depth):
+    def chem_fert_bcdisk_sim(self,start_day_idx,end_day_idx,chem_fert_type,disk_depth,crop=None):
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is [broadcasting - incorporated disk], fertilizer placement depth is: '+str(disk_depth*100)+' cm')
         soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
@@ -833,175 +846,181 @@ class LAND_module:
             print('chemical fertilizer applied: urea')
             sim_pH = self.soil_pH
             sim_ccH = self.soil_ccH
-        if livestock.lower()=="poultry":
-            # for dd in np.arange(start_day_idx,end_day_idx-1):
-            print(livestock)
 
-        else:
-            for dd in np.arange(start_day_idx,end_day_idx):
-                
-                ## soil resistance
-                ## soil resistance = half of the thickness of the corresponding soil layer (z) / (tortuosity for diffusion x diffusivity of the species)
-                ## Note the differences between Vira et al., 2020 GMD and Moring et al., 2016 BG; we used Moring et al.
-                tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
-                tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
-                self.R_soilaq[dd+1] = (disk_depth/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_soilg[dd+1] = (disk_depth/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
-                ## the distance of diffusion to the deeper soil is set to be from the middle point of the disk layer 
-                ## to the middle point of the second soil layer
-                self.R_soilaq_down[dd+1] = (p_2ndsoil-disk_depth/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_soilg_down[dd+1] = (p_2ndsoil-disk_depth/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
+        ## crop calendar that detenmines the N uptake by crops
+        if crop is not None:
+            cropcalspath = file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+            plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
 
-                ## TAN production from urea hydrolysis
-                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
+        
+        for dd in np.arange(start_day_idx,end_day_idx):
+            
+            ## soil resistance
+            ## soil resistance = half of the thickness of the corresponding soil layer (z) / (tortuosity for diffusion x diffusivity of the species)
+            ## Note the differences between Vira et al., 2020 GMD and Moring et al., 2016 BG; we used Moring et al.
+            tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
+            tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
+            self.R_soilaq[dd+1] = (disk_depth/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_soilg[dd+1] = (disk_depth/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            ## the distance of diffusion to the deeper soil is set to be from the middle point of the disk layer 
+            ## to the middle point of the second soil layer
+            self.R_soilaq_down[dd+1] = (p_2ndsoil-disk_depth/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_soilg_down[dd+1] = (p_2ndsoil-disk_depth/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
 
-                ## Urea pool
-                urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
-                self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
-                self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
-                
-                ## TAN pool 
-                ## Note: source of TAN pool: input of TAN from fertilizer (ammonium or urea hydrolysis)
-                ##                              nitrate does not contribute to the TAN pool
-                ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) diffusion to soil (aq+gas), 
-                ##                         3) infiltration (subsurface leaching) to soil, 4) surface runoff
-                ##                         5) nitrification, 6) plant uptake
-                TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsoil_aq[dd] - self.diffusivefluxsoil_gas[dd]-\
-                    self.leachingflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd] - self.ammN_uptake[dd]
-                self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
-                self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
+            ## TAN production from urea hydrolysis
+            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
 
-                ## TAN conc; g/m3
-                ## TAN will partitioned into gaseous NH3, aqueous and solid (adsorption to manure) NH4+
-                ## gaseous NH3 in air-filled pore space; epsilon(soil porosity) - theta
-                ## aqueous TAN in water-filled pore space; theta
-                ## solid phase TAN adsorbed on solid particles; 1 - epsilon
-                ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd is derived from an emperical relationship with soil clay content (ref: DNDC model)
-                ## NH3(g) = KNH3*[TAN(aq)]
-                ## MTAN = Vsoil*(theta*[TAN(aq)]+(epsilon-theta)*NH3(g)+(1-epsilon)*[TAN(s)])
-                ## so, [TAN(aq)] = MTAN/Vsoil * (1/(theta+KNH3*(epsilon-theta)+Kd*(1-epsilon)))
-                KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                    (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]-\
-                        self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## TAN molar conc; mol/L
-                self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
-                ## NH3 conc in soil pool
-                self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
-                ## NH3 conc is 0 when soil water content equals to porosity (saturated soil water content)
-                self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            ## Urea pool
+            urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
+            self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
+            self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+            
+            ## TAN pool 
+            ## Note: source of TAN pool: input of TAN from fertilizer (ammonium or urea hydrolysis)
+            ##                              nitrate does not contribute to the TAN pool
+            ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) diffusion to soil (aq+gas), 
+            ##                         3) infiltration (subsurface leaching) to soil, 4) surface runoff
+            ##                         5) nitrification, 6) plant uptake
+            TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsoil_aq[dd] - self.diffusivefluxsoil_gas[dd]-\
+                self.leachingflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd] - self.ammN_uptake[dd]
+            self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
+            self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
 
-                ## TAN conc at the surface (solved); atmospheric NH3 is ignored
-                self.TAN_surf_amount_M[dd+1] = (self.TAN_amount[dd+1]*(1/self.R_soilaq[dd+1]+KNH3/self.R_soilg[dd+1])/\
-                        (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_soilg[dd+1])+1/self.R_soilaq[dd+1]))/\
-                            (14*1000)
-                ## TAN surface conc in g/m3
-                TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
-                ## Gaseous NH3 at the surface
-                self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
-                ## in ug
-                NH3_gas_g = self.NH3_gas_M[dd+1]*14*1000
+            ## TAN conc; g/m3
+            ## TAN will partitioned into gaseous NH3, aqueous and solid (adsorption to manure) NH4+
+            ## gaseous NH3 in air-filled pore space; epsilon(soil porosity) - theta
+            ## aqueous TAN in water-filled pore space; theta
+            ## solid phase TAN adsorbed on solid particles; 1 - epsilon
+            ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd is derived from an emperical relationship with soil clay content (ref: DNDC model)
+            ## NH3(g) = KNH3*[TAN(aq)]
+            ## MTAN = Vsoil*(theta*[TAN(aq)]+(epsilon-theta)*NH3(g)+(1-epsilon)*[TAN(s)])
+            ## so, [TAN(aq)] = MTAN/Vsoil * (1/(theta+KNH3*(epsilon-theta)+Kd*(1-epsilon)))
+            KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]-\
+                    self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
+                (1-self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## TAN molar conc; mol/L
+            self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
+            ## NH3 conc in soil pool
+            self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
+            ## NH3 conc is 0 when soil water content equals to porosity (saturated soil water content)
+            self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
 
-                ## determining the maximum emission; 
-                emiss_idx = (NH3_gas_g*3600*timestep/self.R_atm[dd+1])
-                ## determining the maximum TAN runoff at the surface;
-                runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
-                ## determining the maximum TAN aqueous diffusion to deeper soil;
-                diffaq_idx = self.TAN_amount[dd+1]/self.R_soilaq_down[dd+1]*timestep*3600
-                diffaq_idx[diffaq_idx<=0] = 0.0
-                ## when soil mositure is 0, aqueous diffusion stops
-                diffaq_idx[self.soilmoist[dd+1]==0] = 0.0
-                ## determining the maximum TAN gaseous diffusion to deeper soil
-                diffgas_idx = self.NH3_gas_bulk[dd+1]/self.R_soilg_down[dd+1]*timestep*3600
-                diffgas_idx[diffgas_idx<0] = 0.0
-                ## when the soil moisture reaches the saturation, gaseous diffusion stops
-                diffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-                ## determining the maximum infiltration/subsurface leaching of TAN
-                leaching_idx = self.qpsoil[dd+1]*self.TAN_amount[dd+1]*timestep*3600
+            ## TAN conc at the surface (solved); atmospheric NH3 is ignored
+            self.TAN_surf_amount_M[dd+1] = (self.TAN_amount[dd+1]*(1/self.R_soilaq[dd+1]+KNH3/self.R_soilg[dd+1])/\
+                    (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_soilg[dd+1])+1/self.R_soilaq[dd+1]))/\
+                        (14*1000)
+            ## TAN surface conc in g/m3
+            TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
+            ## Gaseous NH3 at the surface
+            self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
+            ## in ug
+            NH3_gas_g = self.NH3_gas_M[dd+1]*14*1000
 
-                ## nirification rate of TAN in the soil layer; daily maximum nitrification rate is 0.1 per day
-                KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
-                                                theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
-                KNO3_soil[KNO3_soil>0.1] = 0.1
-                ## correction for WPFS response
-                KNO3_soil[KNO3_soil<0.0] = 0.0
-                KNO3_soil[np.isnan(KNO3_soil)] = 0.0
-                ## determine the aqueous NH4+ fraction of TAN
-                f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
-                    KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
-                    (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
-                ## determining the maximum nitrification of TAN
-                nitrif_idx = KNO3_soil*self.TAN_pool[dd]*f_NH4
-                
-                ## plant N uptake inc. ammonium, nitrate
-                soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool[dd]*f_NH4,\
-                                        Nnit=self.NO3_pool[dd],temp=self.T_sim[dd+1])
+            ## determining the maximum emission; 
+            emiss_idx = (NH3_gas_g*3600*timestep/self.R_atm[dd+1])
+            ## determining the maximum TAN runoff at the surface;
+            runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
+            ## determining the maximum TAN aqueous diffusion to deeper soil;
+            diffaq_idx = self.TAN_amount[dd+1]/self.R_soilaq_down[dd+1]*timestep*3600
+            diffaq_idx[diffaq_idx<=0] = 0.0
+            ## when soil mositure is 0, aqueous diffusion stops
+            diffaq_idx[self.soilmoist[dd+1]==0] = 0.0
+            ## determining the maximum TAN gaseous diffusion to deeper soil
+            diffgas_idx = self.NH3_gas_bulk[dd+1]/self.R_soilg_down[dd+1]*timestep*3600
+            diffgas_idx[diffgas_idx<0] = 0.0
+            ## when the soil moisture reaches the saturation, gaseous diffusion stops
+            diffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            ## determining the maximum infiltration/subsurface leaching of TAN
+            leaching_idx = self.qpsoil[dd+1]*self.TAN_amount[dd+1]*timestep*3600
 
-                ## all loss pathways
-                all_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + leaching_idx + nitrif_idx + soilammNuptake_idx
-                loss_idx = self.TAN_pool[dd+1] - all_loss
-                ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
-                self.NH3_flux[dd+1][loss_idx>=0] = emiss_idx[loss_idx>=0]
-                self.TAN_washoff[dd+1][loss_idx>=0] = runoff_idx[loss_idx>=0]
-                self.diffusivefluxsoil_aq[dd+1][loss_idx>=0] = diffaq_idx[loss_idx>=0]
-                self.diffusivefluxsoil_gas[dd+1][loss_idx>=0] = diffgas_idx[loss_idx>=0]
-                self.leachingflux[dd+1][loss_idx>=0] = leaching_idx[loss_idx>=0]
-                self.nitrif_NO3_sourcelayer[dd+1][loss_idx>=0] = nitrif_idx[loss_idx>=0]
-                self.ammN_uptake[dd+1][loss_idx>=0] = soilammNuptake_idx[loss_idx>=0]
-                ## otherwise, we use a weighted distribution
-                self.NH3_flux[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (emiss_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.TAN_washoff[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (runoff_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.diffusivefluxsoil_aq[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (diffaq_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.diffusivefluxsoil_gas[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (diffgas_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.leachingflux[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (leaching_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.nitrif_NO3_sourcelayer[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (nitrif_idx[loss_idx<0]/all_loss[loss_idx<0])
-                self.ammN_uptake[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
-                                                            (soilammNuptake_idx[loss_idx<0]/all_loss[loss_idx<0])
+            ## nirification rate of TAN in the soil layer; daily maximum nitrification rate is 0.1 per day
+            KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
+                                            theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
+            KNO3_soil[KNO3_soil>0.1] = 0.1
+            ## correction for WPFS response
+            KNO3_soil[KNO3_soil<0.0] = 0.0
+            KNO3_soil[np.isnan(KNO3_soil)] = 0.0
+            ## determine the aqueous NH4+ fraction of TAN
+            f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
+                KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
+                (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
+            ## determining the maximum nitrification of TAN
+            nitrif_idx = KNO3_soil*self.TAN_pool[dd]*f_NH4
+            
+            ## plant N uptake inc. ammonium, nitrate
+            soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool[dd]*f_NH4,\
+                                    Nnit=self.NO3_pool[dd],temp=self.T_sim[dd+1])
+            
+            ## no uptake after harvesting
+            soilammNuptake_idx[harvestidx<(dd+1)] = 0.0
+            soilnitNuptake_idx[harvestidx<(dd+1)] = 0.0
 
-                ## NO3- pool of soil layer
-                ## sources: 1) nitrification of TAN, and 2) input of nitrate fertilizer
-                ## losses: 1) leaching to deeper soil, 2) diffusion to deeper soil
-                ##         3) surface runoff, 4) plant uptake
-                NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusivedeep[dd] - self.NO3_washoff[dd+1] - \
-                            self.nitN_uptake[dd]
-                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + \
-                                                    self.NO3[dd+1][NO3_idx>0]
-                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0]
+            ## all loss pathways
+            all_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + leaching_idx + nitrif_idx + soilammNuptake_idx
+            loss_idx = self.TAN_pool[dd+1] - all_loss
+            ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
+            self.NH3_flux[dd+1][loss_idx>=0] = emiss_idx[loss_idx>=0]
+            self.TAN_washoff[dd+1][loss_idx>=0] = runoff_idx[loss_idx>=0]
+            self.diffusivefluxsoil_aq[dd+1][loss_idx>=0] = diffaq_idx[loss_idx>=0]
+            self.diffusivefluxsoil_gas[dd+1][loss_idx>=0] = diffgas_idx[loss_idx>=0]
+            self.leachingflux[dd+1][loss_idx>=0] = leaching_idx[loss_idx>=0]
+            self.nitrif_NO3_sourcelayer[dd+1][loss_idx>=0] = nitrif_idx[loss_idx>=0]
+            self.ammN_uptake[dd+1][loss_idx>=0] = soilammNuptake_idx[loss_idx>=0]
+            ## otherwise, we use a weighted distribution
+            self.NH3_flux[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (emiss_idx[loss_idx<0]/all_loss[loss_idx<0])
+            self.TAN_washoff[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (runoff_idx[loss_idx<0]/all_loss[loss_idx<0])
+            self.diffusivefluxsoil_aq[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (diffaq_idx[loss_idx<0]/all_loss[loss_idx<0])
+            self.diffusivefluxsoil_gas[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (diffgas_idx[loss_idx<0]/all_loss[loss_idx<0])
+            self.leachingflux[dd+1][loss_idx<0] = self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (leaching_idx[loss_idx<0]/all_loss[loss_idx<0])
+            self.nitrif_NO3_sourcelayer[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (nitrif_idx[loss_idx<0]/all_loss[loss_idx<0])
+            self.ammN_uptake[dd+1][loss_idx<0]= self.TAN_pool[dd+1][loss_idx<0]*\
+                                                        (soilammNuptake_idx[loss_idx<0]/all_loss[loss_idx<0])
 
-                ## NO3- conc of soil layer; g/m3
-                self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                                                            (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
-                self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-                
-                ## diffusive aquous NO3 and infiltration of NO3 to deeper soil
-                NO3_diffidx = self.NO3_amount[dd+1]*(f_DNO3/self.R_soilaq_down[dd+1])*timestep*3600
-                NO3_diffidx[NO3_diffidx<0] = 0.0
-                NO3_diffidx[self.soilmoist[dd+1]==0] = 0.0
-                NO3_leachingidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
-                NO3_washoffidx = self.rain_avail_washoff[dd+1]*self.NO3_amount[dd+1]*timestep*3600
-                NO3_lossall = NO3_diffidx + NO3_leachingidx + NO3_washoffidx + soilnitNuptake_idx 
-                loss_idx = self.NO3_pool[dd+1] - NO3_lossall 
-                self.NO3_diffusivedeep[dd+1][loss_idx>=0] = NO3_diffidx[loss_idx>=0]
-                self.NO3_leaching[dd+1][loss_idx>=0] = NO3_leachingidx[loss_idx>=0]
-                self.NO3_washoff[dd+1][loss_idx>=0] = NO3_washoffidx[loss_idx>=0]
-                self.nitN_uptake[dd+1][loss_idx>=0] = soilnitNuptake_idx[loss_idx>=0]
-                self.NO3_diffusivedeep[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
-                                                                        NO3_diffidx[loss_idx<0]/NO3_lossall[loss_idx<0]                                           
-                self.NO3_leaching[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
-                                                                        NO3_leachingidx[loss_idx<0]/NO3_lossall[loss_idx<0]
-                self.NO3_washoff[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
-                                                                        NO3_washoffidx[loss_idx<0]/NO3_lossall[loss_idx<0]   
-                self.nitN_uptake[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
-                                                                       soilnitNuptake_idx[loss_idx<0]/NO3_lossall[loss_idx<0]                                      
+            ## NO3- pool of soil layer
+            ## sources: 1) nitrification of TAN, and 2) input of nitrate fertilizer
+            ## losses: 1) leaching to deeper soil, 2) diffusion to deeper soil
+            ##         3) surface runoff, 4) plant uptake
+            NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusivedeep[dd] - self.NO3_washoff[dd+1] - \
+                        self.nitN_uptake[dd]
+            self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + \
+                                                self.NO3[dd+1][NO3_idx>0]
+            self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0]
+
+            ## NO3- conc of soil layer; g/m3
+            self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                                                        (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
+            self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+            
+            ## diffusive aquous NO3 and infiltration of NO3 to deeper soil
+            NO3_diffidx = self.NO3_amount[dd+1]*(f_DNO3/self.R_soilaq_down[dd+1])*timestep*3600
+            NO3_diffidx[NO3_diffidx<0] = 0.0
+            NO3_diffidx[self.soilmoist[dd+1]==0] = 0.0
+            NO3_leachingidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
+            NO3_washoffidx = self.rain_avail_washoff[dd+1]*self.NO3_amount[dd+1]*timestep*3600
+            NO3_lossall = NO3_diffidx + NO3_leachingidx + NO3_washoffidx + soilnitNuptake_idx 
+            loss_idx = self.NO3_pool[dd+1] - NO3_lossall 
+            self.NO3_diffusivedeep[dd+1][loss_idx>=0] = NO3_diffidx[loss_idx>=0]
+            self.NO3_leaching[dd+1][loss_idx>=0] = NO3_leachingidx[loss_idx>=0]
+            self.NO3_washoff[dd+1][loss_idx>=0] = NO3_washoffidx[loss_idx>=0]
+            self.nitN_uptake[dd+1][loss_idx>=0] = soilnitNuptake_idx[loss_idx>=0]
+            self.NO3_diffusivedeep[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                                                                    NO3_diffidx[loss_idx<0]/NO3_lossall[loss_idx<0]                                           
+            self.NO3_leaching[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                                                                    NO3_leachingidx[loss_idx<0]/NO3_lossall[loss_idx<0]
+            self.NO3_washoff[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                                                                    NO3_washoffidx[loss_idx<0]/NO3_lossall[loss_idx<0]   
+            self.nitN_uptake[dd+1][loss_idx<0] = self.NO3_pool[dd+1][loss_idx<0]*\
+                                                                    soilnitNuptake_idx[loss_idx<0]/NO3_lossall[loss_idx<0]                                      
                 
         return
 
@@ -1010,7 +1029,7 @@ class LAND_module:
     ## fluxes: 1. surface runoff  2. NH3 volatilization
     ##         3. percolation flux (subsurface runoff/infiltration)  4. diffusion (aq,gas)
     ## pathways/processes: 1. nitrification  2. plant N uptake inc. ammonium and nitrate
-    def chem_fert_bcsurf_sim(self,start_day_idx,end_day_idx,chem_fert_type):
+    def chem_fert_bcsurf_sim(self,start_day_idx,end_day_idx,chem_fert_type,crop=None):
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is [broadcasting - topdressed], fertilizer applied on the field surface')
         soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
@@ -1034,353 +1053,363 @@ class LAND_module:
             print('chemical fertilizer applied: urea')
             sim_pH = self.soil_pH
             sim_ccH = self.soil_ccH
-        if livestock.lower()=="poultry":
-            # for dd in np.arange(start_day_idx,end_day_idx-1):
-            print(livestock)
 
-        else:
-            for dd in np.arange(start_day_idx,end_day_idx):
+        ## crop calendar that detenmines the N uptake by crops
+        if crop is not None:
+            cropcalspath = file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+            plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
 
-                ## soil resistance
-                tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
-                tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
-                ## resistance for diffusion from the surface source layer to the underlying topsoil layer
-                self.R_soilaq[dd+1] = (p_topsoil-p_sourcelayer)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_soilg[dd+1] = (p_topsoil-p_sourcelayer)/(tor_soil_gas*self.D_air_NH3[dd+1])
-                ## resistance for diffusion to the deeper soil from the topsoil layer to the underlying 2nd soil layer
-                self.R_soilaq_down[dd+1] = (p_2ndsoil-p_topsoil)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_soilg_down[dd+1] = (p_2ndsoil-p_topsoil)/(tor_soil_gas*self.D_air_NH3[dd+1])
+        
+        for dd in np.arange(start_day_idx,end_day_idx):
 
-                ## sourcelayer resistance
-                ## sourcelayer resistance is determined by: R = (z/2)/(tor_sourcelayer*D); 
-                ##        z is the layer thickness of sourcelayer; D is molecular diffusivity of NH4+ in water
-                ##        tortuosity dependence for aqueous diffusion is not considered here
-                ## layer thickness of sourcelayer (DM+water) in meter: z = Vsourcelayer
-                self.R_sourcelayer_aq[dd+1] = (z_sourcelayer/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_sourcelayer_gas[dd+1] = (z_sourcelayer/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            ## soil resistance
+            tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
+            tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
+            ## resistance for diffusion from the surface source layer to the underlying topsoil layer
+            self.R_soilaq[dd+1] = (p_topsoil-p_sourcelayer)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_soilg[dd+1] = (p_topsoil-p_sourcelayer)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            ## resistance for diffusion to the deeper soil from the topsoil layer to the underlying 2nd soil layer
+            self.R_soilaq_down[dd+1] = (p_2ndsoil-p_topsoil)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_soilg_down[dd+1] = (p_2ndsoil-p_topsoil)/(tor_soil_gas*self.D_air_NH3[dd+1])
+
+            ## sourcelayer resistance
+            ## sourcelayer resistance is determined by: R = (z/2)/(tor_sourcelayer*D); 
+            ##        z is the layer thickness of sourcelayer; D is molecular diffusivity of NH4+ in water
+            ##        tortuosity dependence for aqueous diffusion is not considered here
+            ## layer thickness of sourcelayer (DM+water) in meter: z = Vsourcelayer
+            self.R_sourcelayer_aq[dd+1] = (z_sourcelayer/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_sourcelayer_gas[dd+1] = (z_sourcelayer/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
 
 
-                '''## N input in multiple forms
-                self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
-                self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
-                self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
-                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            '''## N input in multiple forms
+            self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
 
-                ## TAN production from urea hydrolysis and the N decomposition rate from dung
-                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
-                                        self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
-                                        self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
-                ## TAN from housing to storage
-                self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])'''
+            ## TAN production from urea hydrolysis and the N decomposition rate from dung
+            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
+                                    self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
+                                    self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
+            ## TAN from housing to storage
+            self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])'''
 
-                ## TAN production from urea hydrolysis
-                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
+            ## TAN production from urea hydrolysis
+            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
 
-                ## Urea pool
-                urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1]) - self.urea_washoff[dd+1]
-                self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
-                self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+            ## Urea pool
+            urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1]) - self.urea_washoff[dd+1]
+            self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
+            self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
 
-                '''## Org N pools in various forms
-                self.avail_N_pool[dd+1] = (self.avail_N_pool[dd] - self.avail_N_washoff[dd+1])*(1 - self.daily_Na_decomp_rate[dd+1]) + \
-                    self.avail_N[dd+1] 
-                self.resist_N_pool[dd+1] = (self.resist_N_pool[dd] - self.resist_N_washoff[dd+1])* (1 - self.daily_Nr_decomp_rate[dd+1]) + \
-                    self.resist_N[dd+1] 
-                self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1] - self.unavail_N_washoff[dd+1]'''
+            '''## Org N pools in various forms
+            self.avail_N_pool[dd+1] = (self.avail_N_pool[dd] - self.avail_N_washoff[dd+1])*(1 - self.daily_Na_decomp_rate[dd+1]) + \
+                self.avail_N[dd+1] 
+            self.resist_N_pool[dd+1] = (self.resist_N_pool[dd] - self.resist_N_washoff[dd+1])* (1 - self.daily_Nr_decomp_rate[dd+1]) + \
+                self.resist_N[dd+1] 
+            self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1] - self.unavail_N_washoff[dd+1]'''
 
-                ## TAN pool (source layer)
-                ## Note: source of TAN pool: 1) input of TAN from fertilizer (ammonium or urea hydrolysis)
-                ##                              nitrate does not contribute to the TAN pool
-                ##                           2) diffusion of TAN from the underlying topsoil layer to the source layer
-                ##                                 this is a bi-directional diffusion scheme as the N is removed from the 
-                ##                                  the source layer through surface runoff and the NH3 volatilization, which
-                ##                                   will lead to decreasing of the TAN concentration of the source layer. 
-                ##                                  When the TAN concentration of the underlying topsoil layer is higher than
-                ##                                   the source layer TAN concentration, diffusion takes place from the topsoil layer.
-                ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) surface runoff
-                ##                         3) diffusion to the topsoil (aq+gas) layer, 
-                ##                         4) infiltration to the topsoil layer, and 5) nitrification
-                ##       Note that there is no plant N uptake at the surface source layer in this scheme
-                '''TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsourcelayer_aq[dd] - self.diffusivefluxsourcelayer_gas[dd]-\
-                    self.infilflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd]
-                self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
-                self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
-                ## TAN pool in ug
-                TAN_pool_ug = self.TAN_pool[dd+1] * 1e6'''
+            ## TAN pool (source layer)
+            ## Note: source of TAN pool: 1) input of TAN from fertilizer (ammonium or urea hydrolysis)
+            ##                              nitrate does not contribute to the TAN pool
+            ##                           2) diffusion of TAN from the underlying topsoil layer to the source layer
+            ##                                 this is a bi-directional diffusion scheme as the N is removed from the 
+            ##                                  the source layer through surface runoff and the NH3 volatilization, which
+            ##                                   will lead to decreasing of the TAN concentration of the source layer. 
+            ##                                  When the TAN concentration of the underlying topsoil layer is higher than
+            ##                                   the source layer TAN concentration, diffusion takes place from the topsoil layer.
+            ##       loss of TAN pool: 1) NH3 volatilization to the atmospere, 2) surface runoff
+            ##                         3) diffusion to the topsoil (aq+gas) layer, 
+            ##                         4) infiltration to the topsoil layer, and 5) nitrification
+            ##       Note that there is no plant N uptake at the surface source layer in this scheme
+            '''TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsourcelayer_aq[dd] - self.diffusivefluxsourcelayer_gas[dd]-\
+                self.infilflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd]
+            self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
+            self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
+            ## TAN pool in ug
+            TAN_pool_ug = self.TAN_pool[dd+1] * 1e6'''
 
-                ## TAN pool with inputs
-                self.TAN_pool[dd+1] = self.TAN_pool[dd]+self.TAN_prod[dd+1]+self.TAN[dd+1] + \
-                        self.diffusivefluxup_aq[dd] + self.diffusivefluxup_gas[dd]
+            ## TAN pool with inputs
+            self.TAN_pool[dd+1] = self.TAN_pool[dd]+self.TAN_prod[dd+1]+self.TAN[dd+1] + \
+                    self.diffusivefluxup_aq[dd] + self.diffusivefluxup_gas[dd]
 
-                ## TAN conc; g/m3
-                ## TAN will partitioned into gaseous NH3, aqueous and solid (adsorption to manure) NH4+
-                ## gaseous NH3 in air-filled pore space; epsilon(soil porosity) - theta
-                ## aqueous TAN in water-filled pore space; theta
-                ## solid phase TAN adsorbed on solid particles; 1 - epsilon
-                ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd is derived from an emperical relationship with soil clay content (ref: DNDC model)
-                ## NH3(g) = KNH3*[TAN(aq)]
-                ## MTAN = Vsoil*(theta*[TAN(aq)]+(epsilon-theta)*NH3(g)+(1-epsilon)*[TAN(s)])
-                ## so, [TAN(aq)] = MTAN/Vsoil * (1/(theta+KNH3*(epsilon-theta)+Kd*(1-epsilon)))
-                KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                    (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
-                        self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## TAN molar conc; mol/L
-                self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
-                ## NH3 conc in the source layer
-                self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
-                ## NH3 conc is 0 when sourcelayer water content equals to porosity
-                self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-
-                ## TAN conc at the surface (solved); atmospheric NH3 is ignored
-                self.TAN_surf_amount_M[dd+1] = (self.TAN_amount[dd+1]*(1/self.R_sourcelayer_aq[dd+1]+KNH3/self.R_sourcelayer_gas[dd+1])/\
-                                        (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_sourcelayer_gas[dd+1])+1/self.R_sourcelayer_aq[dd+1]))/\
-                                            (14*1000)
-
-                ## TAN surface conc in g/m3
-                TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
-                ## Gaseous NH3 at the surface
-                self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
-                ## in g
-                NH3_gas_g = self.NH3_gas_M[dd+1]*14*1000
-
-                ## determining the maximum emission; 
-                emiss_idx = (NH3_gas_g*3600*timestep/self.R_atm[dd+1])
-                ## determining the maximum TAN runoff;
-                ## if rain available for runoff already in m/day; don't need to multiply be timestep*3600;
-                ## else need to multiply by timestep*3600
-                runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
-                ## determining the maximum TAN aqueous diffusion to the topsoil layer;
-                ## diffusion is considered to be bi-directional - either from source layer to topsoil or the other way round
-                diffaq_idx = (self.TAN_amount[dd+1]-self.TAN_soil_amount[dd])/self.R_soilaq[dd+1]*timestep*3600
-                ## if this term <0, diffusion takes place from the underlying topsoil layer
-                diffaq_idx[diffaq_idx<=0] = 0.0
-                ## when soil mositure is 0, aqueous diffusion stops
-                diffaq_idx[self.soilmoist[dd+1]==0] = 0.0
-                ## determining the maximum TAN gaseous diffusion to the topsoil layer
-                diffgas_idx = (self.NH3_gas_bulk[dd+1]-self.NH3_gas_soil[dd])/self.R_soilg[dd+1]*timestep*3600
-                diffgas_idx[diffgas_idx<0] = 0.0
-                ## when the soil moisture reaches the saturation, gaseous diffusion stops
-                diffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-                ## determining the maximum infiltration of TAN from the source layer to the topsoil layer
-                infil_idx = self.qpsoil[dd+1]*self.TAN_amount[dd+1]*timestep*3600
-                # infil_idx = 0*self.TAN_amount[dd+1]*timestep*3600
-                ## nirification rate of TAN in the source layer; daily maximum nitrification rate is 0.1 per day
-                KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
-                                                theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
-                KNO3_soil[KNO3_soil>0.1] = 0.1
-                ## correction for WPFS response
-                KNO3_soil[KNO3_soil<0.0] = 0.0
-                KNO3_soil[np.isnan(KNO3_soil)] = 0.0
-                ## determining the maximum nitrification of TAN
-                # nitrif_idx = KNO3_sourcelayer*self.TAN_pool[dd]
-                ## fraction of [NH4+(aq)]
-                f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
-                    KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
-                    (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
-                nitrif_idx = KNO3_soil*self.TAN_pool[dd+1]*f_NH4
-
-                ## fluxes from sourcelayer to the topsoil layer
-                ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
-                sourcelayerall_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + infil_idx + nitrif_idx
-                sourcelayerloss_idx = self.TAN_pool[dd+1] - sourcelayerall_loss
-                
-                self.NH3_flux[dd+1][sourcelayerloss_idx>=0] = emiss_idx[sourcelayerloss_idx>=0]
-                self.TAN_washoff[dd+1][sourcelayerloss_idx>=0] = runoff_idx[sourcelayerloss_idx>=0]
-                self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx>=0] = diffaq_idx[sourcelayerloss_idx>=0]
-                self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx>=0] = diffgas_idx[sourcelayerloss_idx>=0]
-                self.infilflux[dd+1][sourcelayerloss_idx>=0] = infil_idx[sourcelayerloss_idx>=0]
-                self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx>=0] = nitrif_idx[sourcelayerloss_idx>=0]
-                ## otherwise, we use a weighted distribution
-                self.NH3_flux[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                            (emiss_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
-                self.TAN_washoff[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                            (runoff_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
-                self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx<0]= self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                            (diffaq_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
-                self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                            (diffgas_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
-                self.infilflux[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                            (infil_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
-                self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx<0]= self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                            (nitrif_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
-
-                ## determine TAN pool after subtracting all loss pathways
-                self.TAN_pool[dd+1] = self.TAN_pool[dd+1] - self.NH3_flux[dd+1] - self.diffusivefluxsourcelayer_aq[dd+1] - self.diffusivefluxsourcelayer_gas[dd+1]-\
-                    self.infilflux[dd+1] - self.nitrif_NO3_sourcelayer[dd+1] - self.TAN_washoff[dd+1]
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                    (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
-                        self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## NH3 conc in the source layer
-                self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
-                ## NH3 conc is 0 when source layer water content reaches saturation
-                self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-
-                ## NO3- pool of the source layer
-                ## sources: 1) nitrification of TAN, and 2) input of nitrate fertilizer
-                ## losses: 1) infiltration to the underlying topsoil layer, 
-                ##         2) diffusion (aq only) to the underlying topsoil layer, 3) surface washoff
-                NO3_idx = self.NO3_pool[dd] - self.NO3_infilsourcelayer[dd] - self.NO3_diffusivesourcelayer[dd] - self.NO3_washoff[dd+1]
-                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + self.NO3[dd+1][NO3_idx>0]
-                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0]
-
-                ## NO3- conc of the source layer; g/m3
-                self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                                                                            (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
-                self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-
-                ## diffusive aquous NO3 and infiltration of NO3 from the source layer to the topsoil layer
-                NO3_diffidx = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd])*(f_DNO3/self.R_soilaq[dd+1])*timestep*3600
-                NO3_diffidx[NO3_diffidx<0] = 0.0
-                NO3_diffidx[self.soilmoist[dd+1]==0] = 0.0
-                NO3_infilidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
-                NO3_washoffidx = self.rain_avail_washoff[dd+1]*self.NO3_amount[dd+1]*timestep*3600
-                NO3_lossall = NO3_diffidx + NO3_infilidx + NO3_washoffidx
-                sourcelayerloss_idx = self.NO3_pool[dd+1] - NO3_lossall
-                self.NO3_diffusivesourcelayer[dd+1][sourcelayerloss_idx>=0] = NO3_diffidx[sourcelayerloss_idx>=0]
-                self.NO3_infilsourcelayer[dd+1][sourcelayerloss_idx>=0] = NO3_infilidx[sourcelayerloss_idx>=0]
-                self.NO3_washoff[dd+1][sourcelayerloss_idx>=0] = NO3_washoffidx[sourcelayerloss_idx>=0]
-                self.NO3_diffusivesourcelayer[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                        NO3_diffidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]                                           
-                self.NO3_infilsourcelayer[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                        NO3_infilidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]    
-                self.NO3_washoff[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                        NO3_washoffidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]                                     
-
-                ## TAN pool of the topsoil layer
-                ## sources: 1) infiltration from the above source layer, 2) diffusion (aq+gas) source layer to the topsoi layer
-                ## losses: 1) diffusion (aq+gas) to the deeper soil, 2) diffusion (aq+gas) to the source layer if possible (bi-directional)
-                ##         3) subsurface leaching, 4) nitrification, 5) plant uptake 
-                ## TAN pool with inputs
-                self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd] + self.infilflux[dd+1] +\
-                    self.diffusivefluxsourcelayer_aq[dd+1] + self.diffusivefluxsourcelayer_gas[dd+1]
-
-                ## TAN conc of the topsoil layer; g/m3
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
-                    ((z_topsoil-z_sourcelayer)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+            ## TAN conc; g/m3
+            ## TAN will partitioned into gaseous NH3, aqueous and solid (adsorption to manure) NH4+
+            ## gaseous NH3 in air-filled pore space; epsilon(soil porosity) - theta
+            ## aqueous TAN in water-filled pore space; theta
+            ## solid phase TAN adsorbed on solid particles; 1 - epsilon
+            ## we applied: [TAN(s)] = Kd[TAN(aq)], Kd is derived from an emperical relationship with soil clay content (ref: DNDC model)
+            ## NH3(g) = KNH3*[TAN(aq)]
+            ## MTAN = Vsoil*(theta*[TAN(aq)]+(epsilon-theta)*NH3(g)+(1-epsilon)*[TAN(s)])
+            ## so, [TAN(aq)] = MTAN/Vsoil * (1/(theta+KNH3*(epsilon-theta)+Kd*(1-epsilon)))
+            KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
                     self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## NH3 concentration in the soil pore space
-                self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
-                ## NH3 conc is zero when soil moisture content reaches the saturation
-                self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0 
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## TAN molar conc; mol/L
+            self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
+            ## NH3 conc in the source layer
+            self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
+            ## NH3 conc is 0 when sourcelayer water content equals to porosity
+            self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
 
-                ## fluxes to deeper soil
-                ## TAN loss through aqueous diffusion and leaching to deeper soil
-                soildiffaq_idx = self.TAN_soil_amount[dd+1]/(self.R_soilaq_down[dd+1]*timestep*3600)
-                soildiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
-                soildiffgas_idx = self.NH3_gas_soil[dd+1]/(self.R_soilg_down[dd+1]*timestep*3600)
-                soildiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-                
-                ## diffusive fluxes to the above source layer when the topsoil TAN concentration is higher
-                soilupdiffaq_idx = (self.TAN_soil_amount[dd+1] - self.TAN_amount[dd+1])/self.R_soilaq[dd+1]*timestep*3600
-                soilupdiffaq_idx[soilupdiffaq_idx<0] = 0.0 
-                soilupdiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
-                soilupdiffgas_idx = (self.NH3_gas_soil[dd+1] - self.NH3_gas_bulk[dd+1])/self.R_soilg[dd+1]*timestep*3600
-                soilupdiffgas_idx[soilupdiffgas_idx<0] = 0.0 
-                soilupdiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            ## TAN conc at the surface (solved); atmospheric NH3 is ignored
+            self.TAN_surf_amount_M[dd+1] = (self.TAN_amount[dd+1]*(1/self.R_sourcelayer_aq[dd+1]+KNH3/self.R_sourcelayer_gas[dd+1])/\
+                                    (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_sourcelayer_gas[dd+1])+1/self.R_sourcelayer_aq[dd+1]))/\
+                                        (14*1000)
 
-                soilleaching_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
-                soilnitrif_idx =  KNO3_soil*self.TAN_pool_soil[dd+1]*f_NH4
+            ## TAN surface conc in g/m3
+            TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
+            ## Gaseous NH3 at the surface
+            self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
+            ## in g
+            NH3_gas_g = self.NH3_gas_M[dd+1]*14*1000
 
-                soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool_soil[dd+1]*f_NH4,\
-                                        Nnit=self.NO3_pool_soil[dd],temp=self.T_sim[dd+1])
+            ## determining the maximum emission; 
+            emiss_idx = (NH3_gas_g*3600*timestep/self.R_atm[dd+1])
+            ## determining the maximum TAN runoff;
+            ## if rain available for runoff already in m/day; don't need to multiply be timestep*3600;
+            ## else need to multiply by timestep*3600
+            runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
+            ## determining the maximum TAN aqueous diffusion to the topsoil layer;
+            ## diffusion is considered to be bi-directional - either from source layer to topsoil or the other way round
+            diffaq_idx = (self.TAN_amount[dd+1]-self.TAN_soil_amount[dd])/self.R_soilaq[dd+1]*timestep*3600
+            ## if this term <0, diffusion takes place from the underlying topsoil layer
+            diffaq_idx[diffaq_idx<=0] = 0.0
+            ## when soil mositure is 0, aqueous diffusion stops
+            diffaq_idx[self.soilmoist[dd+1]==0] = 0.0
+            ## determining the maximum TAN gaseous diffusion to the topsoil layer
+            diffgas_idx = (self.NH3_gas_bulk[dd+1]-self.NH3_gas_soil[dd])/self.R_soilg[dd+1]*timestep*3600
+            diffgas_idx[diffgas_idx<0] = 0.0
+            ## when the soil moisture reaches the saturation, gaseous diffusion stops
+            diffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            ## determining the maximum infiltration of TAN from the source layer to the topsoil layer
+            infil_idx = self.qpsoil[dd+1]*self.TAN_amount[dd+1]*timestep*3600
+            # infil_idx = 0*self.TAN_amount[dd+1]*timestep*3600
+            ## nirification rate of TAN in the source layer; daily maximum nitrification rate is 0.1 per day
+            KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
+                                            theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
+            KNO3_soil[KNO3_soil>0.1] = 0.1
+            ## correction for WPFS response
+            KNO3_soil[KNO3_soil<0.0] = 0.0
+            KNO3_soil[np.isnan(KNO3_soil)] = 0.0
+            ## determining the maximum nitrification of TAN
+            # nitrif_idx = KNO3_sourcelayer*self.TAN_pool[dd]
+            ## fraction of [NH4+(aq)]
+            f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
+                KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
+                (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
+            nitrif_idx = KNO3_soil*self.TAN_pool[dd+1]*f_NH4
 
-                soilall_loss = soildiffaq_idx + soildiffgas_idx + soilleaching_idx + soilnitrif_idx +\
-                                soilammNuptake_idx + soilupdiffaq_idx + soilupdiffgas_idx
-                soilloss_idx = self.TAN_pool_soil[dd+1] - soilall_loss
-                self.diffusivefluxsoil_aq[dd+1][soilloss_idx>=0] = soildiffaq_idx[soilloss_idx>=0]
-                self.diffusivefluxsoil_gas[dd+1][soilloss_idx>=0] = soildiffgas_idx[soilloss_idx>=0]
-                self.diffusivefluxup_aq[dd+1][soilloss_idx>=0] = soilupdiffaq_idx[soilloss_idx>=0]
-                self.diffusivefluxup_gas[dd+1][soilloss_idx>=0] = soilupdiffgas_idx[soilloss_idx>=0]
-                self.leachingflux[dd+1][soilloss_idx>=0] = soilleaching_idx[soilloss_idx>=0]
-                self.nitrif_NO3_soil[dd+1][soilloss_idx>=0] = soilnitrif_idx[soilloss_idx>=0]
-                self.ammN_uptake[dd+1][soilloss_idx>=0] = soilammNuptake_idx[soilloss_idx>=0]
-                self.diffusivefluxsoil_aq[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soildiffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
-                self.diffusivefluxsoil_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soildiffgas_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
-                self.diffusivefluxup_aq[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilupdiffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
-                self.diffusivefluxup_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilupdiffgas_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
-                self.leachingflux[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilleaching_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
-                self.nitrif_NO3_soil[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilnitrif_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
-                self.ammN_uptake[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilammNuptake_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            ## fluxes from sourcelayer to the topsoil layer
+            ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
+            sourcelayerall_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + infil_idx + nitrif_idx
+            sourcelayerloss_idx = self.TAN_pool[dd+1] - sourcelayerall_loss
+            
+            self.NH3_flux[dd+1][sourcelayerloss_idx>=0] = emiss_idx[sourcelayerloss_idx>=0]
+            self.TAN_washoff[dd+1][sourcelayerloss_idx>=0] = runoff_idx[sourcelayerloss_idx>=0]
+            self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx>=0] = diffaq_idx[sourcelayerloss_idx>=0]
+            self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx>=0] = diffgas_idx[sourcelayerloss_idx>=0]
+            self.infilflux[dd+1][sourcelayerloss_idx>=0] = infil_idx[sourcelayerloss_idx>=0]
+            self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx>=0] = nitrif_idx[sourcelayerloss_idx>=0]
+            ## otherwise, we use a weighted distribution
+            self.NH3_flux[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                        (emiss_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
+            self.TAN_washoff[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                        (runoff_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
+            self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx<0]= self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                        (diffaq_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
+            self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                        (diffgas_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
+            self.infilflux[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                        (infil_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
+            self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx<0]= self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                        (nitrif_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0])
 
-                ## update TAN pool of the topsoil layer
-                self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd+1] - self.diffusivefluxsoil_aq[dd+1] - self.diffusivefluxsoil_gas[dd+1] - \
-                    - self.diffusivefluxup_aq[dd+1] - self.diffusivefluxup_gas[dd+1] - \
-                    self.leachingflux[dd+1] - self.nitrif_NO3_soil[dd+1] - self.ammN_uptake[dd+1]
-
-                ## TAN conc of the topsoil layer; g/m3
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
-                    ((z_topsoil-z_sourcelayer)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+            ## determine TAN pool after subtracting all loss pathways
+            self.TAN_pool[dd+1] = self.TAN_pool[dd+1] - self.NH3_flux[dd+1] - self.diffusivefluxsourcelayer_aq[dd+1] - self.diffusivefluxsourcelayer_gas[dd+1]-\
+                self.infilflux[dd+1] - self.nitrif_NO3_sourcelayer[dd+1] - self.TAN_washoff[dd+1]
+            ## get rid of rounding error (TAN pool occasionaly become <-1e-13)
+            self.TAN_pool[dd+1][self.TAN_pool[dd+1]<0.0] = 0.0
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
                     self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## NH3 concentration in the soil pore space
-                self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
-                ## NH3 conc is zero when soil moisture content reaches the saturation
-                self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0 
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## NH3 conc in the source layer
+            self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
+            ## NH3 conc is 0 when source layer water content reaches saturation
+            self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+
+            ## NO3- pool of the source layer
+            ## sources: 1) nitrification of TAN, and 2) input of nitrate fertilizer
+            ## losses: 1) infiltration to the underlying topsoil layer, 
+            ##         2) diffusion (aq only) to the underlying topsoil layer, 3) surface washoff
+            NO3_idx = self.NO3_pool[dd] - self.NO3_infilsourcelayer[dd] - self.NO3_diffusivesourcelayer[dd] - self.NO3_washoff[dd+1]
+            self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + self.NO3[dd+1][NO3_idx>0]
+            self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0]
+
+            ## NO3- conc of the source layer; g/m3
+            self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                                                                        (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
+            self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+
+            ## diffusive aquous NO3 and infiltration of NO3 from the source layer to the topsoil layer
+            NO3_diffidx = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd])*(f_DNO3/self.R_soilaq[dd+1])*timestep*3600
+            NO3_diffidx[NO3_diffidx<0] = 0.0
+            NO3_diffidx[self.soilmoist[dd+1]==0] = 0.0
+            NO3_infilidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
+            NO3_washoffidx = self.rain_avail_washoff[dd+1]*self.NO3_amount[dd+1]*timestep*3600
+            NO3_lossall = NO3_diffidx + NO3_infilidx + NO3_washoffidx
+            sourcelayerloss_idx = self.NO3_pool[dd+1] - NO3_lossall
+            self.NO3_diffusivesourcelayer[dd+1][sourcelayerloss_idx>=0] = NO3_diffidx[sourcelayerloss_idx>=0]
+            self.NO3_infilsourcelayer[dd+1][sourcelayerloss_idx>=0] = NO3_infilidx[sourcelayerloss_idx>=0]
+            self.NO3_washoff[dd+1][sourcelayerloss_idx>=0] = NO3_washoffidx[sourcelayerloss_idx>=0]
+            self.NO3_diffusivesourcelayer[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                                    NO3_diffidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]                                           
+            self.NO3_infilsourcelayer[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                                    NO3_infilidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]    
+            self.NO3_washoff[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                                    NO3_washoffidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]                                     
+
+            ## TAN pool of the topsoil layer
+            ## sources: 1) infiltration from the above source layer, 2) diffusion (aq+gas) source layer to the topsoi layer
+            ## losses: 1) diffusion (aq+gas) to the deeper soil, 2) diffusion (aq+gas) to the source layer if possible (bi-directional)
+            ##         3) subsurface leaching, 4) nitrification, 5) plant uptake 
+            ## TAN pool with inputs
+            self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd] + self.infilflux[dd+1] +\
+                self.diffusivefluxsourcelayer_aq[dd+1] + self.diffusivefluxsourcelayer_gas[dd+1]
+
+            ## TAN conc of the topsoil layer; g/m3
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
+                ((z_topsoil-z_sourcelayer)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+                self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## NH3 concentration in the soil pore space
+            self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
+            ## NH3 conc is zero when soil moisture content reaches the saturation
+            self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0 
+
+            ## fluxes to deeper soil
+            ## TAN loss through aqueous diffusion and leaching to deeper soil
+            soildiffaq_idx = self.TAN_soil_amount[dd+1]/(self.R_soilaq_down[dd+1]*timestep*3600)
+            soildiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
+            soildiffgas_idx = self.NH3_gas_soil[dd+1]/(self.R_soilg_down[dd+1]*timestep*3600)
+            soildiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            
+            ## diffusive fluxes to the above source layer when the topsoil TAN concentration is higher
+            soilupdiffaq_idx = (self.TAN_soil_amount[dd+1] - self.TAN_amount[dd+1])/self.R_soilaq[dd+1]*timestep*3600
+            soilupdiffaq_idx[soilupdiffaq_idx<0] = 0.0 
+            soilupdiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
+            soilupdiffgas_idx = (self.NH3_gas_soil[dd+1] - self.NH3_gas_bulk[dd+1])/self.R_soilg[dd+1]*timestep*3600
+            soilupdiffgas_idx[soilupdiffgas_idx<0] = 0.0 
+            soilupdiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+
+            soilleaching_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
+            soilnitrif_idx =  KNO3_soil*self.TAN_pool_soil[dd+1]*f_NH4
+
+            soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool_soil[dd+1]*f_NH4,\
+                                    Nnit=self.NO3_pool_soil[dd],temp=self.T_sim[dd+1])
+            
+            ## no uptake after harvesting
+            soilammNuptake_idx[harvestidx<(dd+1)] = 0.0
+            soilnitNuptake_idx[harvestidx<(dd+1)] = 0.0
+
+            soilall_loss = soildiffaq_idx + soildiffgas_idx + soilleaching_idx + soilnitrif_idx +\
+                            soilammNuptake_idx + soilupdiffaq_idx + soilupdiffgas_idx
+            soilloss_idx = self.TAN_pool_soil[dd+1] - soilall_loss
+            self.diffusivefluxsoil_aq[dd+1][soilloss_idx>=0] = soildiffaq_idx[soilloss_idx>=0]
+            self.diffusivefluxsoil_gas[dd+1][soilloss_idx>=0] = soildiffgas_idx[soilloss_idx>=0]
+            self.diffusivefluxup_aq[dd+1][soilloss_idx>=0] = soilupdiffaq_idx[soilloss_idx>=0]
+            self.diffusivefluxup_gas[dd+1][soilloss_idx>=0] = soilupdiffgas_idx[soilloss_idx>=0]
+            self.leachingflux[dd+1][soilloss_idx>=0] = soilleaching_idx[soilloss_idx>=0]
+            self.nitrif_NO3_soil[dd+1][soilloss_idx>=0] = soilnitrif_idx[soilloss_idx>=0]
+            self.ammN_uptake[dd+1][soilloss_idx>=0] = soilammNuptake_idx[soilloss_idx>=0]
+            self.diffusivefluxsoil_aq[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soildiffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            self.diffusivefluxsoil_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soildiffgas_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            self.diffusivefluxup_aq[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilupdiffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            self.diffusivefluxup_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilupdiffgas_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            self.leachingflux[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilleaching_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            self.nitrif_NO3_soil[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilnitrif_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+            self.ammN_uptake[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilammNuptake_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0]
+
+            ## update TAN pool of the topsoil layer
+            self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd+1] - self.diffusivefluxsoil_aq[dd+1] - self.diffusivefluxsoil_gas[dd+1] - \
+                - self.diffusivefluxup_aq[dd+1] - self.diffusivefluxup_gas[dd+1] - \
+                self.leachingflux[dd+1] - self.nitrif_NO3_soil[dd+1] - self.ammN_uptake[dd+1]
+            ## get rid of rounding error (TAN pool occasionaly become <-1e-13)
+            self.TAN_pool_soil[dd+1][self.TAN_pool_soil[dd+1]<0.0] = 0.0
+
+            ## TAN conc of the topsoil layer; g/m3
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
+                ((z_topsoil-z_sourcelayer)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+                self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## NH3 concentration in the soil pore space
+            self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
+            ## NH3 conc is zero when soil moisture content reaches the saturation
+            self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0 
 
 
-                ## NO3- pool of the topsoil layer
-                ## sources: 1) nitrification of TAN, 2) infiltration from the above source layer, 
-                ##          3) diffusion from the above source layer
-                ## losses: 1) leaching to the deeper soil, 2) diffusion (aq only) to the depper soil, 3) plant uptake
-                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivedeep[dd] -\
-                                self.nitN_uptake[dd] 
-                self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0] + \
-                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx>0]
-                self.NO3_pool_soil[dd+1][NO3_soil_idx<=0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<=0] + \
-                        self.NO3_infilsourcelayer[dd+1][NO3_soil_idx<=0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx<=0]
+            ## NO3- pool of the topsoil layer
+            ## sources: 1) nitrification of TAN, 2) infiltration from the above source layer, 
+            ##          3) diffusion from the above source layer
+            ## losses: 1) leaching to the deeper soil, 2) diffusion (aq only) to the depper soil, 3) plant uptake
+            NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_leaching[dd] - self.NO3_diffusivedeep[dd] -\
+                            self.nitN_uptake[dd] 
+            self.NO3_pool_soil[dd+1][NO3_soil_idx>0] = NO3_soil_idx[NO3_soil_idx>0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>0] + \
+                    self.NO3_infilsourcelayer[dd+1][NO3_soil_idx>0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx>0]
+            self.NO3_pool_soil[dd+1][NO3_soil_idx<=0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<=0] + \
+                    self.NO3_infilsourcelayer[dd+1][NO3_soil_idx<=0] + self.NO3_diffusivesourcelayer[dd+1][NO3_soil_idx<=0]
 
-                ## NO3- conc of the topsoil layer in g/m3
-                self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
-                                                        ((z_topsoil-z_sourcelayer)*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])   
-                self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+            ## NO3- conc of the topsoil layer in g/m3
+            self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
+                                                    ((z_topsoil-z_sourcelayer)*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])   
+            self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
 
-                ## NO3 loss through aqueous diffusion and leaching to deeper soil
-                NO3_soildiffidx = self.NO3_soil_amount[dd+1]*(f_DNO3/self.R_soilaq_down[dd+1])*timestep*3600
-                NO3_soilleachingidx = self.qpsoil[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
-                
-                NO3_soilall_loss = NO3_soildiffidx + NO3_soilleachingidx + soilnitNuptake_idx
-                soilloss_idx = self.NO3_pool_soil[dd+1] - NO3_soilall_loss
-                self.NO3_diffusivedeep[dd+1][soilloss_idx>=0] = NO3_soildiffidx[soilloss_idx>=0]
-                self.NO3_leaching[dd+1][soilloss_idx>=0] = NO3_soilleachingidx[soilloss_idx>=0]
-                self.nitN_uptake[dd+1][soilloss_idx>=0] = soilnitNuptake_idx[soilloss_idx>=0]
-                self.NO3_diffusivedeep[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                NO3_soildiffidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
-                self.NO3_leaching[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            NO3_soilleachingidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
-                self.nitN_uptake[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilnitNuptake_idx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
-                
-                # if dd+1 == 347:
-                #     print('Day: '+str(dd+1))
-                #     print('nit uptake idx',soilnitNuptake_idx[183,201])
-                #     print('nit uptake',self.nitN_uptake[dd+1,183,201])
-                #     print('NO3 soil pool all loss idx',NO3_soilall_loss[183,201])
-                #     print('NO3 soil pool idx',soilloss_idx[183,201])
-                # elif dd+1 == 348:
-                #     print('Day: '+str(dd+1))
-                #     print('nit uptake idx',soilnitNuptake_idx[183,201])
-                #     print('nit uptake',self.nitN_uptake[dd+1,183,201])
-                #     print('NO3 soil pool all loss idx',NO3_soilall_loss[183,201])
-                #     print('NO3 soil pool idx',soilloss_idx[183,201])
+            ## NO3 loss through aqueous diffusion and leaching to deeper soil
+            NO3_soildiffidx = self.NO3_soil_amount[dd+1]*(f_DNO3/self.R_soilaq_down[dd+1])*timestep*3600
+            NO3_soilleachingidx = self.qpsoil[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
+            
+            NO3_soilall_loss = NO3_soildiffidx + NO3_soilleachingidx + soilnitNuptake_idx
+            soilloss_idx = self.NO3_pool_soil[dd+1] - NO3_soilall_loss
+            self.NO3_diffusivedeep[dd+1][soilloss_idx>=0] = NO3_soildiffidx[soilloss_idx>=0]
+            self.NO3_leaching[dd+1][soilloss_idx>=0] = NO3_soilleachingidx[soilloss_idx>=0]
+            self.nitN_uptake[dd+1][soilloss_idx>=0] = soilnitNuptake_idx[soilloss_idx>=0]
+            self.NO3_diffusivedeep[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                            NO3_soildiffidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+            self.NO3_leaching[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        NO3_soilleachingidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+            self.nitN_uptake[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilnitNuptake_idx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+            
+            # if dd+1 == 347:
+            #     print('Day: '+str(dd+1))
+            #     print('nit uptake idx',soilnitNuptake_idx[183,201])
+            #     print('nit uptake',self.nitN_uptake[dd+1,183,201])
+            #     print('NO3 soil pool all loss idx',NO3_soilall_loss[183,201])
+            #     print('NO3 soil pool idx',soilloss_idx[183,201])
+            # elif dd+1 == 348:
+            #     print('Day: '+str(dd+1))
+            #     print('nit uptake idx',soilnitNuptake_idx[183,201])
+            #     print('nit uptake',self.nitN_uptake[dd+1,183,201])
+            #     print('NO3 soil pool all loss idx',NO3_soilall_loss[183,201])
+            #     print('NO3 soil pool idx',soilloss_idx[183,201])
         return
 
     ## Simulation: DEEP INJECTION 
@@ -1388,7 +1417,7 @@ class LAND_module:
     ## fluxes: 1. surface runoff  2. NH3 volatilization
     ##         3. percolation flux (subsurface runoff/infiltration)  4. diffusion (aq,gas)
     ## pathways/processes: 1. nitrification  2. plant N uptake inc. ammonium and nitrate
-    def chem_fert_deepinjec_sim(self,start_day_idx,end_day_idx,chem_fert_type,injection_depth=0.1):
+    def chem_fert_deepinjec_sim(self,start_day_idx,end_day_idx,chem_fert_type,injection_depth=0.1,crop=None):
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is [deep injection], injection depth is: '+str(injection_depth*100)+' cm')
         soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
@@ -1412,343 +1441,355 @@ class LAND_module:
             print('chemical fertilizer applied: urea')
             sim_pH = self.soil_pH
             sim_ccH = self.soil_ccH
-        if livestock.lower()=="poultry":
-            # for dd in np.arange(start_day_idx,end_day_idx-1):
-            print(livestock)
+        
+        ## crop calendar that detenmines the N uptake by crops
+        if crop is not None:
+            cropcalspath = file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+            plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
 
-        else:
-            for dd in np.arange(start_day_idx,end_day_idx):
+        
+        for dd in np.arange(start_day_idx,end_day_idx):
 
-                ## soil resistance
-                tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
-                tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
-                ## resistance for diffusion from the topsoil layer to the emitting surface
-                self.R_soilaq[dd+1] = (z_topsoil/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_soilg[dd+1] = (z_topsoil/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
-                ## resistance to the deeper soil from the source layer (deeper soil)
-                self.R_soilaq_down[dd+1] = (p_2ndsoil-injection_depth)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_soilg_down[dd+1] = (p_2ndsoil-injection_depth)/(tor_soil_gas*self.D_air_NH3[dd+1])
-                # self.R_soilaq_down[dd+1] = (0.14)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                # self.R_soilg_down[dd+1] = (0.14)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            ## soil resistance
+            tor_soil_aq = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="aqueous")
+            tor_soil_gas = soil_tuotorsity(theta_sat=self.persm[dd+1],theta=self.soilmoist[dd+1],phase="gaseous")
+            ## resistance for diffusion from the topsoil layer to the emitting surface
+            self.R_soilaq[dd+1] = (z_topsoil/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_soilg[dd+1] = (z_topsoil/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            ## resistance to the deeper soil from the source layer (deeper soil)
+            self.R_soilaq_down[dd+1] = (p_2ndsoil-injection_depth)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_soilg_down[dd+1] = (p_2ndsoil-injection_depth)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            # self.R_soilaq_down[dd+1] = (0.14)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            # self.R_soilg_down[dd+1] = (0.14)/(tor_soil_gas*self.D_air_NH3[dd+1])
 
-                ## sourcelayer resistance
-                ## resistance from the source layer to the above topsoil layer
-                self.R_sourcelayer_aq[dd+1] = (injection_depth-p_topsoil)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                self.R_sourcelayer_gas[dd+1] = (injection_depth-p_topsoil)/(tor_soil_gas*self.D_air_NH3[dd+1])
-                # self.R_sourcelayer_aq[dd+1] = ((injection_depth+z_sourcelayer/2)/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
-                # self.R_sourcelayer_gas[dd+1] = ((injection_depth+z_sourcelayer/2)/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            ## sourcelayer resistance
+            ## resistance from the source layer to the above topsoil layer
+            self.R_sourcelayer_aq[dd+1] = (injection_depth-p_topsoil)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            self.R_sourcelayer_gas[dd+1] = (injection_depth-p_topsoil)/(tor_soil_gas*self.D_air_NH3[dd+1])
+            # self.R_sourcelayer_aq[dd+1] = ((injection_depth+z_sourcelayer/2)/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
+            # self.R_sourcelayer_gas[dd+1] = ((injection_depth+z_sourcelayer/2)/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
 
-                '''## N input in multiple forms
-                self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
-                self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
-                self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
-                self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            '''## N input in multiple forms
+            self.urea[dd+1] = self.urea_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            self.avail_N[dd+1] = self.avail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            self.resist_N[dd+1] = self.resist_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
+            self.unavail_N[dd+1] = self.unavail_N_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])
 
-                ## TAN production from urea hydrolysis and the N decomposition rate from dung
-                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
-                                        self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
-                                        self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
-                ## TAN from housing to storage
-                self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])'''
+            ## TAN production from urea hydrolysis and the N decomposition rate from dung
+            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]+\
+                                    self.daily_Na_decomp_rate[dd+1]*self.avail_N_pool[dd] +\
+                                    self.daily_Nr_decomp_rate[dd+1]*self.resist_N_pool[dd]
+            ## TAN from housing to storage
+            self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])'''
 
-                ## TAN production from urea hydrolysis
-                self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
+            ## TAN production from urea hydrolysis
+            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
 
-                ## Urea pool
-                urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1]) - self.urea_washoff[dd+1]
-                self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
-                self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+            ## Urea pool
+            urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1]) - self.urea_washoff[dd+1]
+            self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
+            self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
 
-                '''## Org N pools in various forms
-                self.avail_N_pool[dd+1] = (self.avail_N_pool[dd] - self.avail_N_washoff[dd+1])*(1 - self.daily_Na_decomp_rate[dd+1]) + \
-                    self.avail_N[dd+1] 
-                self.resist_N_pool[dd+1] = (self.resist_N_pool[dd] - self.resist_N_washoff[dd+1])* (1 - self.daily_Nr_decomp_rate[dd+1]) + \
-                    self.resist_N[dd+1] 
-                self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1] - self.unavail_N_washoff[dd+1]'''
+            '''## Org N pools in various forms
+            self.avail_N_pool[dd+1] = (self.avail_N_pool[dd] - self.avail_N_washoff[dd+1])*(1 - self.daily_Na_decomp_rate[dd+1]) + \
+                self.avail_N[dd+1] 
+            self.resist_N_pool[dd+1] = (self.resist_N_pool[dd] - self.resist_N_washoff[dd+1])* (1 - self.daily_Nr_decomp_rate[dd+1]) + \
+                self.resist_N[dd+1] 
+            self.unavail_N_pool[dd+1] = self.unavail_N_pool[dd] + self.unavail_N[dd+1] - self.unavail_N_washoff[dd+1]'''
 
-                ## TAN pool (source layer) - beneath the topsoil layer
-                ## Note: source of TAN pool: 1) input of TAN from fertilizer (ammonium or urea hydrolysis)
-                ##                              nitrate does not contribute to the TAN pool
-                ##                           2) diffusion (aq+gas) from the above topsoil layer to the source layer (bidirectional)                                
-                ##       loss of TAN pool: 1) diffusion (aq+gas) to the above topsoil layer, 
-                ##                         2) diffusion (aq+gas) to the deep soil, 
-                ##                         3) subsurface leaching to deep soil, 
-                ##                         4) nitrification, 5) plant uptake
-                ##       Note that plant N uptake exists in this scheme, compared to the BC-topdressed scheme
-                '''TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsourcelayer_aq[dd] - self.diffusivefluxsourcelayer_gas[dd]-\
-                    self.infilflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd]
-                self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
-                self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
-                ## TAN pool in ug
-                TAN_pool_ug = self.TAN_pool[dd+1] * 1e6'''
+            ## TAN pool (source layer) - beneath the topsoil layer
+            ## Note: source of TAN pool: 1) input of TAN from fertilizer (ammonium or urea hydrolysis)
+            ##                              nitrate does not contribute to the TAN pool
+            ##                           2) diffusion (aq+gas) from the above topsoil layer to the source layer (bidirectional)                                
+            ##       loss of TAN pool: 1) diffusion (aq+gas) to the above topsoil layer, 
+            ##                         2) diffusion (aq+gas) to the deep soil, 
+            ##                         3) subsurface leaching to deep soil, 
+            ##                         4) nitrification, 5) plant uptake
+            ##       Note that plant N uptake exists in this scheme, compared to the BC-topdressed scheme
+            '''TAN_idx = self.TAN_pool[dd] - self.NH3_flux[dd] - self.diffusivefluxsourcelayer_aq[dd] - self.diffusivefluxsourcelayer_gas[dd]-\
+                self.infilflux[dd] - self.nitrif_NO3_sourcelayer[dd] - self.TAN_washoff[dd]
+            self.TAN_pool[dd+1][TAN_idx>0] = TAN_idx[TAN_idx>0]+self.TAN_prod[dd+1][TAN_idx>0]+self.TAN[dd+1][TAN_idx>0]
+            self.TAN_pool[dd+1][TAN_idx<=0] = self.TAN_prod[dd+1][TAN_idx<=0]+self.TAN[dd+1][TAN_idx<=0]
+            ## TAN pool in ug
+            TAN_pool_ug = self.TAN_pool[dd+1] * 1e6'''
 
-                ## TAN pool with input
-                self.TAN_pool[dd+1] = self.TAN_pool[dd]+self.TAN_prod[dd+1]+self.TAN[dd+1] + \
-                    self.diffusivefluxdown_aq[dd] + self.diffusivefluxdown_gas[dd]
+            ## TAN pool with input
+            self.TAN_pool[dd+1] = self.TAN_pool[dd]+self.TAN_prod[dd+1]+self.TAN[dd+1] + \
+                self.diffusivefluxdown_aq[dd] + self.diffusivefluxdown_gas[dd]
 
-                ## TAN conc; g/m3
-                KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                    (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
-                        self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## TAN molar conc; mol/L
-                self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
-                ## NH3 conc in the source layer
-                self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
-                ## NH3 conc is 0 when sourcelayer water content equals to porosity
-                self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-
-                ## fluxes to deeper soil
-                ## TAN loss through aqueous diffusion and leaching to deeper soil
-                sourcelayerdiffaq_idx = self.TAN_amount[dd+1]/(self.R_soilaq_down[dd+1]*timestep*3600)
-                sourcelayerdiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
-                sourcelayerdiffgas_idx = self.NH3_gas_bulk[dd+1]/(self.R_soilg_down[dd+1]*timestep*3600)
-                sourcelayerdiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-                
-                ## diffusive fluxes to the above topsoil layer
-                sourcelayerupdiffaq_idx = (self.TAN_amount[dd+1] - self.TAN_soil_amount[dd+1])/self.R_sourcelayer_aq[dd+1]*timestep*3600
-                sourcelayerupdiffaq_idx[sourcelayerupdiffaq_idx<0] = 0.0 
-                sourcelayerupdiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
-                sourcelayerupdiffgas_idx = (self.NH3_gas_bulk[dd+1] - self.NH3_gas_soil[dd+1])/self.R_sourcelayer_gas[dd+1]*timestep*3600
-                sourcelayerupdiffgas_idx[sourcelayerupdiffgas_idx<0] = 0.0 
-                sourcelayerupdiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-
-                ## leaching
-                sourcelayerleaching_idx = self.qpsoil[dd+1]*self.TAN_amount[dd+1]*timestep*3600
-                ## nirification rate of TAN in the source layer; daily maximum nitrification rate is 0.1 per day
-                KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
-                                                theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
-                KNO3_soil[KNO3_soil>0.1] = 0.1
-                ## correction for WPFS response
-                KNO3_soil[KNO3_soil<0.0] = 0.0
-                KNO3_soil[np.isnan(KNO3_soil)] = 0.0
-                f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
-                    KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
-                    (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
-                sourcelayernitrif_idx =  KNO3_soil*self.TAN_pool[dd+1]*f_NH4
-                sourcelayerammNuptake_idx, sourcelayernitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool[dd+1]*f_NH4,\
-                                        Nnit=self.NO3_pool[dd],temp=self.T_sim[dd+1])
-
-                ## fluxes from sourcelayer to the topsoil layer
-                ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
-                sourcelayerall_loss = sourcelayerdiffaq_idx + sourcelayerdiffgas_idx + sourcelayerupdiffaq_idx + \
-                                    sourcelayerupdiffgas_idx + sourcelayerleaching_idx + sourcelayernitrif_idx + \
-                                    sourcelayerammNuptake_idx 
-                sourcelayerloss_idx = self.TAN_pool[dd+1] - sourcelayerall_loss
-
-                self.diffusivefluxsoil_aq[dd+1][sourcelayerloss_idx>=0] = sourcelayerdiffaq_idx[sourcelayerloss_idx>=0]
-                self.diffusivefluxsoil_gas[dd+1][sourcelayerloss_idx>=0] = sourcelayerdiffgas_idx[sourcelayerloss_idx>=0]
-                self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx>=0] = sourcelayerupdiffaq_idx[sourcelayerloss_idx>=0]
-                self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx>=0] = sourcelayerupdiffgas_idx[sourcelayerloss_idx>=0]
-                self.leachingflux[dd+1][sourcelayerloss_idx>=0] = sourcelayerleaching_idx[sourcelayerloss_idx>=0]
-                self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx>=0] = sourcelayernitrif_idx[sourcelayerloss_idx>=0]
-                self.ammN_uptake_sourcelayer[dd+1][sourcelayerloss_idx>=0] = sourcelayerammNuptake_idx[sourcelayerloss_idx>=0]
-
-                self.diffusivefluxsoil_aq[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayerdiffaq_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-                self.diffusivefluxsoil_gas[dd+1][sourcelayerloss_idx<0] = self.TAN_pool_soil[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayerdiffgas_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-                self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayerupdiffaq_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-                self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayerupdiffgas_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-                self.leachingflux[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayerleaching_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-                self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayernitrif_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-                self.ammN_uptake_sourcelayer[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
-                                            sourcelayerammNuptake_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
-
-                self.TAN_pool[dd+1] = self.TAN_pool[dd+1] - self.diffusivefluxsoil_aq[dd+1] - self.diffusivefluxsoil_gas[dd+1] -\
-                                    self.diffusivefluxsourcelayer_aq[dd+1] - self.diffusivefluxsourcelayer_gas[dd+1] - self.leachingflux[dd+1] -\
-                                    self.nitrif_NO3_sourcelayer[dd+1] - self.ammN_uptake_sourcelayer[dd+1]
-
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
-                self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                    (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
-                        self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## NH3 conc of the source layer
-                self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
-                ## NH3 conc is 0 when source layer water content equals to porosity
-                self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-
-                ## NO3- pool of source layer
-                ## sources: 1) input of nitrate fertilizer
-                ##          2) nitrification, 3) infiltration from the above topsoil layer
-                ## losses: 1) leaching to the deep soil, 2) diffusion (aq only) to the deep soil
-                ##         3) diffusion (aq only) to the above topsoil layer, 4) plant uptake
-                NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusiveup[dd] - \
-                            self.NO3_diffusivedeep[dd] - self.nitN_uptake_sourcelayer[dd]
-                self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + \
-                            self.NO3[dd+1][NO3_idx>0] + self.NO3_infilsoil[dd][NO3_idx>0]
-                self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0] +\
-                            self.NO3_infilsoil[dd][NO3_idx<=0]
-
-                ## NO3- conc of the source layer; g/m3
-                self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
-                                                                            (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
-                self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-
-                ## diffusive aquous NO3 and infiltration of NO3 from the source layer to the deep soil
-                NO3_diffdownidx = (self.NO3_amount[dd+1])*(f_DNO3/self.R_soilaq_down[dd+1])*timestep*3600
-                NO3_diffdownidx[NO3_diffdownidx<0] = 0.0
-                NO3_diffdownidx[self.soilmoist[dd+1]==0] = 0.0
-                NO3_diffupidx = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd])*(f_DNO3/self.R_soilaq[dd+1])*timestep*3600
-                NO3_diffupidx[NO3_diffupidx<0] = 0.0
-                NO3_diffupidx[self.soilmoist[dd+1]==0] = 0.0
-                NO3_leachingidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
-
-                NO3_lossall = NO3_diffdownidx + NO3_diffupidx + NO3_leachingidx + sourcelayernitNuptake_idx
-                sourcelayerloss_idx = self.NO3_pool[dd+1] - NO3_lossall
-                self.NO3_diffusivedeep[dd+1][sourcelayerloss_idx>=0] = NO3_diffdownidx[sourcelayerloss_idx>=0]
-                self.NO3_diffusiveup[dd+1][sourcelayerloss_idx>=0] = NO3_diffupidx[sourcelayerloss_idx>=0]
-                self.NO3_leaching[dd+1][sourcelayerloss_idx>=0] = NO3_leachingidx[sourcelayerloss_idx>=0]
-                self.nitN_uptake_sourcelayer[dd+1][sourcelayerloss_idx>=0] = sourcelayernitNuptake_idx[sourcelayerloss_idx>=0]
-                self.NO3_diffusivedeep[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                NO3_diffdownidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]   
-                self.NO3_diffusiveup[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                NO3_diffupidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]                                        
-                self.NO3_leaching[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                NO3_leachingidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]
-                self.nitN_uptake_sourcelayer[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
-                                                                sourcelayernitNuptake_idx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]
-
-                ## TAN pool of the topsoil layer
-                ## sources: diffusion (aq+gas) from the underlying source layer
-                ## losses: 1) NH3 volatilization, 2) surface runoff
-                ##         3) infiltration to the underlying source layer
-                ##         4) diffusion (aq+gas) to the underlying source layer (bi-directional)
-                ##         5) nitrification, 6) plant N uptake
-                ## TAN pool with inputs
-                self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd] + self.diffusivefluxsourcelayer_aq[dd+1] +\
-                                                 self.diffusivefluxsourcelayer_gas[dd+1]
-
-                ## TAN conc of the topsoil layer; g/m3
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
-                    ((injection_depth-z_sourcelayer/2)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+            ## TAN conc; g/m3
+            KNH3 = self.Henry_constant[dd+1]/(sim_ccH[dd+1] + self.k_NH4[dd+1])
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
                     self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## NH3 concentration in the soil pore space
-                self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
-                ## NH3 conc is zero when soil moisture content reaches the saturation
-                self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## TAN molar conc; mol/L
+            self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
+            ## NH3 conc in the source layer
+            self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
+            ## NH3 conc is 0 when sourcelayer water content equals to porosity
+            self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
 
-                ## TAN conc at the surface (solved); atmospheric NH3 is ignored
-                self.TAN_surf_amount_M[dd+1] = (self.TAN_soil_amount[dd+1]*(1/self.R_soilaq[dd+1]+KNH3/self.R_soilg[dd+1])/\
-                                        (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_soilg[dd+1])+1/self.R_soilaq[dd+1]))/\
-                                            (14*1000)
-                ## TAN surface conc in g/m3
-                TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
-                ## Gaseous NH3 at the surface
-                self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
-                ## in g
-                NH3_gas_g = self.NH3_gas_M[dd+1]*14*1000
+            ## fluxes to deeper soil
+            ## TAN loss through aqueous diffusion and leaching to deeper soil
+            sourcelayerdiffaq_idx = self.TAN_amount[dd+1]/(self.R_soilaq_down[dd+1]*timestep*3600)
+            sourcelayerdiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
+            sourcelayerdiffgas_idx = self.NH3_gas_bulk[dd+1]/(self.R_soilg_down[dd+1]*timestep*3600)
+            sourcelayerdiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            
+            ## diffusive fluxes to the above topsoil layer
+            sourcelayerupdiffaq_idx = (self.TAN_amount[dd+1] - self.TAN_soil_amount[dd+1])/self.R_sourcelayer_aq[dd+1]*timestep*3600
+            sourcelayerupdiffaq_idx[sourcelayerupdiffaq_idx<0] = 0.0 
+            sourcelayerupdiffaq_idx[self.soilmoist[dd+1]==0.0] = 0.0
+            sourcelayerupdiffgas_idx = (self.NH3_gas_bulk[dd+1] - self.NH3_gas_soil[dd+1])/self.R_sourcelayer_gas[dd+1]*timestep*3600
+            sourcelayerupdiffgas_idx[sourcelayerupdiffgas_idx<0] = 0.0 
+            sourcelayerupdiffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
 
-                ## determining the maximum emission; 
-                emiss_idx = (NH3_gas_g*3600*timestep/self.R_atm[dd+1])
-                ## determining the maximum TAN runoff;
-                ## if rain available for runoff already in m/day; don't need to multiply be timestep*3600;
-                ## else need to multiply by timestep*3600
-                runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
-                ## determining the maximum TAN aqueous diffusion to the underlying source layer;
-                ## diffusion is considered to be bidirectional
-                diffaq_idx = (self.TAN_soil_amount[dd+1]-self.TAN_amount[dd+1])/self.R_sourcelayer_aq[dd+1]*timestep*3600
-                diffaq_idx[diffaq_idx<=0] = 0.0
-                ## when soil mositure is 0, aqueous diffusion stops
-                diffaq_idx[self.soilmoist[dd+1]==0] = 0.0
-                ## determining the maximum TAN gaseous diffusion to the underlying source layer;
-                diffgas_idx = (self.NH3_gas_soil[dd+1]-self.NH3_gas_bulk[dd+1])/self.R_sourcelayer_gas[dd+1]*timestep*3600
-                diffgas_idx[diffgas_idx<0] = 0.0
-                ## when the soil moisture reaches the saturation, gaseous diffusion stops
-                diffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
-                ## determining the maximum infiltration of TAN
-                infil_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
-                ## nirification rate of TAN in the source layer; daily maximum nitrification rate is 0.1 per day
-                nitrif_idx = KNO3_soil*self.TAN_pool_soil[dd+1]*f_NH4
-                ## plant N uptake
-                soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool_soil[dd+1]*f_NH4,\
-                                        Nnit=self.NO3_pool_soil[dd],temp=self.T_sim[dd+1])
+            ## leaching
+            sourcelayerleaching_idx = self.qpsoil[dd+1]*self.TAN_amount[dd+1]*timestep*3600
+            ## nirification rate of TAN in the source layer; daily maximum nitrification rate is 0.1 per day
+            KNO3_soil= nitrification_rate_soil(ground_temp=self.T_sim[dd+1],theta=self.soilmoist[dd+1],
+                                            theta_sat=self.persm[dd+1],pH=sim_pH[dd+1],fer_type='mineral')*timestep*3600
+            KNO3_soil[KNO3_soil>0.1] = 0.1
+            ## correction for WPFS response
+            KNO3_soil[KNO3_soil<0.0] = 0.0
+            KNO3_soil[np.isnan(KNO3_soil)] = 0.0
+            f_NH4 = self.soilmoist[dd+1]/(self.soilmoist[dd+1]+\
+                KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
+                (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
+            sourcelayernitrif_idx =  KNO3_soil*self.TAN_pool[dd+1]*f_NH4
+            sourcelayerammNuptake_idx, sourcelayernitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool[dd+1]*f_NH4,\
+                                    Nnit=self.NO3_pool[dd],temp=self.T_sim[dd+1])
+            ## no uptake after harvesting
+            sourcelayerammNuptake_idx[harvestidx<(dd+1)] = 0.0
+            sourcelayernitNuptake_idx[harvestidx<(dd+1)] = 0.0    
 
-                ## fluxes from sourcelayer to the topsoil layer
-                ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
-                soilall_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + infil_idx + nitrif_idx + soilammNuptake_idx
-                soilloss_idx = self.TAN_pool_soil[dd+1] - soilall_loss
-                
-                self.NH3_flux[dd+1][soilloss_idx>=0] = emiss_idx[soilloss_idx>=0]
-                self.TAN_washoff[dd+1][soilloss_idx>=0] = runoff_idx[soilloss_idx>=0]
-                self.diffusivefluxdown_aq[dd+1][soilloss_idx>=0] = diffaq_idx[soilloss_idx>=0]
-                self.diffusivefluxdown_gas[dd+1][soilloss_idx>=0] = diffgas_idx[soilloss_idx>=0]
-                self.infilflux[dd+1][soilloss_idx>=0] = infil_idx[soilloss_idx>=0]
-                self.nitrif_NO3_soil[dd+1][soilloss_idx>=0] = nitrif_idx[soilloss_idx>=0]
-                self.ammN_uptake[dd+1][soilloss_idx>=0] = soilammNuptake_idx[soilloss_idx>=0]
-                ## otherwise, we use a weighted distribution
-                self.NH3_flux[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (emiss_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
-                self.TAN_washoff[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (runoff_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
-                self.diffusivefluxdown_aq[dd+1][soilloss_idx<0]= self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (diffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
-                self.diffusivefluxdown_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (diffgas_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
-                self.infilflux[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (infil_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
-                self.nitrif_NO3_soil[dd+1][soilloss_idx<0]= self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (nitrif_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
-                self.ammN_uptake[dd+1][soilloss_idx<0]= self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            (soilammNuptake_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])                             
+            ## fluxes from sourcelayer to the topsoil layer
+            ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
+            sourcelayerall_loss = sourcelayerdiffaq_idx + sourcelayerdiffgas_idx + sourcelayerupdiffaq_idx + \
+                                sourcelayerupdiffgas_idx + sourcelayerleaching_idx + sourcelayernitrif_idx + \
+                                sourcelayerammNuptake_idx 
+            sourcelayerloss_idx = self.TAN_pool[dd+1] - sourcelayerall_loss
 
-                ## determine TAN pool after subtracting all loss pathways
-                self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd+1] - self.NH3_flux[dd+1] - self.diffusivefluxdown_aq[dd+1] -\
-                     self.diffusivefluxdown_gas[dd+1]- self.infilflux[dd+1] - \
-                         self.nitrif_NO3_soil[dd+1] - self.TAN_washoff[dd+1] - self.ammN_uptake[dd+1]
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0
-                self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
-                    ((injection_depth-z_sourcelayer/2)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                    KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
-                        self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                    (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
-                ## NH3 concentration in the soil pore space
-                self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
-                ## NH3 conc is zero when soil moisture content reaches the saturation
-                self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            self.diffusivefluxsoil_aq[dd+1][sourcelayerloss_idx>=0] = sourcelayerdiffaq_idx[sourcelayerloss_idx>=0]
+            self.diffusivefluxsoil_gas[dd+1][sourcelayerloss_idx>=0] = sourcelayerdiffgas_idx[sourcelayerloss_idx>=0]
+            self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx>=0] = sourcelayerupdiffaq_idx[sourcelayerloss_idx>=0]
+            self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx>=0] = sourcelayerupdiffgas_idx[sourcelayerloss_idx>=0]
+            self.leachingflux[dd+1][sourcelayerloss_idx>=0] = sourcelayerleaching_idx[sourcelayerloss_idx>=0]
+            self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx>=0] = sourcelayernitrif_idx[sourcelayerloss_idx>=0]
+            self.ammN_uptake_sourcelayer[dd+1][sourcelayerloss_idx>=0] = sourcelayerammNuptake_idx[sourcelayerloss_idx>=0]
 
-                ## NO3- pool of topsoil 
-                ## sources: 1) nitrification, 2) diffusion (aq only) from the underlying source layer
-                ## losses: 1) infiltration to the underlying source layer, 2) plant uptake, 3) surface washoff
-                NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_infilsoil[dd] - self.nitN_uptake[dd] - self.NO3_washoff[dd]
-                self.NO3_pool_soil[dd+1][NO3_soil_idx>=0] = NO3_soil_idx[NO3_soil_idx>=0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>=0] +\
-                    self.NO3_diffusiveup[dd+1][NO3_soil_idx>=0]
-                self.NO3_pool_soil[dd+1][NO3_soil_idx<0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<0] + \
-                    self.NO3_diffusiveup[dd+1][NO3_soil_idx<0]
+            self.diffusivefluxsoil_aq[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayerdiffaq_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
+            self.diffusivefluxsoil_gas[dd+1][sourcelayerloss_idx<0] = self.TAN_pool_soil[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayerdiffgas_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
+            self.diffusivefluxsourcelayer_aq[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayerupdiffaq_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
+            self.diffusivefluxsourcelayer_gas[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayerupdiffgas_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
+            self.leachingflux[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayerleaching_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
+            self.nitrif_NO3_sourcelayer[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayernitrif_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
+            self.ammN_uptake_sourcelayer[dd+1][sourcelayerloss_idx<0] = self.TAN_pool[dd+1][sourcelayerloss_idx<0]*\
+                                        sourcelayerammNuptake_idx[sourcelayerloss_idx<0]/sourcelayerall_loss[sourcelayerloss_idx<0]
 
-                ## NO3- conc of the topsoil layer; g/m3
-                self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
-                                                                            ((injection_depth-z_sourcelayer/2)*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])   
-                self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
-                
-                ## NO3 loss through aqueous diffusion and plant uptake
-                NO3_soilinfilidx = self.qpsoil[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
-                ## NO3 surface runoff
-                NO3_washoffidx = self.rain_avail_washoff[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
-                
-                NO3_soilall_loss = NO3_soilinfilidx + NO3_washoffidx +soilnitNuptake_idx
-                soilloss_idx = self.NO3_pool_soil[dd+1] - NO3_soilall_loss
-                self.NO3_infilsoil[dd+1][soilloss_idx>=0] = NO3_soilinfilidx[soilloss_idx>=0]
-                self.NO3_washoff[dd+1][soilloss_idx>=0] = NO3_washoffidx[soilloss_idx>=0]
-                self.nitN_uptake[dd+1][soilloss_idx>=0] = soilnitNuptake_idx[soilloss_idx>=0]
-                self.NO3_infilsoil[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            NO3_soilinfilidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
-                self.NO3_washoff[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
-                                                            NO3_washoffidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
-                self.nitN_uptake[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
-                                                                    soilnitNuptake_idx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+            self.TAN_pool[dd+1] = self.TAN_pool[dd+1] - self.diffusivefluxsoil_aq[dd+1] - self.diffusivefluxsoil_gas[dd+1] -\
+                                self.diffusivefluxsourcelayer_aq[dd+1] - self.diffusivefluxsourcelayer_gas[dd+1] - self.leachingflux[dd+1] -\
+                                self.nitrif_NO3_sourcelayer[dd+1] - self.ammN_uptake_sourcelayer[dd+1]
+            ## get rid of rounding error (TAN pool occasionaly become <-1e-13)
+            self.TAN_pool[dd+1][self.TAN_pool[dd+1]<0.0] = 0.0
+
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
+            self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+                    self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## NH3 conc of the source layer
+            self.NH3_gas_bulk[dd+1] = KNH3 * self.TAN_amount[dd+1]
+            ## NH3 conc is 0 when source layer water content equals to porosity
+            self.NH3_gas_bulk[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+
+            ## NO3- pool of source layer
+            ## sources: 1) input of nitrate fertilizer
+            ##          2) nitrification, 3) infiltration from the above topsoil layer
+            ## losses: 1) leaching to the deep soil, 2) diffusion (aq only) to the deep soil
+            ##         3) diffusion (aq only) to the above topsoil layer, 4) plant uptake
+            NO3_idx = self.NO3_pool[dd] - self.NO3_leaching[dd] - self.NO3_diffusiveup[dd] - \
+                        self.NO3_diffusivedeep[dd] - self.nitN_uptake_sourcelayer[dd]
+            self.NO3_pool[dd+1][NO3_idx>0] = NO3_idx[NO3_idx>0] + self.nitrif_NO3_sourcelayer[dd+1][NO3_idx>0] + \
+                        self.NO3[dd+1][NO3_idx>0] + self.NO3_infilsoil[dd][NO3_idx>0]
+            self.NO3_pool[dd+1][NO3_idx<=0] = self.nitrif_NO3_sourcelayer[dd+1][NO3_idx<=0] + self.NO3[dd+1][NO3_idx<=0] +\
+                        self.NO3_infilsoil[dd][NO3_idx<=0]
+
+            ## NO3- conc of the source layer; g/m3
+            self.NO3_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool[dd+1][self.soilmoist[dd+1]!=0]/\
+                                                                        (z_sourcelayer*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])
+            self.NO3_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+
+            ## diffusive aquous NO3 and infiltration of NO3 from the source layer to the deep soil
+            NO3_diffdownidx = (self.NO3_amount[dd+1])*(f_DNO3/self.R_soilaq_down[dd+1])*timestep*3600
+            NO3_diffdownidx[NO3_diffdownidx<0] = 0.0
+            NO3_diffdownidx[self.soilmoist[dd+1]==0] = 0.0
+            NO3_diffupidx = (self.NO3_amount[dd+1] - self.NO3_soil_amount[dd])*(f_DNO3/self.R_soilaq[dd+1])*timestep*3600
+            NO3_diffupidx[NO3_diffupidx<0] = 0.0
+            NO3_diffupidx[self.soilmoist[dd+1]==0] = 0.0
+            NO3_leachingidx = self.qpsoil[dd+1]*self.NO3_amount[dd+1]*timestep*3600
+
+            NO3_lossall = NO3_diffdownidx + NO3_diffupidx + NO3_leachingidx + sourcelayernitNuptake_idx
+            sourcelayerloss_idx = self.NO3_pool[dd+1] - NO3_lossall
+            self.NO3_diffusivedeep[dd+1][sourcelayerloss_idx>=0] = NO3_diffdownidx[sourcelayerloss_idx>=0]
+            self.NO3_diffusiveup[dd+1][sourcelayerloss_idx>=0] = NO3_diffupidx[sourcelayerloss_idx>=0]
+            self.NO3_leaching[dd+1][sourcelayerloss_idx>=0] = NO3_leachingidx[sourcelayerloss_idx>=0]
+            self.nitN_uptake_sourcelayer[dd+1][sourcelayerloss_idx>=0] = sourcelayernitNuptake_idx[sourcelayerloss_idx>=0]
+            self.NO3_diffusivedeep[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                            NO3_diffdownidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]   
+            self.NO3_diffusiveup[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                            NO3_diffupidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]                                        
+            self.NO3_leaching[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                            NO3_leachingidx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]
+            self.nitN_uptake_sourcelayer[dd+1][sourcelayerloss_idx<0] = self.NO3_pool[dd+1][sourcelayerloss_idx<0]*\
+                                                            sourcelayernitNuptake_idx[sourcelayerloss_idx<0]/NO3_lossall[sourcelayerloss_idx<0]
+
+            ## TAN pool of the topsoil layer
+            ## sources: diffusion (aq+gas) from the underlying source layer
+            ## losses: 1) NH3 volatilization, 2) surface runoff
+            ##         3) infiltration to the underlying source layer
+            ##         4) diffusion (aq+gas) to the underlying source layer (bi-directional)
+            ##         5) nitrification, 6) plant N uptake
+            ## TAN pool with inputs
+            self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd] + self.diffusivefluxsourcelayer_aq[dd+1] +\
+                                                self.diffusivefluxsourcelayer_gas[dd+1]
+
+            ## TAN conc of the topsoil layer; g/m3
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
+                ((injection_depth-z_sourcelayer/2)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+                self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## NH3 concentration in the soil pore space
+            self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
+            ## NH3 conc is zero when soil moisture content reaches the saturation
+            self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+
+            ## TAN conc at the surface (solved); atmospheric NH3 is ignored
+            self.TAN_surf_amount_M[dd+1] = (self.TAN_soil_amount[dd+1]*(1/self.R_soilaq[dd+1]+KNH3/self.R_soilg[dd+1])/\
+                                    (self.rain_avail_washoff[dd+1]+KNH3*(1/self.R_atm[dd+1]+1/self.R_soilg[dd+1])+1/self.R_soilaq[dd+1]))/\
+                                        (14*1000)
+            ## TAN surface conc in g/m3
+            TAN_surf_amount = self.TAN_surf_amount_M[dd+1]*(14*1000)
+            ## Gaseous NH3 at the surface
+            self.NH3_gas_M[dd+1] = self.TAN_surf_amount_M[dd+1]*KNH3
+            ## in g
+            NH3_gas_g = self.NH3_gas_M[dd+1]*14*1000
+
+            ## determining the maximum emission; 
+            emiss_idx = (NH3_gas_g*3600*timestep/self.R_atm[dd+1])
+            ## determining the maximum TAN runoff;
+            ## if rain available for runoff already in m/day; don't need to multiply be timestep*3600;
+            ## else need to multiply by timestep*3600
+            runoff_idx = self.rain_avail_washoff[dd+1]*TAN_surf_amount*timestep*3600
+            ## determining the maximum TAN aqueous diffusion to the underlying source layer;
+            ## diffusion is considered to be bidirectional
+            diffaq_idx = (self.TAN_soil_amount[dd+1]-self.TAN_amount[dd+1])/self.R_sourcelayer_aq[dd+1]*timestep*3600
+            diffaq_idx[diffaq_idx<=0] = 0.0
+            ## when soil mositure is 0, aqueous diffusion stops
+            diffaq_idx[self.soilmoist[dd+1]==0] = 0.0
+            ## determining the maximum TAN gaseous diffusion to the underlying source layer;
+            diffgas_idx = (self.NH3_gas_soil[dd+1]-self.NH3_gas_bulk[dd+1])/self.R_sourcelayer_gas[dd+1]*timestep*3600
+            diffgas_idx[diffgas_idx<0] = 0.0
+            ## when the soil moisture reaches the saturation, gaseous diffusion stops
+            diffgas_idx[self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+            ## determining the maximum infiltration of TAN
+            infil_idx = self.qpsoil[dd+1]*self.TAN_soil_amount[dd+1]*timestep*3600
+            ## nirification rate of TAN in the source layer; daily maximum nitrification rate is 0.1 per day
+            nitrif_idx = KNO3_soil*self.TAN_pool_soil[dd+1]*f_NH4
+            ## plant N uptake
+            soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool_soil[dd+1]*f_NH4,\
+                                    Nnit=self.NO3_pool_soil[dd],temp=self.T_sim[dd+1])
+            ## no uptake after harvesting
+            soilammNuptake_idx[harvestidx<(dd+1)] = 0.0
+            soilnitNuptake_idx[harvestidx<(dd+1)] = 0.0
+
+            ## fluxes from sourcelayer to the topsoil layer
+            ## if TAN pool > sum of all losses, then each loss equals to its corresponding maximum value
+            soilall_loss = emiss_idx + runoff_idx + diffaq_idx + diffgas_idx + infil_idx + nitrif_idx + soilammNuptake_idx
+            soilloss_idx = self.TAN_pool_soil[dd+1] - soilall_loss
+            
+            self.NH3_flux[dd+1][soilloss_idx>=0] = emiss_idx[soilloss_idx>=0]
+            self.TAN_washoff[dd+1][soilloss_idx>=0] = runoff_idx[soilloss_idx>=0]
+            self.diffusivefluxdown_aq[dd+1][soilloss_idx>=0] = diffaq_idx[soilloss_idx>=0]
+            self.diffusivefluxdown_gas[dd+1][soilloss_idx>=0] = diffgas_idx[soilloss_idx>=0]
+            self.infilflux[dd+1][soilloss_idx>=0] = infil_idx[soilloss_idx>=0]
+            self.nitrif_NO3_soil[dd+1][soilloss_idx>=0] = nitrif_idx[soilloss_idx>=0]
+            self.ammN_uptake[dd+1][soilloss_idx>=0] = soilammNuptake_idx[soilloss_idx>=0]
+            ## otherwise, we use a weighted distribution
+            self.NH3_flux[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (emiss_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
+            self.TAN_washoff[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (runoff_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
+            self.diffusivefluxdown_aq[dd+1][soilloss_idx<0]= self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (diffaq_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
+            self.diffusivefluxdown_gas[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (diffgas_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
+            self.infilflux[dd+1][soilloss_idx<0] = self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (infil_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
+            self.nitrif_NO3_soil[dd+1][soilloss_idx<0]= self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (nitrif_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])
+            self.ammN_uptake[dd+1][soilloss_idx<0]= self.TAN_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        (soilammNuptake_idx[soilloss_idx<0]/soilall_loss[soilloss_idx<0])                             
+
+            ## determine TAN pool after subtracting all loss pathways
+            self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd+1] - self.NH3_flux[dd+1] - self.diffusivefluxdown_aq[dd+1] -\
+                    self.diffusivefluxdown_gas[dd+1]- self.infilflux[dd+1] - \
+                        self.nitrif_NO3_soil[dd+1] - self.TAN_washoff[dd+1] - self.ammN_uptake[dd+1]
+            ## get rid of rounding error (TAN pool occasionaly become <-1e-13)
+            self.TAN_pool_soil[dd+1][self.TAN_pool_soil[dd+1]<0.0] = 0.0
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0
+            self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
+                ((injection_depth-z_sourcelayer/2)*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
+                    self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+            ## NH3 concentration in the soil pore space
+            self.NH3_gas_soil[dd+1] = KNH3 * self.TAN_soil_amount[dd+1]
+            ## NH3 conc is zero when soil moisture content reaches the saturation
+            self.NH3_gas_soil[dd+1][self.soilmoist[dd+1]==self.persm[dd+1]] = 0.0
+
+            ## NO3- pool of topsoil 
+            ## sources: 1) nitrification, 2) diffusion (aq only) from the underlying source layer
+            ## losses: 1) infiltration to the underlying source layer, 2) plant uptake, 3) surface washoff
+            NO3_soil_idx = self.NO3_pool_soil[dd] - self.NO3_infilsoil[dd] - self.nitN_uptake[dd] - self.NO3_washoff[dd]
+            self.NO3_pool_soil[dd+1][NO3_soil_idx>=0] = NO3_soil_idx[NO3_soil_idx>=0] + self.nitrif_NO3_soil[dd+1][NO3_soil_idx>=0] +\
+                self.NO3_diffusiveup[dd+1][NO3_soil_idx>=0]
+            self.NO3_pool_soil[dd+1][NO3_soil_idx<0] = self.nitrif_NO3_soil[dd+1][NO3_soil_idx<0] + \
+                self.NO3_diffusiveup[dd+1][NO3_soil_idx<0]
+
+            ## NO3- conc of the topsoil layer; g/m3
+            self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]!=0] = self.NO3_pool_soil[dd+1][self.soilmoist[dd+1]!=0]/\
+                                                                        ((injection_depth-z_sourcelayer/2)*self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])   
+            self.NO3_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
+            
+            ## NO3 loss through aqueous diffusion and plant uptake
+            NO3_soilinfilidx = self.qpsoil[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
+            ## NO3 surface runoff
+            NO3_washoffidx = self.rain_avail_washoff[dd+1]*self.NO3_soil_amount[dd+1]*timestep*3600
+            
+            NO3_soilall_loss = NO3_soilinfilidx + NO3_washoffidx +soilnitNuptake_idx
+            soilloss_idx = self.NO3_pool_soil[dd+1] - NO3_soilall_loss
+            self.NO3_infilsoil[dd+1][soilloss_idx>=0] = NO3_soilinfilidx[soilloss_idx>=0]
+            self.NO3_washoff[dd+1][soilloss_idx>=0] = NO3_washoffidx[soilloss_idx>=0]
+            self.nitN_uptake[dd+1][soilloss_idx>=0] = soilnitNuptake_idx[soilloss_idx>=0]
+            self.NO3_infilsoil[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        NO3_soilinfilidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+            self.NO3_washoff[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                        NO3_washoffidx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
+            self.nitN_uptake[dd+1][soilloss_idx<0] = self.NO3_pool_soil[dd+1][soilloss_idx<0]*\
+                                                                soilnitNuptake_idx[soilloss_idx<0]/NO3_soilall_loss[soilloss_idx<0]
 
         return
 
@@ -1859,19 +1900,19 @@ class LAND_module:
     def chem_fert_main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,fert_depth,sim_stat=False):
         
         self.sim_env()
-
+        
         if fert_method == 'broadcasting-surf':
             self.chem_fert_input(crop=crop_item)
             self.app_method(application_method=None)
-            self.chem_fert_bcsurf_sim(start_day_idx,end_day_idx,chem_fert_type)              
+            self.chem_fert_bcsurf_sim(start_day_idx,end_day_idx,chem_fert_type,crop=crop_item)              
         elif fert_method == 'broadcasting-disk':
             self.chem_fert_input(crop=crop_item)
             self.app_method(application_method=None)
-            self.chem_fert_bcdisk_sim(start_day_idx,end_day_idx,chem_fert_type,fert_depth)
+            self.chem_fert_bcdisk_sim(start_day_idx,end_day_idx,chem_fert_type,fert_depth,crop=crop_item)
         elif fert_method == 'deep injection':
             self.chem_fert_input(crop=crop_item)
             self.app_method(application_method=None)
-            self.chem_fert_deepinjec_sim(start_day_idx,end_day_idx,chem_fert_type,fert_depth)
+            self.chem_fert_deepinjec_sim(start_day_idx,end_day_idx,chem_fert_type,fert_depth,crop=crop_item)
         else:
             print('Error: fertilization method')
 

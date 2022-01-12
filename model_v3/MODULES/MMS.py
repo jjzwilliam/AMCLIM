@@ -1096,6 +1096,17 @@ class MMS_module:
                 self.NH3_flux[dd+1] = NH3_gas*k_gas*timestep*3600
         return
 
-    def MMS_sim_main():
-        
+    def MMS_sim_main(self,mms_cat,phase,start_day_idx,end_day_idx):
+        if mms_cat == "MMS_barn":
+            self.sim_env(mms_type=mms_cat,mms_phase=phase)
+            if phase == 'solid':
+                self.MMS_barn_solid_sim(start_day_idx,end_day_idx)
+            elif phase == 'liquid':
+                self.MMS_barn_liquid_sim(start_day_idx,end_day_idx)
+        elif mms_cat == "MMS_open":
+            self.sim_env(mms_type=mms_cat,mms_phase=phase)
+            if phase == 'solid':
+                self.MMS_land_sim(start_day_idx,end_day_idx)
+            elif phase == 'liquid':
+                self.MMS_liquid_sim(start_day_idx,end_day_idx)
         return
