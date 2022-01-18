@@ -1794,27 +1794,35 @@ class LAND_module:
         return
 
     def N_stat(self,fert_method,chem_fert_type):
+	## define output dims
+	ntime = Days
+        nlat = int(180.0/dlat)
+        nlon = int(360.0/dlon)
+        lats = 90 - 0.5*np.arange(360)
+        lons = -180 + 0.5*np.arange(720)
+        yearidx = str(year)+'-01-01'
+        time = pd.date_range(yearidx,periods=ntime)
 
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
             chemfert_Ntotal = self.TAN_added*sim_area
             chemfert_NH3emiss = self.NH3_flux*sim_area
-            chemfert_ammN = np.nansum(chemfert_Ntotal,axis=0)
-            chemfert_ammNH3 = np.nansum(chemfert_NH3emiss,axis=0)
+            #chemfert_ammN = np.nansum(chemfert_Ntotal,axis=0)
+            #chemfert_ammNH3 = np.nansum(chemfert_NH3emiss,axis=0)
 
         elif chem_fert_type == 'urea':
             sim_area = self.ureaN_area
             chemfert_Ntotal = self.urea_added*sim_area
             chemfert_NH3emiss = self.NH3_flux*sim_area
-            chemfert_ureaN = np.nansum(chemfert_Ntotal,axis=0)
-            chemfert_ureaNH3 = np.nansum(chemfert_NH3emiss,axis=0)
+            #chemfert_ureaN = np.nansum(chemfert_Ntotal,axis=0)
+            #chemfert_ureaNH3 = np.nansum(chemfert_NH3emiss,axis=0)
             
         elif chem_fert_type == 'nitrate':
             sim_area = self.nitN_area
             chemfert_Ntotal = self.NO3_added*sim_area
             chemfert_NH3emiss = self.NH3_flux*sim_area
-            chemfert_nitN = np.nansum(chemfert_Ntotal,axis=0)
-            chemfert_nitNH3 = np.nansum(chemfert_NH3emiss,axis=0)
+            #chemfert_nitN = np.nansum(chemfert_Ntotal,axis=0)
+            #chemfert_nitNH3 = np.nansum(chemfert_NH3emiss,axis=0)
         
         print('Total N applied: '+str(np.nansum(chemfert_Ntotal/1e9)))
         print('NH3 emission: '+str(np.nansum(chemfert_NH3emiss/1e9)))

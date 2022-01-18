@@ -11,7 +11,7 @@ from CONFIG.config import *        ## animal data file names specified in CONFIG
 from MODULES.FUNC import *
 
 ## directing input file directory
-file_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/' 
+file_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/' 
 animal_data_path = 'animal_data/'
 met_data_path = 'met_data/'
 crop_data_path = 'crop_data/'
@@ -33,8 +33,8 @@ soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACT
 # sshf_file = xr.open_dataset(file_path+met_data_path+'ERA5_2018d_sshf05.nc')
 rain_file = xr.open_dataset(file_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
 ratm_file = xr.open_dataset(file_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
-runoff_file = xr.open_dataset(file_path+met_data_path+'era5_2018d_surface_runoff-05.nc')
-subrunoff_file = xr.open_dataset(file_path+met_data_path+'era5_2018d_subsurface_runoff-05.nc')
+runoff_file = xr.open_dataset(file_path+met_data_path+'ERA5-Land_srfrunoff_2018d_05.nc')
+subrunoff_file = xr.open_dataset(file_path+met_data_path+'ERA5-Land_subrunoff_2018d_05.nc')
 
 temp_data = temp_file['t2m'] - 273.15  ## degC
 groundtemp_data = groundtemp_file['stl1'] - 273.15  ## degC
