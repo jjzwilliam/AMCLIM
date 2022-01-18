@@ -1,4 +1,5 @@
 from logging import raiseExceptions
+from os import times
 from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
@@ -1801,7 +1802,7 @@ class LAND_module:
         output = sim_result[1:dim1]+sim_result[dim1:]
         return output
 
-    def N_stat(self,fert_method,chem_fert_type):
+    def N_stat(self,crop_item,fert_method,chem_fert_type,ncfile_o=False):
         ## define output dims
         nlat = int(180.0/dlat)
         nlon = int(360.0/dlon)
@@ -1809,7 +1810,7 @@ class LAND_module:
         lats = 90 - 0.5*np.arange(nlat)
         lons = -180 + 0.5*np.arange(nlon)
         yearidx = str(sim_year)+'-01-01'
-        time = pd.date_range(yearidx,periods=ntime)
+        times = pd.date_range(yearidx,periods=ntime)
 
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
@@ -1915,9 +1916,67 @@ class LAND_module:
             print('NO3 leaching: '+ str(sum_totalGg(chemfert_NO3leaching))+' Gg')
             chemfert_NO3diffusionsoil = self.land_sim_reshape(self.NO3_diffusivedeep)*sim_area
             print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(chemfert_NO3diffusionsoil))+' Gg')
+
+            chemfert_ammN_uptake = chemfert_ammN_uptake + chemfert_ammN_uptakesl
+            chemfert_nitN_uptake = chemfert_nitN_uptake + chemfert_nitN_uptakesl
+        
+        ## generate an ncfile that contains the N pathways
+        if ncfile_o is True:
+            outds = xr.Dataset(
+                data_vars=dict(
+                    NH3emiss=(['time','lat','lon'],chemfert_NH3emiss),
+                    TANwashoff=(['lat','lon'],annual_total(chemfert_TANwashoff)),
+                    TANleaching=(['lat','lon'],annual_total(chemfert_leaching)),
+                    TANdiffaq=(['lat','lon'],annual_total(chemfert_diffaqdown)),
+                    NH3diffgas=(['lat','lon'],annual_total(chemfert_diffgasdown)),
+                    NH4nitrif=(['lat','lon'],annual_total(chemfert_nitrif)),
+                    NH4uptake=(['lat','lon'],annual_total(chemfert_ammN_uptake)),
+                    NO3uptake=(['lat','lon'],annual_total(chemfert_nitN_uptake)),
+                    NO3leaching=(['lat','lon'],annual_total(chemfert_NO3leaching)),
+                    NO3diff=(['lat','lon'],annual_total(chemfert_NO3diffusionsoil)),
+                            ),
+                coords = dict(
+                    time=(["time"], times),
+                    lon=(["lon"], lons),
+                    lat=(["lat"], lats),
+                            ),
+                attrs=dict(
+                    description="AMCLIM-Land_chem_fert: \
+                        N pathways of chemical fertilizer application in " +str(sim_year),
+                    info = fert_method+" of "+chem_fert_type+" for: "+str(crop_item),
+                    units="gN per grid",
+                ),
+            )
+
+            outds.NH3emiss.attrs["unit"] = 'gN/day'
+            outds.NH3emiss.attrs["long name"] = 'NH3 emission from fertilizer application'
+            outds.TANwashoff.attrs["unit"] = 'gN/year'
+            outds.TANwashoff.attrs["long name"] = 'TAN washoff from fertilizer application'
+            outds.TANleaching.attrs["unit"] = 'gN/year'
+            outds.TANleaching.attrs["long name"] = 'TAN leaching from fertilizer application'
+            outds.TANdiffaq.attrs["unit"] = 'gN/year'
+            outds.TANdiffaq.attrs["long name"] = 'TAN diffusion to deep soil from fertilizer application'
+            outds.NH3diffgas.attrs["unit"] = 'gN/year'
+            outds.NH3diffgas.attrs["long name"] = 'NH3 diffusion to deep soil from fertilizer application'
+            outds.NH4nitrif.attrs["unit"] = 'gN/year'
+            outds.NH4nitrif.attrs["long name"] = 'Nitrification'
+            outds.NH4uptake.attrs["unit"] = 'gN/year'
+            outds.NH4uptake.attrs["long name"] = 'Uptake of NH4+ by crops'
+            outds.NO3uptake.attrs["unit"] = 'gN/year'
+            outds.NO3uptake.attrs["long name"] = 'Uptake of NO3- by crops'
+            outds.NO3leaching.attrs["unit"] = 'gN/year'
+            outds.NO3leaching.attrs["long name"] = 'Nitrate leaching from fertilizer application'
+            outds.NO3diff.attrs["unit"] = 'gN/year'
+            outds.NO3diff.attrs["long name"] = 'Nitrate diffusion to deep soil from fertilizer application'
+
+            comp = dict(zlib=True, complevel=9)
+            encoding = {var: comp for var in outds.data_vars}
+
+            outds.to_netcdf(output_path+str(crop_item)+'.'+\
+                str(chem_fert_type)+'.'+str(fert_method)+'.'+str(sim_year)+'.nc',encoding=encoding)
         return
 
-    def chem_fert_main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,fert_depth,sim_stat=False):
+    def chem_fert_main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,fert_depth,sim_stat=False,ncfile_o=False):
         
         self.sim_env()
         
@@ -1937,7 +1996,11 @@ class LAND_module:
             print('Error: fertilization method')
 
         if sim_stat is True:
-            self.N_stat(fert_method,chem_fert_type)
+            ## output ncfile
+            if ncfile_o is True:
+                self.N_stat(crop_item,fert_method,chem_fert_type,ncfile_o=True)
+            else:
+                self.N_stat(crop_item,fert_method,chem_fert_type,ncfile_o=False)
 
         return
 

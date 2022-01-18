@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 sim_year = 2018
+output_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/outputs/output_ncfiles/'
 
 ## daily simulation or hourly simulation
 nhours = 24
