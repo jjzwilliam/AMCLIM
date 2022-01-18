@@ -110,3 +110,7 @@ def write_netcdf_file(file_info,file_data):
     print(str(file_info['file_name'])+' file complete!')
     return
 	
+## function: annual total
+def annual_total(indata):
+    outdata = np.nansum(indata,axis=0)
+    return outdata

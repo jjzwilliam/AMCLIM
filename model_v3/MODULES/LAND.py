@@ -3,6 +3,7 @@ from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
 from MODULES.FUNC import *
+from POSTPROC.postprocessing import *
 import sys
 
 ###################################
@@ -1793,116 +1794,127 @@ class LAND_module:
 
         return
 
+    def land_sim_reshape(self,sim_result):
+        shape = sim_result.shape
+        dim1 = int((shape[0]-1)/2+1)
+        output = np.zeros([dim1,shape[1],shape[2]])
+        output = sim_result[1:dim1]+sim_result[dim1:]
+        return output
+
     def N_stat(self,fert_method,chem_fert_type):
-	## define output dims
-	ntime = Days
+        ## define output dims
         nlat = int(180.0/dlat)
         nlon = int(360.0/dlon)
-        lats = 90 - 0.5*np.arange(360)
-        lons = -180 + 0.5*np.arange(720)
-        yearidx = str(year)+'-01-01'
+        ntime = Days
+        lats = 90 - 0.5*np.arange(nlat)
+        lons = -180 + 0.5*np.arange(nlon)
+        yearidx = str(sim_year)+'-01-01'
         time = pd.date_range(yearidx,periods=ntime)
 
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
-            chemfert_Ntotal = self.TAN_added*sim_area
-            chemfert_NH3emiss = self.NH3_flux*sim_area
+            chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
+            chemfert_NH3emiss = self.land_sim_reshape(self.NH3_flux)*sim_area
+            # chemfert_Ntotal = self.TAN_added*sim_area
+            # chemfert_NH3emiss = self.NH3_flux*sim_area
             #chemfert_ammN = np.nansum(chemfert_Ntotal,axis=0)
             #chemfert_ammNH3 = np.nansum(chemfert_NH3emiss,axis=0)
 
         elif chem_fert_type == 'urea':
             sim_area = self.ureaN_area
-            chemfert_Ntotal = self.urea_added*sim_area
-            chemfert_NH3emiss = self.NH3_flux*sim_area
+            chemfert_Ntotal = self.land_sim_reshape(self.urea_added)*sim_area
+            chemfert_NH3emiss = self.land_sim_reshape(self.NH3_flux)*sim_area
+            # chemfert_Ntotal = self.urea_added*sim_area
+            # chemfert_NH3emiss = self.NH3_flux*sim_area
             #chemfert_ureaN = np.nansum(chemfert_Ntotal,axis=0)
             #chemfert_ureaNH3 = np.nansum(chemfert_NH3emiss,axis=0)
             
         elif chem_fert_type == 'nitrate':
             sim_area = self.nitN_area
-            chemfert_Ntotal = self.NO3_added*sim_area
-            chemfert_NH3emiss = self.NH3_flux*sim_area
+            chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area
+            chemfert_NH3emiss = self.land_sim_reshape(self.NH3_flux)*sim_area
+            # chemfert_Ntotal = self.NO3_added*sim_area
+            # chemfert_NH3emiss = self.NH3_flux*sim_area
             #chemfert_nitN = np.nansum(chemfert_Ntotal,axis=0)
             #chemfert_nitNH3 = np.nansum(chemfert_NH3emiss,axis=0)
         
-        print('Total N applied: '+str(np.nansum(chemfert_Ntotal/1e9)))
-        print('NH3 emission: '+str(np.nansum(chemfert_NH3emiss/1e9)))
+        print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal)))
+        print('NH3 emission: '+str(sum_totalGg(chemfert_NH3emiss)))
 
-        chemfert_TANwashoff = np.nansum(self.TAN_washoff*sim_area)/1e9
-        print('TAN washoff: '+ str(chemfert_TANwashoff))
-        chemfert_leaching = np.nansum(self.leachingflux*sim_area)/1e9
-        print('NH4 leaching: '+ str(chemfert_leaching))
+        chemfert_TANwashoff = self.land_sim_reshape(self.TAN_washoff)*sim_area
+        print('TAN washoff: '+ str(sum_totalGg(chemfert_TANwashoff))+' Gg')
+        chemfert_leaching = self.land_sim_reshape(self.leachingflux)*sim_area
+        print('NH4 leaching: '+ str(sum_totalGg(chemfert_leaching))+' Gg')
 
         if fert_method == 'broadcasting-surf':
-            chemfert_diffaq = np.nansum(self.diffusivefluxsourcelayer_aq*sim_area)/1e9
-            print('TAN diff aq to topsoil: '+ str(chemfert_diffaq))
-            chemfert_diffgas = np.nansum(self.diffusivefluxsourcelayer_gas*sim_area)/1e9
-            print('TAN diff gas to topsoil: '+ str(chemfert_diffgas))
-            chemfert_updiffaq = np.nansum(self.diffusivefluxup_aq*sim_area)/1e9
-            print('TAN diff aq upwards to source layer: '+ str(chemfert_updiffaq))
-            chemfert_updiffgas = np.nansum(self.diffusivefluxup_gas*sim_area)/1e9
-            print('TAN diff gas upwards to source layer: '+ str(chemfert_updiffgas))
-            chemfert_infil = np.nansum(self.infilflux*sim_area)/1e9
-            print('NH4 infiltration to topsoil: '+ str(chemfert_infil))
-            chemfert_nitrif = np.nansum(self.nitrif_NO3_sourcelayer*sim_area)/1e9
-            print('NH4 nitrification (surf source layer): '+ str(chemfert_nitrif))
-            chemfert_diffaqdown = np.nansum(self.diffusivefluxsoil_aq*sim_area)/1e9
-            print('TAN diff aq to deeper soil: '+ str(chemfert_diffaqdown))
-            chemfert_diffgasdown = np.nansum(self.diffusivefluxsoil_gas*sim_area)/1e9
-            print('TAN diff gas to deeper soil: '+ str(chemfert_diffgasdown))
-            chemfert_nitrif_soil = np.nansum(self.nitrif_NO3_soil*sim_area)/1e9
-            print('NH4 nitrif (topsoil layer): '+ str(chemfert_nitrif_soil))
-            chemfert_ammN_uptake = np.nansum(self.ammN_uptake*sim_area)/1e9
-            print('NH4 uptake by plants: '+ str(chemfert_ammN_uptake))
-            chemfert_nitN_uptake = np.nansum(self.nitN_uptake*sim_area)/1e9
-            print('NO3 uptake by plants: '+ str(chemfert_nitN_uptake))
-            chemfert_NO3diffusive = np.nansum(self.NO3_diffusivesourcelayer*sim_area)/1e9
-            print('NO3 diffusion from source layer to soil pool: '+ str(chemfert_NO3diffusive))
-            chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
-            print('NO3 leaching: '+str(chemfert_NO3leaching))
-            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
-            print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))
+            chemfert_diffaq = self.land_sim_reshape(self.diffusivefluxsourcelayer_aq)*sim_area
+            print('TAN diff aq to topsoil: '+ str(sum_totalGg(chemfert_diffaq))+' Gg')
+            chemfert_diffgas = self.land_sim_reshape(self.diffusivefluxsourcelayer_gas)*sim_area
+            print('TAN diff gas to topsoil: '+ str(sum_totalGg(chemfert_diffgas))+' Gg')
+            chemfert_updiffaq = self.land_sim_reshape(self.diffusivefluxup_aq)*sim_area
+            print('TAN diff aq upwards to source layer: '+ str(sum_totalGg(chemfert_updiffaq))+' Gg')
+            chemfert_updiffgas = self.land_sim_reshape(self.diffusivefluxup_gas)*sim_area
+            print('TAN diff gas upwards to source layer: '+ str(sum_totalGg(chemfert_updiffgas))+' Gg')
+            chemfert_infil = self.land_sim_reshape(self.infilflux)*sim_area
+            print('NH4 infiltration to topsoil: '+ str(sum_totalGg(chemfert_infil))+' Gg')
+            chemfert_nitrif = self.land_sim_reshape(self.nitrif_NO3_sourcelayer)*sim_area
+            print('NH4 nitrification (surf source layer): '+ str(sum_totalGg(chemfert_nitrif))+' Gg')
+            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq)*sim_area
+            print('TAN diff aq to deeper soil: '+ str(sum_totalGg(chemfert_diffaqdown))+' Gg')
+            chemfert_diffgasdown = self.land_sim_reshape(self.diffusivefluxsoil_gas)*sim_area
+            print('TAN diff gas to deeper soil: '+ str(sum_totalGg(chemfert_diffgasdown))+' Gg')
+            chemfert_nitrif_soil = self.land_sim_reshape(self.nitrif_NO3_soil)*sim_area
+            print('NH4 nitrif (topsoil layer): '+ str(sum_totalGg(chemfert_nitrif_soil))+' Gg')
+            chemfert_ammN_uptake = self.land_sim_reshape(self.ammN_uptake)*sim_area
+            print('NH4 uptake by plants: '+ str(sum_totalGg(chemfert_ammN_uptake))+' Gg')
+            chemfert_nitN_uptake = self.land_sim_reshape(self.nitN_uptake)*sim_area
+            print('NO3 uptake by plants: '+ str(sum_totalGg(chemfert_nitN_uptake))+' Gg')
+            chemfert_NO3diffusive = self.land_sim_reshape(self.NO3_diffusivesourcelayer)*sim_area
+            print('NO3 diffusion from source layer to soil pool: '+ str(sum_totalGg(chemfert_NO3diffusive))+' Gg')
+            chemfert_NO3leaching = self.land_sim_reshape(self.NO3_leaching)*sim_area
+            print('NO3 leaching: '+ str(sum_totalGg(chemfert_NO3leaching))+' Gg')
+            chemfert_NO3diffusionsoil = self.land_sim_reshape(self.NO3_diffusivedeep)*sim_area
+            print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(chemfert_NO3diffusionsoil))+' Gg')
                 
         elif fert_method == 'broadcasting-disk':
 
-            chemfert_nitrif = np.nansum(self.nitrif_NO3_sourcelayer*sim_area)/1e9
-            print('TAN nitrification: '+ str(chemfert_nitrif))
-            chemfert_diffaqdown = np.nansum(self.diffusivefluxsoil_aq*sim_area)/1e9
-            print('TAN diff aq to deeper soil: '+ str(chemfert_diffaqdown))
-            chemfert_diffgasdown = np.nansum(self.diffusivefluxsoil_gas*sim_area)/1e9
-            print('TAN diff gas to deeper soil: '+ str(chemfert_diffgasdown))
-            chemfert_ammN_uptake = np.nansum(self.ammN_uptake*sim_area)/1e9
-            print('NH4 uptake by plants: '+ str(chemfert_ammN_uptake))
-            chemfert_nitN_uptake = np.nansum(self.nitN_uptake*sim_area)/1e9
-            print('NO3 uptake by plants: '+ str(chemfert_nitN_uptake))
-            chemfert_NO3diffusive = np.nansum(self.NO3_diffusivesourcelayer*sim_area)/1e9
-            print('NO3 diffusion from source layer to soil pool: '+ str(chemfert_NO3diffusive))
-            chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
-            print('NO3 leaching: '+str(chemfert_NO3leaching))
-            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
-            print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))    
+            chemfert_nitrif = self.land_sim_reshape(self.nitrif_NO3_sourcelayer)*sim_area
+            print('NH4 nitrification: '+ str(sum_totalGg(chemfert_nitrif))+' Gg')
+            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq)*sim_area
+            print('TAN diff aq to deeper soil: '+ str(sum_totalGg(chemfert_diffaqdown))+' Gg')
+            chemfert_diffgasdown = self.land_sim_reshape(self.diffusivefluxsoil_gas)*sim_area
+            print('TAN diff gas to deeper soil: '+ str(sum_totalGg(chemfert_diffgasdown))+' Gg')
+            chemfert_ammN_uptake = self.land_sim_reshape(self.ammN_uptake)*sim_area
+            print('NH4 uptake by plants: '+ str(sum_totalGg(chemfert_ammN_uptake))+' Gg')
+            chemfert_nitN_uptake = self.land_sim_reshape(self.nitN_uptake)*sim_area
+            print('NO3 uptake by plants: '+ str(sum_totalGg(chemfert_nitN_uptake))+' Gg')
+            chemfert_NO3leaching = self.land_sim_reshape(self.NO3_leaching)*sim_area
+            print('NO3 leaching: '+ str(sum_totalGg(chemfert_NO3leaching))+' Gg')
+            chemfert_NO3diffusionsoil = self.land_sim_reshape(self.NO3_diffusivedeep)*sim_area
+            print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(chemfert_NO3diffusionsoil))+' Gg')
 
         elif fert_method == 'deep injection':
 
-            chemfert_nitrif = np.nansum(self.nitrif_NO3_sourcelayer*sim_area)/1e9
-            print('NH4 nitrification (source layer): '+ str(chemfert_nitrif))
-            chemfert_diffaqdown = np.nansum(self.diffusivefluxsoil_aq*sim_area)/1e9
-            print('TAN diff aq to deeper soil: '+ str(chemfert_diffaqdown))
-            chemfert_diffgasdown = np.nansum(self.diffusivefluxsoil_gas*sim_area)/1e9
-            print('TAN diff gas to deeper soil: '+ str(chemfert_diffgasdown))
-            chemfert_nitrif_soil = np.nansum(self.nitrif_NO3_soil*sim_area)/1e9
-            print('NH4 nitrif (topsoil layer): '+ str(chemfert_nitrif_soil))
-            chemfert_ammN_uptakesl = np.nansum(self.ammN_uptake_sourcelayer*sim_area)/1e9
-            print('NH4 uptake by plants (source layer): '+ str(chemfert_ammN_uptakesl))
-            chemfert_ammN_uptake = np.nansum(self.ammN_uptake*sim_area)/1e9
-            print('NH4 uptake by plants (topsoil layer): '+ str(chemfert_ammN_uptake))
-            chemfert_nitN_uptakesl = np.nansum(self.nitN_uptake_sourcelayer*sim_area)/1e9
-            print('NO3 uptake by plants (source layer): '+ str(chemfert_nitN_uptakesl))
-            chemfert_nitN_uptake = np.nansum(self.nitN_uptake*sim_area)/1e9
-            print('NO3 uptake by plants (topsoil layer): '+ str(chemfert_nitN_uptake))
-            chemfert_NO3leaching = np.nansum(self.NO3_leaching*sim_area)/1e9
-            print('NO3 leaching: '+str(chemfert_NO3leaching))
-            chemfert_NO3diffusionsoil = np.nansum(self.NO3_diffusivedeep*sim_area)/1e9
-            print('NO3 diffusion to deeper soil: '+str(chemfert_NO3diffusionsoil))
+            chemfert_nitrif = self.land_sim_reshape(self.nitrif_NO3_sourcelayer)*sim_area
+            print('NH4 nitrification (source layer): '+ str(sum_totalGg(chemfert_nitrif))+' Gg')
+            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq)*sim_area
+            print('TAN diff aq to deeper soil: '+ str(sum_totalGg(chemfert_diffaqdown))+' Gg')
+            chemfert_diffgasdown = self.land_sim_reshape(self.diffusivefluxsoil_gas)*sim_area
+            print('TAN diff gas to deeper soil: '+ str(sum_totalGg(chemfert_diffgasdown))+' Gg')
+            chemfert_nitrif_soil = self.land_sim_reshape(self.nitrif_NO3_soil)*sim_area
+            print('NH4 nitrif (topsoil layer): '+ str(sum_totalGg(chemfert_nitrif_soil))+' Gg')
+            chemfert_ammN_uptakesl = self.land_sim_reshape(self.ammN_uptake_sourcelayer)*sim_area
+            print('NH4 uptake by plants (source layer): '+ str(sum_totalGg(chemfert_ammN_uptakesl))+' Gg')
+            chemfert_ammN_uptake = self.land_sim_reshape(self.ammN_uptake)*sim_area
+            print('NH4 uptake by plants (topsoil layer): '+ str(sum_totalGg(chemfert_ammN_uptake))+' Gg')
+            chemfert_nitN_uptakesl = self.land_sim_reshape(self.nitN_uptake_sourcelayer)*sim_area
+            print('NO3 uptake by plants (source layer): '+ str(sum_totalGg(chemfert_nitN_uptakesl))+' Gg')
+            chemfert_nitN_uptake = self.land_sim_reshape(self.nitN_uptake)*sim_area
+            print('NO3 uptake by plants (topsoil layer): '+ str(sum_totalGg(chemfert_nitN_uptake))+' Gg')
+            chemfert_NO3leaching = self.land_sim_reshape(self.NO3_leaching)*sim_area
+            print('NO3 leaching: '+ str(sum_totalGg(chemfert_NO3leaching))+' Gg')
+            chemfert_NO3diffusionsoil = self.land_sim_reshape(self.NO3_diffusivedeep)*sim_area
+            print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(chemfert_NO3diffusionsoil))+' Gg')
         return
 
     def chem_fert_main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,fert_depth,sim_stat=False):

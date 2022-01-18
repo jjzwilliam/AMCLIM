@@ -36,3 +36,8 @@ def insert_time_slice(input_array):
     new_array[1:,:,:] = input_array
     new_array[0,:,:] = input_array[-1,:,:]
     return new_array
+
+## function: calculation total Gg of each pathways, and rounding to 3 decimal numbers
+def sum_totalGg(input):
+    total = np.round(np.nansum(input)/1e9,decimals=3)
+    return total

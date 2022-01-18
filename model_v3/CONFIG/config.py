@@ -2,9 +2,13 @@ import numpy as np
 import sys
 import os
 from pathlib import Path
+
+sim_year = 2018
+
 ## daily simulation or hourly simulation
 nhours = 24
-Days = 365
+if (sim_year%4)==0: Days = 366
+else: Days = 365
 Hours = nhours * Days
 time = Days
 timestep = 24
@@ -24,7 +28,7 @@ levels = 2
 ## array dimensions;
 #mtrx = [levels,time,lats,lons]
 mtrx = [time+1,lats,lons]
-mtrx2 = [time+366,lats,lons]
+mtrx2 = [time*2+1,lats,lons]
 
 ## define months info
 Months_name = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
