@@ -1,5 +1,7 @@
 from logging import raiseExceptions
 from os import times
+
+from pandas import array
 from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
@@ -77,6 +79,35 @@ class LAND_module:
             ## i.e., without drying processes
             self.manure_water = np.zeros(array_shape)
             self.manure_minwc = np.zeros(array_shape)
+            ## input of available N component from MMS/HOUSING
+            self.avail_N_added = avail_N_added
+            self.avail_N = np.zeros(array_shape)
+            ## Nitrogen pool that is available (easily) to form TAN
+            self.avail_N_pool = np.zeros(array_shape)
+            ## washoff flux of available org N 
+            self.avail_N_washoff = np.zeros(array_shape)
+            ## input of resistant N component from MMS/HOUSING
+            self.resist_N_added = resist_N_added
+            self.resist_N = np.zeros(array_shape)
+            ## Nitrogen pool that is resistant (slowly) to form TAN
+            self.resist_N_pool = np.zeros(array_shape)
+            ## washoff flux of resistant org N 
+            self.resist_N_washoff = np.zeros(array_shape)
+            ## input of unavailable N component from MMS/HOUSING
+            self.unavail_N_added = unavail_N_added
+            self.unavail_N = np.zeros(array_shape)
+            ## Nitrogen pool that is unavailable (cannot) to form TAN
+            self.unavail_N_pool = np.zeros(array_shape)
+            ## washoff flux of unavailable org N 
+            self.unavail_N_washoff = np.zeros(array_shape)
+            ## water added from MMS/HOUSING
+            self.water_added = water_added
+            self.water = np.zeros(array_shape)
+            ## total water pool of the system (soil water; manure water+soil water)
+            self.Total_water_pool = np.zeros(array_shape)
+            ## total pool of the topsoil layer
+            self.water_pool_soil = np.zeros(array_shape)
+
         else:
             ## cropping area for nitrate N fertilizer
             self.nitN_area = np.zeros(array_shape[1:])
@@ -90,8 +121,20 @@ class LAND_module:
         self.urea = np.zeros(array_shape)
         ## urea pool
         self.urea_pool = np.zeros(array_shape)
+        ## urea pool of the topsoil layer
+        self.urea_pool_soil = np.zeros(array_shape)
+        ## urea concentration (layer where major N input is; source layer)
+        self.urea_amount = np.zeros(array_shape)
+        ## urea concentration of the topsoil layer
+        self.urea_soil_amount = np.zeros(array_shape)
         ## washoff flux of urea
         self.urea_washoff = np.zeros(array_shape)
+        ## urea diffusion to deeper soil (aq)
+        self.urea_diff = np.zeros(array_shape)
+        ## urea infiltration from the 1st layer to the underlying layer
+        self.urea_infil = np.zeros(array_shape)
+        ## urea leaching to deeper soil
+        self.urealeaching = np.zeros(array_shape)
         ## uric acid input from MMS/HOUSING
         self.UA_added = UA_added
         self.UA = np.zeros(array_shape)
@@ -99,32 +142,13 @@ class LAND_module:
         self.UA_pool = np.zeros(array_shape)
         ## washoff flux of UA
         self.UA_washoff = np.zeros(array_shape)
-        ## input of available N component from MMS/HOUSING
-        self.avail_N_added = avail_N_added
-        self.avail_N = np.zeros(array_shape)
-        ## Nitrogen pool that is available (easily) to form TAN
-        self.avail_N_pool = np.zeros(array_shape)
-        ## washoff flux of available org N 
-        self.avail_N_washoff = np.zeros(array_shape)
-        ## input of resistant N component from MMS/HOUSING
-        self.resist_N_added = resist_N_added
-        self.resist_N = np.zeros(array_shape)
-        ## Nitrogen pool that is resistant (slowly) to form TAN
-        self.resist_N_pool = np.zeros(array_shape)
-        ## washoff flux of resistant org N 
-        self.resist_N_washoff = np.zeros(array_shape)
-        ## input of unavailable N component from MMS/HOUSING
-        self.unavail_N_added = unavail_N_added
-        self.unavail_N = np.zeros(array_shape)
-        ## Nitrogen pool that is unavailable (cannot) to form TAN
-        self.unavail_N_pool = np.zeros(array_shape)
-        ## washoff flux of unavailable org N 
-        self.unavail_N_washoff = np.zeros(array_shape)
         ## TAN added from MMS/HOUSING
         self.TAN_added = TAN_added
         self.TAN = np.zeros(array_shape)
-        ## TAN production from urea hydrolysis, conversion from N_avail and N_resist pool
+        ## TAN production from urea hydrolysis, conversion from N_avail and N_resist pool (source layer)
         self.TAN_prod = np.zeros(array_shape)
+        ## TAN production from urea hydrolysis, conversion from N_avail and N_resist pool (topsoil layer)
+        self.TAN_prod_soil = np.zeros(array_shape)
         ## TAN pool (layer where major N input is; source layer)
         self.TAN_pool = np.zeros(array_shape)
         ## TAN pool of the topsoil layer
@@ -165,13 +189,6 @@ class LAND_module:
         self.NO3_leaching = np.zeros(array_shape)
         ## diffusive aqueous NO3- to deeper soil
         self.NO3_diffusivedeep = np.zeros(array_shape)
-        ## water added from MMS/HOUSING
-        self.water_added = water_added
-        self.water = np.zeros(array_shape)
-        ## total water pool of the system (soil water; manure water+soil water)
-        self.Total_water_pool = np.zeros(array_shape)
-        ## total pool of the topsoil layer
-        self.water_pool_soil = np.zeros(array_shape)
         ## ratio of [NH4+]/[H+] in the system
         self.Gamma_manure = np.zeros(array_shape)
         ## surface NH3 concentrtion at equilirium (in molar mass)
@@ -180,6 +197,7 @@ class LAND_module:
         self.NH3_gas_bulk = np.zeros(array_shape)
         ## topsoil layer NH3 concentration
         self.NH3_gas_soil = np.zeros(array_shape)
+
         ## emission potential
         self.modelled_emiss = np.zeros(array_shape)
         ## final emission
@@ -190,22 +208,10 @@ class LAND_module:
         self.NH3_flux = np.zeros(array_shape)
         ## leaching of aqueous TAN to deeper soil (not diffusive)
         self.leachingflux = np.zeros(array_shape)
-
-        ## the following fluxes are valid when source layer refers to the whole topsoil layer (broadcasting-disk)
-        ## OR the source layer is above the topsoil layer (e.g., broadcasting-topdressed)
-        ## diffusion of aqueous TAN from the source layer to the topsoil layer
-        self.diffusivefluxsourcelayer_aq = np.zeros(array_shape)
-        ## diffusion of gaseous NH3 from the source layer to the topsoil layer
-        self.diffusivefluxsourcelayer_gas = np.zeros(array_shape)
         ## diffusion of aqueous TAN from the topsoil layer to the deeper soil
         self.diffusivefluxsoil_aq = np.zeros(array_shape)
         ## diffusion of gaseous NH3 from the topsoil layer to the deeper soil
         self.diffusivefluxsoil_gas = np.zeros(array_shape)
-        ## upward diffusion of aqueous TAN: from the topsoil layer to the source layer 
-        self.diffusivefluxup_aq = np.zeros(array_shape)
-        ## upward diffusion of gaseous NH3: from the topsoil layer to the  source layer
-        self.diffusivefluxup_gas = np.zeros(array_shape)
-
         ## infiltration of aqueous TAN from the 1st layer to the underlying layer; very similar to the leaching flux
         self.infilflux = np.zeros(array_shape)
         ## Note that when there is a thin source layer above (within) the topsoil layer, 
@@ -216,14 +222,38 @@ class LAND_module:
         ## uptake of nitrate nitrogen by plants in the topsoil layer
         self.nitN_uptake = np.zeros(array_shape)
 
+        ## [broadcasting-disl] technique:
+        ## the following fluxes are valid when source layer refers to the whole topsoil layer (broadcasting-disk)   
+        if application_method_index == 'surf':
+            ## diffusion of aqueous TAN from the source layer to the topsoil layer
+            self.diffusivefluxsourcelayer_aq = np.zeros(array_shape)
+            ## diffusion of gaseous NH3 from the source layer to the topsoil layer
+            self.diffusivefluxsourcelayer_gas = np.zeros(array_shape)
+            ## diffusion of urea from the source layer to the topsoil layer
+            self.ureadiffusivefluxsourcelayer = np.zeros(array_shape)
+            ## upward diffusion of aqueous TAN: from the topsoil layer to the source layer 
+            self.diffusivefluxup_aq = np.zeros(array_shape)
+            ## upward diffusion of gaseous NH3: from the topsoil layer to the  source layer
+            self.diffusivefluxup_gas = np.zeros(array_shape)
+            ## upward diffusion of urea: from the topsoil layer to the source layer
+            # self.ureadiffusivefluxup = np.zeros(array_shape)
+
         ## [deep injection] technique:
         ## vertical soil profile in the model (from top to the bottom):
         ## surface (0 cm) - topsoil layer (0 - 7 cm) - source layer (7 - 13 cm) - deeper soil
-        if application_method_index == 'deep injection':
+        elif application_method_index == 'deep injection':
+            ## diffusion of aqueous TAN from the source layer to the topsoil layer
+            self.diffusivefluxsourcelayer_aq = np.zeros(array_shape)
+            ## diffusion of gaseous NH3 from the source layer to the topsoil layer
+            self.diffusivefluxsourcelayer_gas = np.zeros(array_shape)
+            ## diffusion of urea from the source layer to the topsoil layer
+            self.ureadiffusivefluxsourcelayer = np.zeros(array_shape)
             ## downward diffusion of aqueous TAN: from the topsoil layer to the source layer 
             self.diffusivefluxdown_aq = np.zeros(array_shape)
             ## downward diffusion of gaseous NH3: from the topsoil layer to the  source layer
             self.diffusivefluxdown_gas = np.zeros(array_shape)
+            ## downward diffusion of urea: from topsoil layer to the source layer
+            # self.ureadiffusivefluxdown = np.zeros(array_shape)
             ## infiltration of NO3 from the topsoillayer to the source layer; downwards
             self.NO3_infilsoil = np.zeros(array_shape)
             ## diffusive aqueous NO3- from the source layer to the topsoil layer; upwards
@@ -869,13 +899,35 @@ class LAND_module:
             self.R_soilaq_down[dd+1] = (p_2ndsoil-disk_depth/2)/(tor_soil_aq*self.D_aq_NH4[dd+1])
             self.R_soilg_down[dd+1] = (p_2ndsoil-disk_depth/2)/(tor_soil_gas*self.D_air_NH3[dd+1])
 
-            ## TAN production from urea hydrolysis
-            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
-
-            ## Urea pool
-            urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1])
-            self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
-            self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+            if chem_fert_type == 'urea':
+                ## Urea pool
+                urea_idx = self.urea_pool[dd] - self.TAN_prod[dd] - self.urea_washoff[dd] - \
+                            self.urea_diff[dd] - self.urealeaching[dd]
+                self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
+                self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+                ## urea concentration of the source layer and at the surface
+                self.urea_amount[dd+1] = self.urea_pool[dd+1]/(z_sourcelayer*self.soilmoist[dd+1])
+                urea_surf_amount = self.urea_amount[dd+1]/(self.R_soilaq[dd+1]*self.rain_avail_washoff[dd+1]+1)
+                ## pathways
+                urea_washoffidx = self.rain_avail_washoff[dd+1] * urea_surf_amount*timestep*3600
+                urea_diffidx = self.urea_amount[dd+1]/self.R_soilaq_down[dd+1] * timestep*3600
+                urea_leachingidx = self.qpsoil[dd+1] * self.urea_amount[dd+1]*timestep*3600
+                urea_toTANidx = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd+1]
+                ## determining the fluxes: washoff, diffusion, leaching, hydrolysis
+                all_loss = urea_washoffidx + urea_diffidx + urea_leachingidx + urea_toTANidx
+                loss_idx = self.urea_pool[dd+1] - all_loss
+                self.urea_washoff[dd+1][loss_idx>=0] = urea_washoffidx[loss_idx>=0]
+                self.urea_diff[dd+1][loss_idx>=0] = urea_diffidx[loss_idx>=0]
+                self.urealeaching[dd+1][loss_idx>=0] = urea_leachingidx[loss_idx>=0]
+                self.TAN_prod[dd+1][loss_idx>=0] = urea_toTANidx[loss_idx>=0]
+                self.urea_washoff[dd+1][loss_idx<0] = urea_washoffidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.urea_diff[dd+1][loss_idx<0] = urea_diffidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.urealeaching[dd+1][loss_idx<0]= urea_leachingidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.TAN_prod[dd+1][loss_idx<0] = urea_toTANidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
             
             ## TAN pool 
             ## Note: source of TAN pool: input of TAN from fertilizer (ammonium or urea hydrolysis)
@@ -951,7 +1003,7 @@ class LAND_module:
                 KNH3*(self.persm[dd+1]-self.soilmoist[dd+1])+\
                 (1-self.persm[dd+1])*Kd)*(sim_ccH[dd+1]/(sim_ccH[dd+1]+self.k_NH4[dd+1]))
             ## determining the maximum nitrification of TAN
-            nitrif_idx = KNO3_soil*self.TAN_pool[dd]*f_NH4
+            nitrif_idx = KNO3_soil*self.TAN_pool[dd+1]*f_NH4
             
             ## plant N uptake inc. ammonium, nitrate
             soilammNuptake_idx, soilnitNuptake_idx = plant_N_uptake(Namm=self.TAN_pool[dd]*f_NH4,\
@@ -1070,7 +1122,7 @@ class LAND_module:
             ## resistance for diffusion from the surface source layer to the underlying topsoil layer
             self.R_soilaq[dd+1] = (p_topsoil-p_sourcelayer)/(tor_soil_aq*self.D_aq_NH4[dd+1])
             self.R_soilg[dd+1] = (p_topsoil-p_sourcelayer)/(tor_soil_gas*self.D_air_NH3[dd+1])
-            ## resistance for diffusion to the deeper soil from the topsoil layer to the underlying 2nd soil layer
+            ## resistance for diffusion from the topsoil layer to the deeper soil
             self.R_soilaq_down[dd+1] = (p_2ndsoil-p_topsoil)/(tor_soil_aq*self.D_aq_NH4[dd+1])
             self.R_soilg_down[dd+1] = (p_2ndsoil-p_topsoil)/(tor_soil_gas*self.D_air_NH3[dd+1])
 
@@ -1096,13 +1148,65 @@ class LAND_module:
             ## TAN from housing to storage
             self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])'''
 
-            ## TAN production from urea hydrolysis
-            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
+            if chem_fert_type == 'urea':
 
-            ## Urea pool
-            urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1]) - self.urea_washoff[dd+1]
-            self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
-            self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+                ## Urea pool of the surface source layer
+                self.urea_pool[dd+1] = self.urea_pool[dd] + self.urea[dd+1]
+                ## urea concentration of the source layer and at the surface
+                self.urea_amount[dd+1] = self.urea_pool[dd+1]/(z_sourcelayer*self.soilmoist[dd+1])
+                urea_surf_amount = self.urea_amount[dd+1]/(self.R_sourcelayer_aq[dd+1]*self.rain_avail_washoff[dd+1]+1)
+                ## pathways
+                urea_washoffidx = self.rain_avail_washoff[dd+1] * urea_surf_amount*timestep*3600
+                urea_diffidx = (self.urea_amount[dd+1]-self.urea_soil_amount[dd])/self.R_soilaq[dd+1] * timestep*3600
+                urea_infilidx = self.qpsoil[dd+1] * self.urea_amount[dd+1]*timestep*3600
+                urea_toTANidx = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd+1]
+                ## determining the fluxes: washoff, diffusion, infiltration, hydrolysis
+                all_loss = urea_washoffidx + urea_diffidx + urea_infilidx + urea_toTANidx
+                loss_idx = self.urea_pool[dd+1] - all_loss
+                self.urea_washoff[dd+1][loss_idx>=0] = urea_washoffidx[loss_idx>=0]
+                self.ureadiffusivefluxsourcelayer[dd+1][loss_idx>=0] = urea_diffidx[loss_idx>=0]
+                self.urea_infil[dd+1][loss_idx>=0] = urea_infilidx[loss_idx>=0]
+                self.TAN_prod[dd+1][loss_idx>=0] = urea_toTANidx[loss_idx>=0]
+                self.urea_washoff[dd+1][loss_idx<0] = urea_washoffidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.ureadiffusivefluxsourcelayer[dd+1][loss_idx<0] = urea_diffidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.urealeaching[dd+1][loss_idx<0]= urea_infilidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.TAN_prod[dd+1][loss_idx<0] = urea_toTANidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                ## determining urea pool after subtracting all loss pathways
+                self.urea_pool[dd+1] = self.urea_pool[dd+1] - self.TAN_prod[dd+1] - self.urea_washoff[dd+1] - \
+                            self.ureadiffusivefluxsourcelayer[dd+1] - self.urea_infil[dd+1]
+                ## getting rid of rounding error
+                self.urea_pool[dd+1][self.urea_pool[dd+1]<0.0] = 0.0
+                self.urea_amount[dd+1] = self.urea_pool[dd+1]/(z_sourcelayer*self.soilmoist[dd+1])
+
+                ## urea pool of the topsoil layer
+                self.urea_pool_soil[dd+1] = self.urea_pool_soil[dd] + self.urea_infil[dd+1] + self.ureadiffusivefluxsourcelayer[dd+1]
+                ## urea concentration of the topsoil layer
+                self.urea_soil_amount[dd+1] = self.urea_pool_soil[dd+1]/(z_topsoil*self.soilmoist[dd+1])
+                ## pathways
+                soilurea_diffidx = self.urea_soil_amount[dd+1]/self.R_soilaq_down[dd+1]*timestep*3600
+                soilurea_leachingidx = self.qpsoil[dd+1]*self.urea_soil_amount[dd+1]*timestep*3600
+                soilurea_toTANidx = self.daily_urea_hydro_rate[dd+1]*self.urea_pool_soil[dd+1]
+                ## determining the fluxes: washoff, diffusion, leaching, hydrolysis
+                soilall_loss = soilurea_diffidx + soilurea_leachingidx + soilurea_toTANidx
+                soilloss_idx = self.urea_pool_soil[dd+1] - soilall_loss
+                self.urea_diff[dd+1][soilloss_idx>=0] = soilurea_diffidx[soilloss_idx>=0]
+                self.urealeaching[dd+1][soilloss_idx>=0] = soilurea_leachingidx[soilloss_idx>=0]
+                self.TAN_prod_soil[dd+1][soilloss_idx>=0] = soilurea_toTANidx[soilloss_idx>=0]
+                self.urea_diff[dd+1][soilloss_idx<0] = soilurea_diffidx[soilloss_idx<0]/\
+                                            soilall_loss[soilloss_idx<0]*self.urea_pool_soil[dd+1][soilloss_idx<0]
+                self.urealeaching[dd+1][soilloss_idx<0]= soilurea_leachingidx[soilloss_idx<0]/\
+                                            soilall_loss[soilloss_idx<0]*self.urea_pool_soil[dd+1][soilloss_idx<0]
+                self.TAN_prod_soil[dd+1][soilloss_idx<0] = soilurea_toTANidx[soilloss_idx<0]/\
+                                            soilall_loss[soilloss_idx<0]*self.urea_pool_soil[dd+1][soilloss_idx<0]
+                ## deterining urea pool of the topsoil layer after subtracting all losses
+                self.urea_pool_soil[dd+1] = self.urea_pool_soil[dd+1] - self.urea_diff[dd+1] - self.urealeaching[dd+1] - \
+                                            self.TAN_prod_soil[dd+1]
+                self.urea_pool_soil[dd+1][self.urea_pool_soil[dd+1]<0.0] = 0.0
+                self.urea_soil_amount[dd+1] = self.urea_pool_soil[dd+1]/(z_topsoil*self.soilmoist[dd+1])
 
             '''## Org N pools in various forms
             self.avail_N_pool[dd+1] = (self.avail_N_pool[dd] - self.avail_N_washoff[dd+1])*(1 - self.daily_Na_decomp_rate[dd+1]) + \
@@ -1284,7 +1388,7 @@ class LAND_module:
             ##         3) subsurface leaching, 4) nitrification, 5) plant uptake 
             ## TAN pool with inputs
             self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd] + self.infilflux[dd+1] +\
-                self.diffusivefluxsourcelayer_aq[dd+1] + self.diffusivefluxsourcelayer_gas[dd+1]
+                self.diffusivefluxsourcelayer_aq[dd+1] + self.diffusivefluxsourcelayer_gas[dd+1] + self.TAN_prod_soil[dd+1]
 
             ## TAN conc of the topsoil layer; g/m3
             self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
@@ -1484,13 +1588,65 @@ class LAND_module:
             ## TAN from housing to storage
             self.TAN[dd+1] = self.TAN_added[dd+1]/(self.housingarea*MMS_area_factor["mms_open_solid"])'''
 
-            ## TAN production from urea hydrolysis
-            self.TAN_prod[dd+1] = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd]
+            if chem_fert_type == 'urea':
 
-            ## Urea pool
-            urea_idx = self.urea_pool[dd]*(1 - self.daily_urea_hydro_rate[dd+1]) - self.urea_washoff[dd+1]
-            self.urea_pool[dd+1][urea_idx>0] = urea_idx[urea_idx>0] + self.urea[dd+1][urea_idx>0]
-            self.urea_pool[dd+1][urea_idx<=0] = self.urea[dd+1][urea_idx<=0]
+                ## Urea pool of the source layer (deep injection layer)
+                self.urea_pool[dd+1] = self.urea_pool[dd] + self.urea[dd+1] + self.urea_infil[dd]
+                ## urea concentration of the source layer and at the surface
+                self.urea_amount[dd+1] = self.urea_pool[dd+1]/(z_sourcelayer*self.soilmoist[dd+1])
+                ## pathways
+                urea_diffidx = self.urea_amount[dd+1]/self.R_soilaq_down[dd+1] * timestep*3600
+                urea_diffupidx = (self.urea_amount[dd+1]-self.urea_soil_amount[dd])/self.R_sourcelayer_aq[dd+1]*timestep*3600
+                urea_leachingidx = self.qpsoil[dd+1] * self.urea_amount[dd+1]*timestep*3600
+                urea_toTANidx = self.daily_urea_hydro_rate[dd+1]*self.urea_pool[dd+1]
+                ## determining the fluxes: washoff, diffusion, leaching, hydrolysis
+                all_loss =  urea_diffidx + urea_diffupidx + urea_leachingidx + urea_toTANidx
+                loss_idx = self.urea_pool[dd+1] - all_loss
+                self.urea_diff[dd+1][loss_idx>=0] = urea_diffidx[loss_idx>=0]
+                self.ureadiffusivefluxsourcelayer[dd+1][loss_idx>0] = urea_diffupidx[loss_idx>=0]
+                self.urealeaching[dd+1][loss_idx>=0] = urea_leachingidx[loss_idx>=0]
+                self.TAN_prod[dd+1][loss_idx>=0] = urea_toTANidx[loss_idx>=0]
+                self.urea_diff[dd+1][loss_idx<0] = urea_diffidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.ureadiffusivefluxsourcelayer[dd+1][loss_idx<0] = urea_diffupidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.urealeaching[dd+1][loss_idx<0]= urea_leachingidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                self.TAN_prod[dd+1][loss_idx<0] = urea_toTANidx[loss_idx<0]/\
+                                                        all_loss[loss_idx<0]*self.urea_pool[dd+1][loss_idx<0]
+                ## determining urea pool after subtracting all loss pathways
+                self.urea_pool[dd+1] = self.urea_pool[dd+1] - self.TAN_prod[dd+1] - self.urea_diff[dd+1] - \
+                            self.ureadiffusivefluxsourcelayer[dd+1] - self.urealeaching[dd+1]
+                ## getting rid of rounding error
+                self.urea_pool[dd+1][self.urea_pool[dd+1]<0.0] = 0.0
+                self.urea_amount[dd+1] = self.urea_pool[dd+1]/(z_sourcelayer*self.soilmoist[dd+1])
+
+                ## urea pool of the topsoil layer
+                self.urea_pool_soil[dd+1] = self.urea_pool_soil[dd] + self.ureadiffusivefluxsourcelayer[dd+1]
+                ## urea concentration of the topsoil layer
+                self.urea_soil_amount[dd+1] = self.urea_pool_soil[dd+1]/(z_topsoil*self.soilmoist[dd+1])
+                urea_surf_amount = self.urea_soil_amount[dd+1]/(self.R_soilaq[dd+1]*self.rain_avail_washoff[dd+1]+1)
+                ## pathways
+                urea_washoffidx = self.rain_avail_washoff[dd+1] * urea_surf_amount*timestep*3600
+                soilurea_infilidx = self.qpsoil[dd+1]*self.urea_soil_amount[dd+1]*timestep*3600
+                soilurea_toTANidx = self.daily_urea_hydro_rate[dd+1]*self.urea_pool_soil[dd+1]
+                ## determining the fluxes: washoff, diffusion, leaching, hydrolysis
+                soilall_loss = urea_washoffidx + soilurea_infilidx + soilurea_toTANidx
+                soilloss_idx = self.urea_pool_soil[dd+1] - soilall_loss
+                self.urea_washoff[dd+1][soilloss_idx>=0] = urea_washoffidx[soilloss_idx>=0]
+                self.urea_infil[dd+1][soilloss_idx>=0] = soilurea_infilidx[soilloss_idx>=0]
+                self.TAN_prod_soil[dd+1][soilloss_idx>=0] = soilurea_toTANidx[soilloss_idx>=0]
+                self.urea_washoff[dd+1][soilloss_idx<0] = urea_washoffidx[soilloss_idx<0]/\
+                                            soilall_loss[soilloss_idx<0]*self.urea_pool_soil[dd+1][soilloss_idx<0]
+                self.urea_infil[dd+1][soilloss_idx<0]= soilurea_infilidx[soilloss_idx<0]/\
+                                            soilall_loss[soilloss_idx<0]*self.urea_pool_soil[dd+1][soilloss_idx<0]
+                self.TAN_prod_soil[dd+1][soilloss_idx<0] = soilurea_toTANidx[soilloss_idx<0]/\
+                                            soilall_loss[soilloss_idx<0]*self.urea_pool_soil[dd+1][soilloss_idx<0]
+                ## deterining urea pool of the topsoil layer after subtracting all losses
+                self.urea_pool_soil[dd+1] = self.urea_pool_soil[dd+1] - self.urea_washoff[dd+1] - self.urea_infil[dd+1] - \
+                                            self.TAN_prod_soil[dd+1]
+                self.urea_pool_soil[dd+1][self.urea_pool_soil[dd+1]<0.0] = 0.0
+                self.urea_soil_amount[dd+1] = self.urea_pool_soil[dd+1]/(z_topsoil*self.soilmoist[dd+1])
 
             '''## Org N pools in various forms
             self.avail_N_pool[dd+1] = (self.avail_N_pool[dd] - self.avail_N_washoff[dd+1])*(1 - self.daily_Na_decomp_rate[dd+1]) + \
@@ -1664,7 +1820,7 @@ class LAND_module:
             ##         5) nitrification, 6) plant N uptake
             ## TAN pool with inputs
             self.TAN_pool_soil[dd+1] = self.TAN_pool_soil[dd] + self.diffusivefluxsourcelayer_aq[dd+1] +\
-                                                self.diffusivefluxsourcelayer_gas[dd+1]
+                                    self.diffusivefluxsourcelayer_gas[dd+1] + self.TAN_prod_soil[dd+1]
 
             ## TAN conc of the topsoil layer; g/m3
             self.TAN_soil_amount[dd+1][self.soilmoist[dd+1]==0] = 0.0
@@ -1803,15 +1959,7 @@ class LAND_module:
         return output
 
     def N_stat(self,crop_item,fert_method,chem_fert_type,ncfile_o=False):
-        ## define output dims
-        nlat = int(180.0/dlat)
-        nlon = int(360.0/dlon)
-        ntime = Days
-        lats = 90 - 0.5*np.arange(nlat)
-        lons = -180 + 0.5*np.arange(nlon)
-        yearidx = str(sim_year)+'-01-01'
-        times = pd.date_range(yearidx,periods=ntime)
-
+        
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
             chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
@@ -1842,13 +1990,13 @@ class LAND_module:
         print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal)))
         print('NH3 emission: '+str(sum_totalGg(chemfert_NH3emiss)))
 
-        chemfert_TANwashoff = self.land_sim_reshape(self.TAN_washoff)*sim_area
+        chemfert_TANwashoff = self.land_sim_reshape(self.TAN_washoff+self.urea_washoff)*sim_area
         print('TAN washoff: '+ str(sum_totalGg(chemfert_TANwashoff))+' Gg')
-        chemfert_leaching = self.land_sim_reshape(self.leachingflux)*sim_area
+        chemfert_leaching = self.land_sim_reshape(self.leachingflux+self.urealeaching)*sim_area
         print('NH4 leaching: '+ str(sum_totalGg(chemfert_leaching))+' Gg')
 
         if fert_method == 'broadcasting-surf':
-            chemfert_diffaq = self.land_sim_reshape(self.diffusivefluxsourcelayer_aq)*sim_area
+            chemfert_diffaq = self.land_sim_reshape(self.diffusivefluxsourcelayer_aq+self.urea_diff)*sim_area
             print('TAN diff aq to topsoil: '+ str(sum_totalGg(chemfert_diffaq))+' Gg')
             chemfert_diffgas = self.land_sim_reshape(self.diffusivefluxsourcelayer_gas)*sim_area
             print('TAN diff gas to topsoil: '+ str(sum_totalGg(chemfert_diffgas))+' Gg')
@@ -1881,7 +2029,7 @@ class LAND_module:
 
             chemfert_nitrif = self.land_sim_reshape(self.nitrif_NO3_sourcelayer)*sim_area
             print('NH4 nitrification: '+ str(sum_totalGg(chemfert_nitrif))+' Gg')
-            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq)*sim_area
+            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq+self.urea_diff)*sim_area
             print('TAN diff aq to deeper soil: '+ str(sum_totalGg(chemfert_diffaqdown))+' Gg')
             chemfert_diffgasdown = self.land_sim_reshape(self.diffusivefluxsoil_gas)*sim_area
             print('TAN diff gas to deeper soil: '+ str(sum_totalGg(chemfert_diffgasdown))+' Gg')
@@ -1898,7 +2046,7 @@ class LAND_module:
 
             chemfert_nitrif = self.land_sim_reshape(self.nitrif_NO3_sourcelayer)*sim_area
             print('NH4 nitrification (source layer): '+ str(sum_totalGg(chemfert_nitrif))+' Gg')
-            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq)*sim_area
+            chemfert_diffaqdown = self.land_sim_reshape(self.diffusivefluxsoil_aq+self.urea_diff)*sim_area
             print('TAN diff aq to deeper soil: '+ str(sum_totalGg(chemfert_diffaqdown))+' Gg')
             chemfert_diffgasdown = self.land_sim_reshape(self.diffusivefluxsoil_gas)*sim_area
             print('TAN diff gas to deeper soil: '+ str(sum_totalGg(chemfert_diffgasdown))+' Gg')
@@ -1922,6 +2070,15 @@ class LAND_module:
         
         ## generate an ncfile that contains the N pathways
         if ncfile_o is True:
+            ## define output dims
+            nlat = int(180.0/dlat)
+            nlon = int(360.0/dlon)
+            ntime = Days
+            lats = 90 - 0.5*np.arange(nlat)
+            lons = -180 + 0.5*np.arange(nlon)
+            yearidx = str(sim_year)+'-01-01'
+            times = pd.date_range(yearidx,periods=ntime)
+
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],chemfert_NH3emiss),
