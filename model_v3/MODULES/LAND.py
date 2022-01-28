@@ -241,7 +241,7 @@ class LAND_module:
         ## [deep injection] technique:
         ## vertical soil profile in the model (from top to the bottom):
         ## surface (0 cm) - topsoil layer (0 - 7 cm) - source layer (7 - 13 cm) - deeper soil
-        elif application_method_index == 'deep injection':
+        elif application_method_index == 'injection':
             ## diffusion of aqueous TAN from the source layer to the topsoil layer
             self.diffusivefluxsourcelayer_aq = np.zeros(array_shape)
             ## diffusion of gaseous NH3 from the source layer to the topsoil layer

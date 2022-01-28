@@ -3,6 +3,8 @@ outputs/
 *test*.py
 *jobscript*
 *.ipynb
+*.err
+*.out
 model/MODULES/__pycache__/
 model/CONFIG/__pycache__/
 model/INPUT/__pycache__/
