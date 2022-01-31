@@ -443,13 +443,13 @@ class LAND_module:
     def chem_fert_type(self):
         ## country level chemical fertilizer use: 1) ammonium N, 2) nitrate N, 3) urea N
         fertds = open_ds(file_path+crop_data_path+fertfilename)
-        nitN = fertds.nitrate_fert.values
-        ammN = fertds.ammonium_fert.values
-        ureaN = fertds.urea_fert.values
-        totalN = nitN + ammN
+        nitN = fertds.nitrate_fert.sel(year=sim_year).values
+        ammN = fertds.ammonium_fert.sel(year=sim_year).values
+        ureaN = fertds.urea_fert.sel(year=sim_year).values
+        totalN = nitN + ammN + ureaN
         fnitN = nitN/totalN
         ## urea N is a subcategory of ammonium N in the readed dataset
-        fammN = (ammN-ureaN)/totalN
+        fammN = ammN/totalN
         fureaN = ureaN/totalN
         return fnitN, fammN, fureaN
     
@@ -953,9 +953,9 @@ class LAND_module:
             self.TAN_amount[dd+1][self.soilmoist[dd+1]==0] = 0
             self.TAN_amount[dd+1][self.soilmoist[dd+1]!=0] = self.TAN_pool[dd+1][self.soilmoist[dd+1]!=0]/\
                 (z_sourcelayer*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]+\
-                KNH3[self.soilmoist[dd+1]!=0]*(self.soilmoist[dd+1][self.soilmoist[dd+1]!=0]-\
+                KNH3[self.soilmoist[dd+1]!=0]*(self.persm[dd+1][self.soilmoist[dd+1]!=0]-\
                     self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])+\
-                (1-self.soilmoist[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
+                (1-self.persm[dd+1][self.soilmoist[dd+1]!=0])*Kd[self.soilmoist[dd+1]!=0]))
             ## TAN molar conc; mol/L
             self.TAN_amount_M[dd+1] = self.TAN_amount[dd+1]/(14*1000)
             ## NH3 conc in soil pool

@@ -97,7 +97,7 @@ except:
 #################################
 ## crop and fertilizer data
 #################################
-fertfilename = 'IFA_country_level_fertinfo.nc'
+fertfilename = 'IFA_fert_info_21st_century.nc'
 cropfileformat = '_cropping_info.nc'
 crop_filledcalendar = 'ALL_CROPS_netCDF_0.5deg_filled_dir/'
 crop_unfilledcalendar = 'ALL_CROPS_netCDF_0.5deg_unfilled_dir/'
