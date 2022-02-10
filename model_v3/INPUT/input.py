@@ -11,6 +11,7 @@ from CONFIG.config import *        ## animal data file names specified in CONFIG
 from MODULES.FUNC import *
 
 ## directing input file directory
+#file_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/'
 file_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/' 
 animal_data_path = 'animal_data/'
 met_data_path = 'met_data/'
