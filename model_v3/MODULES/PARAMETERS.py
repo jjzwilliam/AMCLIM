@@ -349,16 +349,22 @@ def TAN_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False,flux5=False,
     totalidx = flux1+flux2+flux3+flux4+flux5+flux6
     massidx = mN-totalidx
     if flux1 is not False:
+        flux1[np.isnan(massidx)] = 0.0
         flux1[massidx<0] = (flux1[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux2 is not False:
+        flux2[np.isnan(massidx)] = 0.0
         flux2[massidx<0] = (flux2[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux3 is not False:
+        flux3[np.isnan(massidx)] = 0.0
         flux3[massidx<0] = (flux3[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux4 is not False:
+        flux4[np.isnan(massidx)] = 0.0
         flux4[massidx<0] = (flux4[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux5 is not False:
+        flux5[np.isnan(massidx)] = 0.0
         flux5[massidx<0] = (flux5[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux6 is not False:
+        flux6[np.isnan(massidx)] = 0.0
         flux6[massidx<0] = (flux6[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     return flux1,flux2,flux3,flux4,flux5,flux6
 
@@ -370,12 +376,16 @@ def N_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False):
     totalidx = flux1+flux2+flux3+flux4
     massidx = mN-totalidx
     if flux1 is not False:
+        flux1[np.isnan(massidx)] = 0.0
         flux1[massidx<0] = (flux1[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux2 is not False:
+        flux2[np.isnan(massidx)] = 0.0
         flux2[massidx<0] = (flux2[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux3 is not False:
+        flux3[np.isnan(massidx)] = 0.0
         flux3[massidx<0] = (flux3[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux4 is not False:
+        flux4[np.isnan(massidx)] = 0.0
         flux4[massidx<0] = (flux4[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     return flux1,flux2,flux3,flux4
 
