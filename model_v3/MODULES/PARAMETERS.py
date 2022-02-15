@@ -311,8 +311,9 @@ def TAN_nitrif(tan_pool,temp,theta,theta_sat,pH,fert_type,frac_nh4):
     nitrif_rate[nitrif_rate>0.1] = 0.1
     ## correction for WPFS response
     nitrif_rate[nitrif_rate<0.0] = 0.0
-    nitrif_rate[np.isnan(nitrif_rate)] = 0.0
+    # nitrif_rate[np.isnan(nitrif_rate)] = 0.0
     tan_nitrif = tan_pool*nitrif_rate*frac_nh4
+    tan_nitrif[np.isnan(tan_nitrif)] = 0.0
     return tan_nitrif
 ## calculate plant N uptake rate (to be removed from PARAMETER.py and to be put in LAND.py)
 ## Ammonium and Nitrate N in g/m2; soil C in gC
