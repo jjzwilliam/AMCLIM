@@ -669,8 +669,10 @@ class LAND_module:
                                                         qsubrunoff=self.subrunoffrate[dd+1])*timestep*3600  ## TAN infiltration/leaching
                     TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,dd+1],cnc2=self.TAN_amount[ll+1,dd],
                                         resist=self.Rdiffaq[ll,dd+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                    TANdiffaqdownidx[self.soil_moist[llidx,dd+1]==0]=0.0
                     NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,dd+1],cnc2=self.NH3_gas[ll+1,dd],
                                         resist=self.Rdiffgas[ll,dd+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                    NH3diffgasdownidx[self.soil_moist[llidx,dd+1]==self.soil_satmoist[llidx,dd+1]]=0.0
                     TANuptakeidx = False  ## N uptake
                     nh3volidx,srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffgasdownidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,dd+1],
                             flux1=emissidx,flux2=TANwashoffidx,flux3=TANinfilidx,flux4=TANdiffaqdownidx,
@@ -710,12 +712,16 @@ class LAND_module:
                                                         qsubrunoff=self.subrunoffrate[dd+1])*timestep*3600  ## TAN infiltration/leaching
                     TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,dd+1],cnc2=self.TAN_amount[ll+1,dd],
                                         resist=self.Rdiffaq[ll,dd+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                    TANdiffaqdownidx[self.soil_moist[llidx,dd+1]==0]=0.0
                     NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,dd+1],cnc2=self.NH3_gas[ll+1,dd],
                                         resist=self.Rdiffgas[ll,dd+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                    NH3diffgasdownidx[self.soil_moist[llidx,dd+1]==self.soil_satmoist[llidx,dd+1]]=0.0
                     NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,dd],cnc2=self.NH3_gas[ll-1,dd+1],
                                         resist=self.Rdiffgas[ll-1,dd+1])*timestep*3600  ## NH3 gaseous upwards diffusion
+                    NH3diffgasupidx[self.soil_moist[llidx,dd+1]==self.soil_satmoist[llidx,dd+1]]=0.0
                     TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,dd],cnc2=self.TAN_amount[ll-1,dd+1],
                                         resist=self.Rdiffaq[ll-1,dd+1])*timestep*3600  ## TAN aqueous diffusion
+                    TANdiffaqdownidx[self.soil_moist[llidx,dd+1]==0]=0.0
                     TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1],mNO3=self.NO3_pool[ll,dd],
                                     temp=self.soil_temp[llidx,dd+1],uptake='nh4')*timestep*3600  ## N uptake
                     TANuptakeidx[harvestidx<(dd+1)] = 0.0
@@ -757,12 +763,16 @@ class LAND_module:
                                                         qsubrunoff=self.subrunoffrate[dd+1])*timestep*3600  ## TAN infiltration/leaching
                     TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,dd+1],cnc2=0,
                                         resist=self.Rdiffaq[ll,dd+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                    TANdiffaqdownidx[self.soil_moist[llidx,dd+1]==0]=0.0
                     NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,dd+1],cnc2=0,
                                         resist=self.Rdiffgas[ll,dd+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                    NH3diffgasdownidx[self.soil_moist[llidx,dd+1]==self.soil_satmoist[llidx,dd+1]]=0.0
                     NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,dd],cnc2=self.NH3_gas[ll-1,dd+1],
                                         resist=self.Rdiffgas[ll-1,dd+1])*timestep*3600  ## NH3 gaseous upwards diffusion
+                    NH3diffgasupidx[self.soil_moist[llidx,dd+1]==self.soil_satmoist[llidx,dd+1]]=0.0
                     TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,dd],cnc2=self.TAN_amount[ll-1,dd+1],
                                         resist=self.Rdiffaq[ll-1,dd+1])*timestep*3600  ## TAN aqueous diffusion
+                    TANdiffaqupidx[self.soil_moist[llidx,dd+1]==0]=0.0
                     TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1],mNO3=self.NO3_pool[ll,dd],
                                     temp=self.soil_temp[llidx,dd+1],uptake='nh4')*timestep*3600  ## N uptake
                     TANuptakeidx[harvestidx<(dd+1)] = 0.0
