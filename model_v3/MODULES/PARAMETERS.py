@@ -26,7 +26,12 @@ from MODULES.FUNC import *
 ###################################
 ## define parameter functions
 ###################################
-## housing indoor conditions, e.g. temperature, ventilation, humidity as functions of natural environment
+
+
+###################
+## ENV/Management
+###################
+## EMPIRICAL - housing indoor conditions, e.g. temperature, ventilation, humidity as functions of natural environment
 ## ref: Gyldenkærne et al., 2005 for general livestock housing env; Jiang et al, 2021 for poultry
 def housing_env(temp,rhum,livestock_type,production_system_type):
     temp = np.array(temp)
@@ -67,8 +72,7 @@ def housing_env(temp,rhum,livestock_type,production_system_type):
             u_in[temp>=12.5] = 0.43
             rhum_in = rhum
     return t_in, u_in, rhum_in
-
-## barn conditions, including open barns for livestock; ref: Gyldenkærne et al., 2005
+## EMPIRICAL - barn conditions, including open barns for livestock; ref: Gyldenkærne et al., 2005
 ## barn temperature is distinct to natural temperature
 def barn_env(temp,wind):
     temp = np.array(temp)
@@ -88,7 +92,10 @@ def barn_env(temp,wind):
     u_barn[temp>temp_idx] = (1-blocking_factor2)*wind[temp>temp_idx]
     return t_barn, u_barn
 
-## rate: uric acid hydrolysis to TAN; temp in degC, rhum in per cent
+####################
+## Reaction rates
+####################
+## EMPIRICAL - rate: uric acid hydrolysis to TAN; temp in degC, rhum in per cent
 def ua_hydrolysis_rate(temp,rhum,ph):
     ## maximum daily hydrolysis rate is 20%
     dmax_rate = 0.2
@@ -101,22 +108,19 @@ def ua_hydrolysis_rate(temp,rhum,ph):
     ## daily conversion rate
     drate = dmax_rate*ft*frh*fph
     return drate
-    
-## rate: urea hydrolysis to TAN; temp in degC, delta_t is the time step, i.e 1 hour, daily res: delta_t=24
+## EMPIRICAL - rate: urea hydrolysis to TAN; temp in degC, delta_t is the time step, i.e 1 hour, daily res: delta_t=24
 # def urea_hydrolysis_rate(temp,WFPS,delta_t):
 #     ## T is the soil temperature (or air temperature for housing)
 #     ## WFPS is water-filled porosity, i.e. in this simulation, is the moisture content of manure for housing
 #     ## it remains unclear of k_h and WFPS
 #     ## k_h = 1.2 * WFPS
-def urea_hydrolysis_rate(temp,delta_t): 
-    ## k_h equals 0.23 per hour at 20 degC; Goh and Sherlock, 1985; Muck, 1981;
-    k_h = 0.23
+def urea_hydrolysis_rate(temp,delta_t,k_h=0.23): 
+    ## DEFAULT:k_h equals 0.23 per hour at 20 degC; Goh and Sherlock, 1985; Muck, 1981;
     ## Ah_t is a temeprature scaling factor for k_h; temperature dependence Q10 is ~2. 
     Ah_t = 0.25 * np.exp(0.0693*temp)
     hydrolysis_rate = 1 - np.exp((-k_h*delta_t)*Ah_t)  
     return hydrolysis_rate
- 
-## rate: TAN production from the decompostion of N_avail and N_resist; temp in degC
+## EMPIRICAL - rate: TAN production from the decompostion of N_avail and N_resist; temp in degC
 ## ref: Vigil and Kissel (1995)
 ## other ref: CLM_FANv1 (Riddick et al., 2016) and FAN_v2 (Julius et al., 2020?)
 def N_pools_decomp_rate(temp,delta_t):    
@@ -133,8 +137,7 @@ def N_pools_decomp_rate(temp,delta_t):
     k_a = 1 - np.exp(-ka*delta_t) 
     k_r = 1 - np.exp(-kr*delta_t) 
     return k_a, k_r 
-
-## rate: nitrification rate in soils
+## EMPIRICAL - rate: nitrification rate in soils
 ## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
 ## ground temp in degC; theta in m3/m3, theta_sat in m3/m3
 def nitrification_rate_soil(ground_temp,theta,theta_sat,pH,fer_type):
@@ -183,8 +186,7 @@ def nitrification_rate_soil(ground_temp,theta,theta_sat,pH,fer_type):
     # nitrif_rate = (2*rmax*func_tg*func_wfps)/(func_tg+func_wfps)
     nitrif_rate = rmax*func_tg*func_wfps*func_pH
     return nitrif_rate
-
-## rate: nitrification rate of manure (analogy to nitrification rate in soils)
+## EMPIRICAL - rate: nitrification rate of manure (analogy to nitrification rate in soils)
 ## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
 ## manure temp in degC; WFPS in fraction
 def nitrification_rate_manure(manure_temp,WFPS):
@@ -217,9 +219,104 @@ def nitrification_rate_manure(manure_temp,WFPS):
     nitrif_rate = rmax*func_tg*func_wfps
     return nitrif_rate
 
-## plant N uptake rate
+#####################
+## Concentration
+#####################
+## calculate TAN contentration
+def TAN_concentration(mtan,zlayer,theta_sat,theta,knh3,kd):
+    cnc = mtan/(zlayer*(theta+knh3*(theta_sat-theta)+(1-theta_sat)*kd))
+    cnc[theta==0] = 0.0
+    return cnc
+## calculate NH3 concentration
+def NH3_concentration(tan_cnc,knh3,theta_sat,theta):
+    cnc = tan_cnc * knh3
+    cnc[theta==theta_sat] = 0.0
+    return cnc
+## calculate N species concentration; urea, NO3-
+def N_concentration(mN,zlayer,theta):
+    cnc = mN/(zlayer*theta)
+    cnc[theta==0.0] = 0.0
+    return cnc
+## calculate surface compensation point for TAN
+def surf_TAN_cnc(tan_cnc,rliq,rgas,knh3,ratm,qrunoff):
+    TAN_surf_cnc = (tan_cnc*(1/rliq+knh3/rgas)/(qrunoff+knh3*(1/ratm+1/rgas)+1/rliq))
+    return TAN_surf_cnc
+## calculate surface compensation point for N species, i.e., urea, NO3-
+def surf_Ncnc(N_cnc,rliq,qrunoff):
+    N_surf_cnc = N_cnc/(rliq*qrunoff+1)
+    return N_surf_cnc
+
+######################################
+## physical/chemical coefficients
+######################################
+## calculate dissociation constant of NH4+, kNH4 (to be put in PARAMETERS.py)
+## temp in degC
+def NH4_dissoc_coeff(temp):
+    knh4 = 5.67e-10*np.exp(-6286*(1/(temp + 273.15)-1/298.15))
+    return knh4 
+## calculated NH3 partitioning coefficient, KNH3 (to be put in PARAMETERS.py)
+## temp in degC; H+ ions concentration
+def NH3_par_coeff(temp,cncH):
+    ## dimensonessHenry's Law number
+    henry_constant = (161500/(temp + 273.15)) * np.exp(-10380/(temp + 273.15))
+    ## dissociation constant of NH4+
+    k_NH4 = NH4_dissoc_coeff(temp)
+    knh3 = henry_constant/(cncH + k_NH4)
+    return knh3
+## calculate NH4+ fraction
+def frac_NH4(theta,theta_sat,temp,cncH,kd):
+    k_NH4 = NH4_dissoc_coeff(temp)
+    knh3 = NH3_par_coeff(temp,cncH)
+    f_NH4 = theta/(theta+knh3*(theta_sat-theta)+(1-theta_sat)*kd)*(cncH/(cncH+k_NH4))
+    return f_NH4
+## calculate molecular diffusivity of NH4+ in water (inc. urea); D_aq_nh4, m^2/s 
+## ref : Van Der Molen et al.,1990; Vira et al., GMD2020
+## temp in degC
+def diffusivity_NH4(temp,phase):
+    if phase == 'aqueous':
+        d_nh4 = 9.8e-10*1.03**temp
+    elif phase == 'gaseous':
+        temp = temp + 273.15
+        d_nh4 = (1e-7*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
+    return d_nh4
+
+#######################
+## Fluxes/Pathways
+#######################
+## calculate flux: NH3 volatilization (g/m2/s)
+## tan_surfcnc in g/m3, ratm in s/m
+def NH3_vol(nh3_surfcnc,ratm,nh3_atmcnc=0.0):
+    nh3vol = (nh3_surfcnc-nh3_atmcnc)/ratm
+    return nh3vol
+## calculate flux: surface runoffs (g/m2/s)
+## N_surfcnc in g/m3, qrunoff in m/s
+def surf_runoff(N_surfcnc,qrunoff):
+    surfrunoff = N_surfcnc*qrunoff
+    return surfrunoff
+## calculate flux: infiltrtion/leaching (g/m2/s)
+## N_cnc in g/m3, qsubrunoff in m/s
+def subsurf_leaching(N_cnc,qsubrunoff):
+    subsrfleaching = N_cnc*qsubrunoff
+    return subsrfleaching
+## calculate flux: TAN aq diffusion (g/m2/s)
+## cnc in g/m3, resist in s/m  
+def N_diffusion(cnc1,cnc2,resist):
+    diffusion = (cnc1-cnc2)/resist
+    diffusion[diffusion<0.0] = 0.0
+    return diffusion
+## calculate chemical transformation: nitrification (g/m2/s)
+def TAN_nitrif(tan_pool,temp,theta,theta_sat,pH,fert_type,frac_nh4):
+    nitrif_rate = nitrification_rate_soil(temp,theta,theta_sat,pH,fert_type)
+    nitrif_rate[nitrif_rate>0.1] = 0.1
+    ## correction for WPFS response
+    nitrif_rate[nitrif_rate<0.0] = 0.0
+    nitrif_rate[np.isnan(nitrif_rate)] = 0.0
+    tan_nitrif = tan_pool*nitrif_rate*frac_nh4
+    return tan_nitrif
+## calculate plant N uptake rate (to be removed from PARAMETER.py and to be put in LAND.py)
 ## Ammonium and Nitrate N in g/m2; soil C in gC
-def plant_N_uptake(Namm,Nnit,temp,substrateC=0.04,substrateN=0.004):
+def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
     ## root activity weighting parameters
     v1,v2,v3,v4 = 1.0,0.5,0.25,0.1
     ## root structural dry matter components; g/m2
@@ -232,27 +329,59 @@ def plant_N_uptake(Namm,Nnit,temp,substrateC=0.04,substrateN=0.004):
     func_temp = 0.25*np.exp(0.0693*temp)
     func_temp[func_temp>1.0] = 1.0
     ## soil mineral concentration; 
-    Neff = Namm + func_temp*Nnit
+    Neff = mNH4 + func_temp*mNO3
     ## non-linear relationship between N uptake and effective soil mineral concentration
     NC_factor = 1/(1+K_C/substrateC*(1+substrateN/J_N))
-    ## gN/m2 day
-    UammN = sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(Namm/(Neff+K_Neff))*NC_factor
-    UnitN = sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(func_temp*Nnit/(Neff+K_Neff))*NC_factor
-    return UammN, UnitN
+    ## gN/m2/s
+    if uptake == 'nh4':
+        uptake = (sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(mNH4/(Neff+K_Neff))*NC_factor)/(24*3600)
+    elif uptake == 'no3':
+        uptake = (sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(func_temp*mNO3/(Neff+K_Neff))*NC_factor)/(24*3600)
+    return uptake
 
-## manure characteristics: manure 1) volumetric water content 2) porosity 3) water-filled pore space (WFPS)
-## solid mass in g/m2; water mass in g/m2; rho_manure in g/cm3
-def manure_properties(solidmass,watermass):
-    ## total volume of manure; m3/m2
-    vtotal = solidmass/(manure_BD*1e3)
-    ## gravimetric water content of manure
-    theta_g = watermass/solidmass
-    ## volumetric water content
-    theta_v = theta_g*manure_BD/rho_water
-    ## WFPS: volumetric water content/porosity
-    WFPS = theta_v/manure_porosity
-    return vtotal,theta_v,WFPS
+## flux1: [NH3 volatalization] or [NH3 upwards diffusion]
+## flux2: [TAN washoff] or [TAN upwards diffusion]
+## flux3: [TAN infiltration/leaching]
+## flux4: [TAN downwards diffusion]
+## flux5: [NH3 downwards diffusion]
+## flux6: [ammonium uptake]
+def TAN_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False,flux5=False,flux6=False):
+    totalidx = flux1+flux2+flux3+flux4+flux5+flux6
+    massidx = mN-totalidx
+    if flux1 is not False:
+        flux1[massidx<0] = (flux1[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux2 is not False:
+        flux2[massidx<0] = (flux2[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux3 is not False:
+        flux3[massidx<0] = (flux3[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux4 is not False:
+        flux4[massidx<0] = (flux4[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux5 is not False:
+        flux5[massidx<0] = (flux5[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux6 is not False:
+        flux6[massidx<0] = (flux6[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    return flux1,flux2,flux3,flux4,flux5,flux6
 
+## flux1: [urea/NO3 washoff] or [NO3 uptake]
+## flux2: [urea/NO3 upwards diffusion]
+## flux3: [urea/NO3 infiltration/leaching]
+## flux4: [urea/NO3 downwards diffusion]
+def N_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False):
+    totalidx = flux1+flux2+flux3+flux4
+    massidx = mN-totalidx
+    if flux1 is not False:
+        flux1[massidx<0] = (flux1[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux2 is not False:
+        flux2[massidx<0] = (flux2[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux3 is not False:
+        flux3[massidx<0] = (flux3[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    if flux4 is not False:
+        flux4[massidx<0] = (flux4[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
+    return flux1,flux2,flux3,flux4
+
+############################
+## Other physical/chemical 
+############################
 ## physical variables: specific humidity; temp in degC, rhum in per cent
 def humidity_measures(temp, rhum):
     M_w = 18.0                ## 18.0 g/mol, molar mass of water vapor;
@@ -270,7 +399,6 @@ def humidity_measures(temp, rhum):
     q_atm = ((M_w/M_d)*e_vp)/(p-(1-(M_w/M_d))*e_vp)
     q_sat = ((M_w/M_d)*e_sat)/(p-(1-(M_w/M_d))*e_sat)
     return q_sat, q_atm, e_sat, e_vp
-
 ## physical variables: water evaporation in houses; temp in degC, rhum in per cent, Rn in J/m^2/s, u in m/s
 ## aerodynamic method: similar to Penman's method based on the site simulation
 def water_evap_a(temp,rhum,u,zo):
@@ -280,7 +408,6 @@ def water_evap_a(temp,rhum,u,zo):
     es = 0.6108*np.exp(17.27*temp/(temp+237.3))      # temp in degC
     ## water vapor pressure
     ea = es*rhum/100
-
     # zo = 0.002               ## roughness height 2mm
     Z = 2                     ## reference height 2m
     k = 0.41                  ## van Karman constant
@@ -288,19 +415,7 @@ def water_evap_a(temp,rhum,u,zo):
     evap = B*(es-ea)*1000
     # evap = evap*1000*3600*24
     return evap
-
-## physical variables: molecular diffusivity of NH4+ in water (inc. urea); D_aq_nh4, m^2/s (Van Der Molen et al.,1990; Vira et al., GMD2020)
-## temp in degC
-def diffusivity_NH4(temp,phase):
-    if phase == 'aqueous':
-        d_nh4 = 9.8e-10*1.03**temp
-    elif phase == 'gaseous':
-        temp = temp + 273.15
-        d_nh4 = (1e-7*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
-                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
-    return d_nh4
-
-## mass tranfer coefficient for NH4 in liquid boundary layer
+## EMPIRICAL - mass tranfer coefficient for NH4 in liquid boundary layer
 ## wind at 8m in m/s; temp in deg C
 def k_aq_NH4(wind_8m,temp):
     temp = temp + 273.15
@@ -310,8 +425,7 @@ def k_aq_NH4(wind_8m,temp):
     d_aq_O2 = 7.28236e-15*temp/(np.exp(1622/temp-12.40581))
     kL = k_aq0*((d_aq_nh4/d_aq_O2)**0.57)/3.6e5
     return kL
-
-## mass transfer coefficient for NH3 in gas boudnary layer
+## EMPIRICAL - mass transfer coefficient for NH3 in gas boudnary layer
 def k_gas_NH3(wind_8m,temp):
     temp = temp + 273.15
     ## cm/h
@@ -323,71 +437,13 @@ def k_gas_NH3(wind_8m,temp):
     ## m/s
     kG = k_gas0 *((d_gas_NH3/d_gas_H2O)**0.67)/3.6e5
     return kG
-
-## soil characteristics: tortuosity for diffusion
-## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
-## theta in m3/m3
-def soil_tuotorsity(theta_sat,theta,phase):
-    ## soil tuotorsity in aqueous phase and gaeous phase (Millington and Quirk, 1961)
-    if phase == 'aqueous':
-        soil_tor = ((theta)**(10/3))/(theta_sat**2)
-    elif phase == 'gaseous':
-        soil_tor = ((theta_sat-theta)**(10/3))/(theta_sat**2)
-    return soil_tor
-
-## soil characteristics: infiltration rate (m/s) - empirical method 
-## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
-## data source: Patle et al., Geo.Eco.Landscale 2019
-## loamy sand and sandy loam in 14 sites (quality control; remove bad quality data)
-## multilinear regression: R^2 = 0.75; 
-## soil para: sand (%), clay (%), bulk density (g/cm^3), particle density (g/cm^3)
-## percentage of saturation soil moisture 
-def infiltration_rate_empirical(soilmoist_percent,sand_percent,clay_percent,bulk_density,particle_density):
-    ## soil parameters matrix
-    soil_para = 0.62*sand_percent - 0.17*clay_percent - 26.42*bulk_density + 3.14*particle_density - 10.58
-    ## soil moisture dependence
-    infil_func = soil_para + 6.31*(soilmoist_percent/100)
-    ## Ks is the permeability coefficient at saturation for loamy sand, Ks=0.714cm/h (0.0119cm/min;171.36mm/day) ref: Hu et al., 2017 J.Arid.Land
-    Ks = 0.714
-    ## infiltration rate Ki m/s
-    Ki = (infil_func/Ks)/(100*3600)
-    return Ki
-
-## soil characteristics: infiltration rate (m/s) - conceptual method
-## In Sommer&Jacobsen 1999, 3kg/m2 slurry was applied to loamdy sand (9.5%clay;11%silt;77%sand;BD~1.5g/cm3)
-## and infiltrate within 24h, which is equivalent to 3mm/24h;
-## dailyevap in m/day
-def infiltration_rate_method(dailyinfil,theta_sat,theta):
-    ## 10 mm of water/slurry; ref 5mm for 12h infiltration in Vira et al., FANv2 2020 GMD
-    ## infiltration to a depth of 4mm; ref: source layer thickness used in Moring et al., GAG model, 2016 BG
-    z_layer = 0.004
-    ## infiltration rate; m/s
-    Ki = (dailyinfil - z_layer*(theta_sat-theta))/(24*3600)
-    return Ki
-
-## soil characteristics: soil pH after manure/fertilizer application
-## soil pH will increase due to application of urea, peak within 24-48 h, then decrease
-## urea decomposition consumes H+ ion, which leads to pH increase
-## [app_timing_app] is an indexing map that remarks the timing of fertilizer application with  a shape of [time,lat,lon]
-def soil_pH_postapp(base_pH,app_timing_map,fert_pH):
-    pH_postapp = np.zeros(mtrx2)
-    for tt in np.arange(base_pH.shape[0]-6):
-        pH_postapp[tt+1][app_timing_map[tt]==1] = fert_pH
-        pH_postapp[tt+2][app_timing_map[tt]==1] = fert_pH
-        pH_postapp[tt+3][app_timing_map[tt]==1] = fert_pH - (1/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
-        pH_postapp[tt+4][app_timing_map[tt]==1] = fert_pH - (2/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
-        pH_postapp[tt+5][app_timing_map[tt]==1] = fert_pH - (3/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
-        pH_postapp[tt+6][app_timing_map[tt]==1] = fert_pH - (4/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
-    pH_postapp[pH_postapp<base_pH] = base_pH[pH_postapp<base_pH]
-    return pH_postapp
-
-## soil characteristics: adsorption coefficient of NH4+ on soil particles
-## clay_content in %
-def ammonium_adsorption(clay_content):
-    clay = clay_content/100
-    kd = 0.5*(7.2733*clay**3-11.22*clay**2) + 5.7198*clay + 0.0263
-    return kd
-
+## calculate resistance for diffusion of aq,gas TAN
+## for NO3-, a correction must be applied (after calling this function)
+def diff_resistance(distance,phase,theta_sat,theta,temp):
+    f_soil = soil_tuotorsity(theta_sat,theta,phase)
+    diff_val = diffusivity_NH4(temp,phase)
+    rdiff = distance/(f_soil*diff_val)
+    return rdiff
 ## resistance: resistance for water-air exchange; temp in degC, rhum in per cent; evap flux in m/s
 def resistance_water_air(temp,rhum,evap_flux):
     T = temp + 273.15
@@ -413,7 +469,6 @@ def resistance_water_air(temp,rhum,evap_flux):
     #              0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
     Rc = (rho_air/rho_water)*((Q_sat-Q_atm)/evap_flux)
     return Rc
-
 ## resistance: resistance for manure in houses and in storage; temp in degC, u in m/s
 ##              also return corresponding evaporation
 def resistance_manure(temp, u, rhum):
@@ -433,12 +488,10 @@ def resistance_manure(temp, u, rhum):
     u_correction = u**a/(0.1**a)
     r_correct = r_standard/(T_correction*u_correction)
     r_ab_star = r_correct*24*3600
-
     Q_sat, Q_atm, e_sat, e_vp = humidity_measures(temp, rhum)
     ## evap flux in m/s (1000 kg/m^2/s)
     evap_flux = (rho_air/rho_water)*((Q_sat-Q_atm)/r_ab_star)
     return r_ab_star, evap_flux
-
 ## resistance: resistance for aerodynamic and boundary layer resistance; 
 ## temp in degC; rhum in %; u in m/s; H is sensible heat flux in J/(m^2 s); Z is reference height in m; zo is surface roughness in m 
 def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
@@ -492,14 +545,91 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
     B = 5
     Rb = 1/(B*ustar)
     return Ra+Rb
-
 ## physical: wind profile
 ## calculating mean wind speed at a specific height by knowing the wind speed at a reference height
 ## uref in m/s; height_ref and height_out in m; zo in m
 def wind_profile(uref,height_ref,height_out,zo):
     uout = uref*(np.log(height_out/zo)/np.log(height_ref/zo))
-    return uout
+    return uout   
 
+#######################################
+## Soil properties/characteristics
+#######################################
+## soil characteristics: tortuosity for diffusion
+## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
+## theta in m3/m3
+def soil_tuotorsity(theta_sat,theta,phase):
+    ## soil tuotorsity in aqueous phase and gaeous phase (Millington and Quirk, 1961)
+    if phase == 'aqueous':
+        soil_tor = ((theta)**(10/3))/(theta_sat**2)
+    elif phase == 'gaseous':
+        soil_tor = ((theta_sat-theta)**(10/3))/(theta_sat**2)
+    return soil_tor
+## soil characteristics: infiltration rate (m/s) - empirical method 
+## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
+## data source: Patle et al., Geo.Eco.Landscale 2019
+## loamy sand and sandy loam in 14 sites (quality control; remove bad quality data)
+## multilinear regression: R^2 = 0.75; 
+## soil para: sand (%), clay (%), bulk density (g/cm^3), particle density (g/cm^3)
+## percentage of saturation soil moisture 
+def infiltration_rate_empirical(soilmoist_percent,sand_percent,clay_percent,bulk_density,particle_density):
+    ## soil parameters matrix
+    soil_para = 0.62*sand_percent - 0.17*clay_percent - 26.42*bulk_density + 3.14*particle_density - 10.58
+    ## soil moisture dependence
+    infil_func = soil_para + 6.31*(soilmoist_percent/100)
+    ## Ks is the permeability coefficient at saturation for loamy sand, Ks=0.714cm/h (0.0119cm/min;171.36mm/day) ref: Hu et al., 2017 J.Arid.Land
+    Ks = 0.714
+    ## infiltration rate Ki m/s
+    Ki = (infil_func/Ks)/(100*3600)
+    return Ki
+## soil characteristics: infiltration rate (m/s) - conceptual method
+## In Sommer&Jacobsen 1999, 3kg/m2 slurry was applied to loamdy sand (9.5%clay;11%silt;77%sand;BD~1.5g/cm3)
+## and infiltrate within 24h, which is equivalent to 3mm/24h;
+## dailyevap in m/day
+def infiltration_rate_method(dailyinfil,theta_sat,theta):
+    ## 10 mm of water/slurry; ref 5mm for 12h infiltration in Vira et al., FANv2 2020 GMD
+    ## infiltration to a depth of 4mm; ref: source layer thickness used in Moring et al., GAG model, 2016 BG
+    z_layer = 0.004
+    ## infiltration rate; m/s
+    Ki = (dailyinfil - z_layer*(theta_sat-theta))/(24*3600)
+    return Ki
+## EMPIRICAL - soil characteristics: soil pH after manure/fertilizer application
+## soil pH will increase due to application of urea, peak within 24-48 h, then decrease
+## urea decomposition consumes H+ ion, which leads to pH increase
+## [app_timing_app] is an indexing map that remarks the timing of fertilizer application with  a shape of [time,lat,lon]
+def soil_pH_postapp(base_pH,app_timing_map,fert_pH):
+    pH_postapp = np.zeros(mtrx2)
+    for tt in np.arange(base_pH.shape[0]-6):
+        pH_postapp[tt+1][app_timing_map[tt]==1] = fert_pH
+        pH_postapp[tt+2][app_timing_map[tt]==1] = fert_pH
+        pH_postapp[tt+3][app_timing_map[tt]==1] = fert_pH - (1/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+4][app_timing_map[tt]==1] = fert_pH - (2/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+5][app_timing_map[tt]==1] = fert_pH - (3/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+        pH_postapp[tt+6][app_timing_map[tt]==1] = fert_pH - (4/5)*(fert_pH - base_pH[tt][app_timing_map[tt]==1])
+    pH_postapp[pH_postapp<base_pH] = base_pH[pH_postapp<base_pH]
+    return pH_postapp
+## EMPIRICAL - soil characteristics: adsorption coefficient of NH4+ on soil particles
+## clay_content in %
+def ammonium_adsorption(clay_content):
+    clay = clay_content/100
+    kd = 0.5*(7.2733*clay**3-11.22*clay**2) + 5.7198*clay + 0.0263
+    return kd
+
+####################################################
+## Livestock waste properties/characteristics
+####################################################
+## manure characteristics: manure 1) volumetric water content 2) porosity 3) water-filled pore space (WFPS)
+## solid mass in g/m2; water mass in g/m2; rho_manure in g/cm3
+def manure_properties(solidmass,watermass):
+    ## total volume of manure; m3/m2
+    vtotal = solidmass/(manure_BD*1e3)
+    ## gravimetric water content of manure
+    theta_g = watermass/solidmass
+    ## volumetric water content
+    theta_v = theta_g*manure_BD/rho_water
+    ## WFPS: volumetric water content/porosity
+    WFPS = theta_v/manure_porosity
+    return vtotal,theta_v,WFPS
 ## aniaml info: waste N should be consistent to livestock_N
 ## unit in kg N per head per year; returning daily values
 def livestock_waste_info(livestock_type, waste_N):
