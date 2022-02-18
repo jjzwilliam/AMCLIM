@@ -30,9 +30,9 @@ groundtemp_filelvl2 = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl2temp
 rhum_file = xr.open_dataset(file_path+met_data_path+'AgERA5-rhum2m-2018d-05.nc')
 wind_file = xr.open_dataset(file_path+met_data_path+'AgERA5-wind10m-2018d-05.nc')
 evap_file = xr.open_dataset(file_path+met_data_path+'ERA5-evapfromsoil-2018d-05.nc')
-soilmoist_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
-# soilmoist_filelvl1 = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl1moist-2018d-05.nc')
-# soilmoist_filelvl2 = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl2moist-2018d-05.nc')
+# soilmoist_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
+soilmoist_filelvl1 = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl1moist-2018d-05.nc')
+soilmoist_filelvl2 = xr.open_dataset(file_path+met_data_path+'ERA5-soillvl2moist-2018d-05.nc')
 soilsm_file = xr.open_dataset(file_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
 rain_file = xr.open_dataset(file_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
 ratm_file = xr.open_dataset(file_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
@@ -45,9 +45,9 @@ groundtemp_datalvl2 = groundtemp_filelvl2['stl2'] - 273.15  ## degC
 rhum_data = rhum_file['Relative_Humidity_2m_06h']  ## per cent
 wind_data = wind_file['Wind_Speed_10m_Mean']  ## m/s
 evap_data = evap_file['evabs']*(-1e6)  ## g/day
-soilmoist_data = soilmoist_file['sm']  ## m3/m3
-# soilmoist_datalvl1 = soilmoist_filelvl1['swvl1']  ## m3/m3
-# soilmoist_datalvl2 = soilmoist_filelvl2['swvl2']  ## m3/m3
+# soilmoist_data = soilmoist_file['sm']  ## m3/m3
+soilmoist_datalvl1 = soilmoist_filelvl1['swvl1']  ## m3/m3
+soilmoist_datalvl2 = soilmoist_filelvl2['swvl2']  ## m3/m3
 persm_data = soilsm_file['sm']  ## per cent
 # sshf_data = sshf_file['sshf']/(24*3600)  ## J/m2/s
 rain_data = rain_file['tcrw']*1000  ## g/m2
@@ -59,19 +59,19 @@ subrunoff_data = subrunoff_file['ssro']  ## m/day
 ##################################
 ## fill land input data
 ##################################
-groundtemp_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_datalvl1)  ## degC
-groundtemp_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_datalvl2)  ## degC
-rhum_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rhum_data)  ## per cent
-wind_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=wind_data)  ## m/s
-evap_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=evap_data) ## g/day
-soilmoist_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_data)  ## m3/m3
-# soilmoist_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl1)  ## m3/m3
-# soilmoist_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl2)  ## m3/m3
-persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=persm_data)  ## per cent
-ram1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=ram1_data)  ## s/m
-rb1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rb1_data)  ## s/m
-runoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=runoff_data)  ## m/day
-subrunoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=subrunoff_data)  ## m/day
+# groundtemp_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_datalvl1)  ## degC
+# groundtemp_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_datalvl2)  ## degC
+# rhum_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rhum_data)  ## per cent
+# wind_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=wind_data)  ## m/s
+# evap_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=evap_data) ## g/day
+# soilmoist_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_data)  ## m3/m3
+# # soilmoist_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl1)  ## m3/m3
+# # soilmoist_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl2)  ## m3/m3
+# persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=persm_data)  ## per cent
+# ram1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=ram1_data)  ## s/m
+# rb1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rb1_data)  ## s/m
+# runoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=runoff_data)  ## m/day
+# subrunoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=subrunoff_data)  ## m/day
 
 ###############################################
 ## insert an extra time slice to met fields
@@ -82,9 +82,9 @@ groundtemp_datalvl2 = insert_time_slice(groundtemp_datalvl2)
 rhum_data = insert_time_slice(rhum_data)
 wind_data = insert_time_slice(wind_data)
 evap_data = insert_time_slice(evap_data)
-soilmoist_data = insert_time_slice(soilmoist_data)
-# soilmoist_datalvl1 = insert_time_slice(soilmoist_datalvl1)
-# soilmoist_datalvl2 = insert_time_slice(soilmoist_datalvl2)
+# soilmoist_data = insert_time_slice(soilmoist_data)
+soilmoist_datalvl1 = insert_time_slice(soilmoist_datalvl1)
+soilmoist_datalvl2 = insert_time_slice(soilmoist_datalvl2)
 persm_data = insert_time_slice(persm_data)
 rain_data = insert_time_slice(rain_data)
 ram1_data = insert_time_slice(ram1_data)
@@ -122,4 +122,4 @@ crop_unfilledcalendarformat = '.crop.calendar.nc'
 soilpHfile = 'topsoil_pH_H2O.nc'
 soilCECfile = 'topsoil_CEC_clay.nc'
 soilclayfile = 'topsoil_clay.nc'
-
+soilbdfile = 'topsoil_BD.nc'

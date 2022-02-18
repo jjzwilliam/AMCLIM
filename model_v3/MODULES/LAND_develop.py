@@ -257,37 +257,20 @@ class LAND_module:
         ##################################
         ## fill land input data
         ##################################
-        T_sim_lvl1 = field_var_fill(sd_template=template,input_field=groundtemp_datalvl1)  ## degC
-        groundtemp_datalvl2 = field_var_fill(sd_template=template,input_field=groundtemp_datalvl2)  ## degC
-        rhum_data = field_var_fill(sd_template=template,input_field=rhum_data)  ## per cent
-        wind_data = field_var_fill(sd_template=template,input_field=wind_data)  ## m/s
-        evap_data = field_var_fill(sd_template=template,input_field=evap_data) ## g/day
-        soilmoist_data = field_var_fill(sd_template=template,input_field=soilmoist_data)  ## m3/m3
-        # soilmoist_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl1)  ## m3/m3
-        # soilmoist_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl2)  ## m3/m3
-        persm_data = field_var_fill(sd_template=template,input_field=persm_data)  ## per cent
-        ram1_data = field_var_fill(sd_template=template,input_field=ram1_data)  ## s/m
-        rb1_data = field_var_fill(sd_template=template,input_field=rb1_data)  ## s/m
-        runoff_data = field_var_fill(sd_template=template,input_field=runoff_data)  ## m/day
-        subrunoff_data = field_var_fill(sd_template=template,input_field=subrunoff_data)  ## m/day
-
-        ###############################################
-        ## insert an extra time slice to met fields
-        ###############################################
-        groundtemp_datalvl1 = insert_time_slice(groundtemp_datalvl1)
-        groundtemp_datalvl2 = insert_time_slice(groundtemp_datalvl2)
-        rhum_data = insert_time_slice(rhum_data)
-        wind_data = insert_time_slice(wind_data)
-        evap_data = insert_time_slice(evap_data)
-        soilmoist_data = insert_time_slice(soilmoist_data)
-        # soilmoist_datalvl1 = insert_time_slice(soilmoist_datalvl1)
-        # soilmoist_datalvl2 = insert_time_slice(soilmoist_datalvl2)
-        persm_data = insert_time_slice(persm_data)
-        rain_data = insert_time_slice(rain_data)
-        ram1_data = insert_time_slice(ram1_data)
-        rb1_data = insert_time_slice(rb1_data)
-        runoff_data = insert_time_slice(runoff_data)
-        subrunoff_data = insert_time_slice(subrunoff_data)
+        self.soil_temp[0] = field_var_fill(sd_template=template,input_field=self.soil_temp[0])  ## degC
+        self.soil_temp[1] = field_var_fill(sd_template=template,input_field=self.soil_temp[1])  ## degC
+        # rhum_data = field_var_fill(sd_template=template,input_field=rhum_data)  ## per cent
+        # wind_data = field_var_fill(sd_template=template,input_field=wind_data)  ## m/s
+        self.evap_sim = field_var_fill(sd_template=template,input_field=self.evap_sim) ## g/day
+        # soilmoist_data = field_var_fill(sd_template=template,input_field=soilmoist_data)  ## m3/m3
+        self.soil_moist[0]= field_var_fill(sd_template=template,input_field=self.soil_moist[0])  ## m3/m3
+        self.soil_moist[1] = field_var_fill(sd_template=template,input_field=self.soil_moist[1])  ## m3/m3
+        self.soil_satmoist[0] = field_var_fill(sd_template=template,input_field=self.soil_satmoist[0])  ## m3/m3
+        self.soil_satmoist[1] = field_var_fill(sd_template=template,input_field=self.soil_satmoist[1])  ## m3/m3
+        self.R_atm = field_var_fill(sd_template=template,input_field=self.R_atm)  ## s/m
+        self.surfrunoffrate = field_var_fill(sd_template=template,input_field=self.surfrunoffrate)  ## m/day
+        self.subrunoffrate = field_var_fill(sd_template=template,input_field=self.subrunoffrate)  ## m/day
+        self.soil_moist[self.soil_moist>self.soil_satmoist] = self.soil_satmoist[self.soil_moist>self.soil_satmoist]
         return
 
     def sim_env(self):
@@ -299,14 +282,23 @@ class LAND_module:
         self.soil_temp[1,:366] = groundtemp_datalvl2
         self.soil_temp[1,366:] = groundtemp_datalvl2[1:]
         ## soil moisture and porosity
-        self.soil_moist[0,:366] = soilmoist_data
-        self.soil_moist[0,366:] = soilmoist_data[1:]
-        self.soil_moist[1,:366] = soilmoist_data
-        self.soil_moist[1,366:] = soilmoist_data[1:]
-        self.soil_satmoist[0,:366] = soilmoist_data/(persm_data/100)
-        self.soil_satmoist[0,366:] = soilmoist_data[1:]/(persm_data[1:]/100)
-        self.soil_satmoist[1,:366] = soilmoist_data/(persm_data/100)
-        self.soil_satmoist[1,366:] = soilmoist_data[1:]/(persm_data[1:]/100)
+        # self.soil_moist[0,:366] = soilmoist_data
+        # self.soil_moist[0,366:] = soilmoist_data[1:]
+        # self.soil_moist[1,:366] = soilmoist_data
+        # self.soil_moist[1,366:] = soilmoist_data[1:]
+        self.soil_moist[0,:366] = soilmoist_datalvl1
+        self.soil_moist[0,366:] = soilmoist_datalvl1[1:]
+        self.soil_moist[1,:366] = soilmoist_datalvl2
+        self.soil_moist[1,366:] = soilmoist_datalvl2[1:]
+        soilbd_ds = open_ds(file_path+soil_data_path+soilbdfile)
+        ## buld density unit: kg/dm3
+        soilbd = soilbd_ds.T_BULK_DEN.values
+        soilporosity = 1 - (soilbd/(rho_soil/1000))
+        # self.soil_satmoist[0,:366] = soilmoist_data/(persm_data/100)
+        # self.soil_satmoist[0,366:] = soilmoist_data[1:]/(persm_data[1:]/100)
+        # self.soil_satmoist[1,:366] = soilmoist_data/(persm_data/100)
+        # self.soil_satmoist[1,366:] = soilmoist_data[1:]/(persm_data[1:]/100)
+        self.soil_satmoist[:] = soilporosity
         self.soil_satmoist[self.soil_satmoist>1.0] = 0.99
         ## evaporation from bare soil
         self.evap_sim[:366] = evap_data
@@ -452,7 +444,7 @@ class LAND_module:
         self.ureaN_area = fureaN * croparea
 
         ## met data interpolation
-        # self.met_input_interp(totalN)
+        self.met_input_interp(totalN)
         return 
 
     ## determine fertilizer application depth
@@ -986,8 +978,8 @@ class LAND_module:
         return
     
     def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,sim_stat=False,ncfile_o=False):
-        self.chem_fert_input(crop=crop_item)
         self.sim_env()
+        self.chem_fert_input(crop=crop_item)
         self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item)
         if sim_stat is True:
             ## output ncfile
