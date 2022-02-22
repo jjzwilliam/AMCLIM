@@ -939,6 +939,7 @@ class LAND_module:
                     NH4nitrif=(['lat','lon'],annual_total(chemfert_nitrif)),
                     NH4uptake=(['lat','lon'],annual_total(chemfert_ammN_uptake)),
                     NO3uptake=(['lat','lon'],annual_total(chemfert_nitN_uptake)),
+                    NO3washoff=(['lat','lon'],annual_total(chemfert_NO3washoff)),
                     NO3leaching=(['lat','lon'],annual_total(chemfert_NO3leaching)),
                     NO3diff=(['lat','lon'],annual_total(chemfert_NO3diffusion)),
                             ),
@@ -971,6 +972,8 @@ class LAND_module:
             outds.NH4uptake.attrs["long name"] = 'Uptake of NH4+ by crops'
             outds.NO3uptake.attrs["unit"] = 'gN/year'
             outds.NO3uptake.attrs["long name"] = 'Uptake of NO3- by crops'
+            outds.NO3washoff.attrs["unit"] = 'gN/year'
+            outds.NO3washoff.attrs["long name"] = 'Nitrate washoff from fertilizer application'
             outds.NO3leaching.attrs["unit"] = 'gN/year'
             outds.NO3leaching.attrs["long name"] = 'Nitrate leaching from fertilizer application'
             outds.NO3diff.attrs["unit"] = 'gN/year'
