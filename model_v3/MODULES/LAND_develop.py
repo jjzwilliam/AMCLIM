@@ -874,7 +874,7 @@ class LAND_module:
         output = sim_result[1:dim1]+sim_result[dim1:]
         return output
     
-    def N_stat(self,crop_item,chem_fert_type,ncfile_o=False,quality_check=False):
+    def N_stat(self,crop_item,chem_fert_type,fert_method,ncfile_o=False,quality_check=False):
         
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
@@ -1071,8 +1071,8 @@ class LAND_module:
         if sim_stat is True:
             ## output ncfile
             if ncfile_o is True:
-                self.N_stat(crop_item,chem_fert_type,ncfile_o=True,quality_check=quality_check)
+                self.N_stat(crop_item,chem_fert_type,fert_method,ncfile_o=True,quality_check=quality_check)
             else:
-                self.N_stat(crop_item,chem_fert_type,ncfile_o=False,quality_check=quality_check)
+                self.N_stat(crop_item,chem_fert_type,fert_method,ncfile_o=False,quality_check=quality_check)
 
         return
