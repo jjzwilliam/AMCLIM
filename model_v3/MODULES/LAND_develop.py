@@ -290,6 +290,7 @@ class LAND_module:
         self.soil_moist[0,366:] = soilmoist_datalvl1[1:]
         self.soil_moist[1,:366] = soilmoist_datalvl2
         self.soil_moist[1,366:] = soilmoist_datalvl2[1:]
+        self.soil_moist[self.soil_moist<0] = 0.0
         soilbd_ds = open_ds(file_path+soil_data_path+soilbdfile)
         ## buld density unit: kg/dm3
         soilbd = soilbd_ds.T_BULK_DEN.values
@@ -634,7 +635,7 @@ class LAND_module:
                 
                 if ll == 0:
                     ## TAN pool
-                    self.TAN_pool[ll,dd+1] = self.TAN_pool[ll,dd]+self.TANdiffusionup[ll,dd]+TANprod
+                    self.TAN_pool[ll,dd+1] = self.TAN_pool[ll,dd]+self.TANdiffusionup[ll,dd]+self.NH3diffusionup[ll,dd]+TANprod
                     ## fraction of aqueous NH4
                     fNH4 = frac_NH4(theta=self.soil_moist[llidx,dd+1],theta_sat=self.soil_satmoist[llidx,dd+1],
                                     temp=self.soil_temp[llidx,dd+1],cncH=sim_ccH[dd+1],kd=Kd)
@@ -682,7 +683,7 @@ class LAND_module:
 
                 elif ll == 1:
                     ## TAN pool
-                    self.TAN_pool[ll,dd+1] = self.TAN_pool[ll,dd]+self.TANdiffusionup[ll,dd]+TANprod+\
+                    self.TAN_pool[ll,dd+1] = self.TAN_pool[ll,dd]+self.TANdiffusionup[ll,dd]+self.NH3diffusionup[ll,dd]+TANprod+\
                                             self.TANinfil[ll-1,dd+1]+self.TANdiffusiondown[ll-1,dd+1]+self.NH3diffusiondown[ll-1,dd+1]
                     ## fraction of aqueous NH4
                     fNH4 = frac_NH4(theta=self.soil_moist[llidx,dd+1],theta_sat=self.soil_satmoist[llidx,dd+1],
@@ -873,26 +874,23 @@ class LAND_module:
         output = sim_result[1:dim1]+sim_result[dim1:]
         return output
     
-    def N_stat(self,crop_item,chem_fert_type,ncfile_o=False):
+    def N_stat(self,crop_item,chem_fert_type,ncfile_o=False,quality_check=False):
         
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
             chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
-            chemfert_NH3emiss = self.land_sim_reshape(self.NH3flux)*sim_area
 
         elif chem_fert_type == 'urea':
             sim_area = self.ureaN_area
             chemfert_Ntotal = self.land_sim_reshape(self.urea_added)*sim_area
-            chemfert_NH3emiss = self.land_sim_reshape(self.NH3flux)*sim_area
             
         elif chem_fert_type == 'nitrate':
             sim_area = self.nitN_area
-            chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area
-            chemfert_NH3emiss = self.land_sim_reshape(self.NH3flux)*sim_area
-        
+            chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area     
         print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal))+' Gg')
+        
+        chemfert_NH3emiss = self.land_sim_reshape(self.NH3flux)*sim_area
         print('NH3 emission: '+str(sum_totalGg(chemfert_NH3emiss))+' Gg')
-
         chemfert_TANwashoff = self.land_sim_reshape(self.TANwashoff+self.ureawashoff)*sim_area
         print('TAN washoff: '+str(sum_totalGg(chemfert_TANwashoff))+' Gg')
         chemfert_nitrif = self.land_sim_reshape(np.nansum(self.NH4nitrif,axis=0))*sim_area
@@ -907,11 +905,19 @@ class LAND_module:
         print('NH4 uptake by plants: '+ str(sum_totalGg(chemfert_ammN_uptake))+' Gg')
         chemfert_nitN_uptake = self.land_sim_reshape(np.nansum(self.nitNuptake,axis=0))*sim_area
         print('NO3 uptake by plants: '+ str(sum_totalGg(chemfert_nitN_uptake))+' Gg')
+        chemfert_NO3washoff = self.land_sim_reshape(self.NO3washoff)*sim_area
+        print('NO3 washoff: '+str(sum_totalGg(chemfert_NO3washoff))+' Gg')
         chemfert_NO3leaching = self.land_sim_reshape(self.NO3infil[-1])*sim_area
         print('NO3 leaching: '+ str(sum_totalGg(chemfert_NO3leaching))+' Gg')
         chemfert_NO3diffusion = self.land_sim_reshape(self.NO3diffusiondown[-1])*sim_area
         print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(chemfert_NO3diffusion))+' Gg')
-        
+
+        if quality_check is True:
+            check = chemfert_Ntotal-chemfert_NH3emiss-chemfert_TANwashoff-chemfert_nitrif-chemfert_leaching-\
+                    chemfert_diffaq-chemfert_diffgas-chemfert_ammN_uptake
+            result = np.round(sum_totalGg(check)/sum_totalGg(chemfert_Ntotal)*100,decimals=3)
+            print("Integrity check result: "+str(result)+' %')
+
         ## generate an ncfile that contains the N pathways
         if ncfile_o is True:
             ## define output dims
@@ -977,15 +983,96 @@ class LAND_module:
                 str(chem_fert_type)+'.'+str(fert_method)+'.'+str(sim_year)+'.nc',encoding=encoding)
         return
     
-    def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,sim_stat=False,ncfile_o=False):
+    def quality_check(self):
+        ptest_stat = {'urea pool': 0,
+             'urea conc': 0,
+             'urea washoff': 0,
+             'urea diffusion': 0,
+             'urea hydrolysis': 0,
+             'TAN pool': 0,
+             'TAN conc': 0,
+             'NH3 flux': 0,
+             'TAN washoff': 0,
+             'TAN leaching': 0,
+             'TAN diffusion': 0,
+             'NH3 diffusion': 0,
+             'NH4 nitrif': 0,
+             'NH4 uptake': 0,
+             'NO3 pool': 0,
+             'NO3 conc': 0,
+             'NO3 washoff': 0,
+             'NO3 leaching': 0,
+             'NO3 diffusion': 0,
+             'NO3 uptake': 0}
+
+        if np.where(self.urea_pool<0)[0].size!=0:
+            ptest_stat['urea pool'] = 1
+        if np.where(self.urea_amount<0)[0].size!=0:
+            ptest_stat['urea conc'] = 1
+        if np.where(self.ureawashoff<0)[0].size!=0:
+            ptest_stat['urea washoff'] = 1
+        if np.where(self.ureadiffusiondown<0)[0].size!=0:
+            ptest_stat['urea diffusion'] = 1
+        if np.where(self.ureadiffusionup<0)[0].size!=0:
+            ptest_stat['urea diffusion'] = 1
+        if np.where(self.ureahydrolysis<0)[0].size!=0:
+            ptest_stat['urea hydrolysis'] = 1
+            
+        if np.where(self.TAN_pool<0)[0].size!=0:
+            ptest_stat['TAN pool'] = 1
+        if np.where(self.TAN_amount<0)[0].size!=0:
+            ptest_stat['TAN conc'] = 1
+        if np.where(self.NH3flux<0)[0].size!=0:
+            ptest_stat['NH3 flux'] = 1
+        if np.where(self.TANwashoff<0)[0].size!=0:
+            ptest_stat['TAN washoff'] = 1
+        if np.where(self.TANinfil<0)[0].size!=0:
+            ptest_stat['TAN leaching'] = 1
+        if np.where(self.TANdiffusiondown<0)[0].size!=0:
+            ptest_stat['TAN diffusion'] = 1
+        if np.where(self.TANdiffusionup<0)[0].size!=0:
+            ptest_stat['TAN diffusion'] = 1
+        if np.where(self.NH3diffusiondown<0)[0].size!=0:
+            ptest_stat['NH3 diffusion'] = 1
+        if np.where(self.NH3diffusionup<0)[0].size!=0:
+            ptest_stat['NH3 diffusion'] = 1
+        if np.where(self.NH4nitrif<0)[0].size!=0:
+            ptest_stat['NH4 nitrif'] = 1
+        if np.where(self.ammNuptake<0)[0].size!=0:
+            ptest_stat['NH4 uptake'] = 1
+
+        if np.where(self.NO3_pool<0)[0].size!=0:
+            ptest_stat['NO3 pool'] = 1
+        if np.where(self.NO3_amount<0)[0].size!=0:
+            ptest_stat['NO3 conc'] = 1
+        if np.where(self.NO3washoff<0)[0].size!=0:
+            ptest_stat['NO3 washoff'] = 1
+        if np.where(self.NO3infil<0)[0].size!=0:
+            ptest_stat['NO3 leaching'] = 1
+        if np.where(self.NO3diffusiondown<0)[0].size!=0:
+            ptest_stat['NO3 diffusion'] = 1
+        if np.where(self.NO3diffusionup<0)[0].size!=0:
+            ptest_stat['NO3 diffusion'] = 1
+        if np.where(self.nitNuptake<0)[0].size!=0:
+            ptest_stat['NO3 uptake'] = 1
+
+        if all(value == 0 for value in ptest_stat.values()) is True:
+            print("Basic test passsed.")
+        else:
+            print("Basic test failed! Please check!")
+            print(ptest_stat)
+    
+    def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,sim_stat=False,ncfile_o=False,quality_check=False):
         self.sim_env()
         self.chem_fert_input(crop=crop_item)
         self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item)
+        if quality_check is True:
+            self.quality_check()
         if sim_stat is True:
             ## output ncfile
             if ncfile_o is True:
-                self.N_stat(crop_item,chem_fert_type,ncfile_o=True)
+                self.N_stat(crop_item,chem_fert_type,ncfile_o=True,quality_check=quality_check)
             else:
-                self.N_stat(crop_item,chem_fert_type,ncfile_o=False)
+                self.N_stat(crop_item,chem_fert_type,ncfile_o=False,quality_check=quality_check)
 
         return
