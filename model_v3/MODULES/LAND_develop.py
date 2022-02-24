@@ -984,6 +984,7 @@ class LAND_module:
 
             outds.to_netcdf(output_path+str(crop_item)+'.'+\
                 str(chem_fert_type)+'.'+str(fert_method)+'.'+str(sim_year)+'.nc',encoding=encoding)
+            print("ncfile saved.")
         return
     
     def quality_check(self):
