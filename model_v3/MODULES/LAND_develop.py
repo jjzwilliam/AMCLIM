@@ -394,11 +394,15 @@ class LAND_module:
         ## read planting and harvesting dates
         plantdate = cropcalds['plant.start'].values
         harvestdate = cropcalds['harvest.start'].values
+        plantfill = cropcalds['plant'].values
+        harvestfill = cropcalds['harvest'].values
+        plantdate[(np.isnan(plantdate))&(~np.isnan(plantfill))] = plantfill[(np.isnan(plantdate))&(~np.isnan(plantfill))]
+        harvestdate[(np.isnan(harvestdate))&(~np.isnan(harvestfill))] = harvestfill[(np.isnan(harvestdate))&(~np.isnan(harvestfill))]
         ## harvesting date goes into next year
         harvestdate[harvestdate<plantdate] = harvestdate[harvestdate<plantdate]+365
         return plantdate,harvestdate
 
-    def chem_fert_input(self,crop):
+    def chem_fert_input(self,crop,ncfile_o=False):
         ## read N application rates dataset for crops
         fertds = open_ds(file_path+crop_data_path+crop+cropfileformat)
         ## crop calendar dataset
@@ -446,6 +450,52 @@ class LAND_module:
 
         ## met data interpolation
         self.met_input_interp(totalN)
+
+        ## generate an ncfile that contains the N pathways
+        if ncfile_o is True:
+            ## define output dims
+            nlat = int(180.0/dlat)
+            nlon = int(360.0/dlon)
+            ntime = Days
+            lats = 90 - 0.5*np.arange(nlat)
+            lons = -180 + 0.5*np.arange(nlon)
+            yearidx = str(sim_year)+'-01-01'
+            times = pd.date_range(yearidx,periods=ntime)
+
+            outds = xr.Dataset(
+                data_vars=dict(
+                    Nrate=(['time','lat','lon'],self.land_sim_reshape(chem_N_tocrop)),
+                    ammN_area=(['lat','lon'],self.ammN_area),
+                    ureaN_area=(['lat','lon'],self.ureaN_area),
+                    nitN_area=(['lat','lon'],self.nitN_area),
+                            ),
+                coords = dict(
+                    time=(["time"], times),
+                    lon=(["lon"], lons),
+                    lat=(["lat"], lats),
+                            ),
+                attrs=dict(
+                    description="AMCLIM-Land_chem_fert: \
+                        N application rates and corresponding areas of three types of fertilizer in " +\
+                            str(sim_year),
+                    info ="Ammonium, urea, nitrate fertilizing area (m^2) for: "+str(crop),
+                ),
+            )
+
+            outds.Nrate.attrs["unit"] = 'gN/m^2'
+            outds.Nrate.attrs["long name"] = 'N application rate'
+            outds.ammN_area["unit"] = 'm^2'
+            outds.ammN_area["long name"] = 'Ammonium fertilizer area'
+            outds.ureaN_area["unit"] = 'm^2'
+            outds.ureaN_area["long_name"] = 'Urea fertilizer area'
+            outds.nitN_area["unit"] = 'm^2'
+            outds.nitN_area["long name"] = 'Nitrate fertilizer area'
+
+            comp = dict(zlib=True, complevel=9)
+            encoding = {var: comp for var in outds.data_vars}
+
+            outds.to_netcdf(output_path+str(crop)+'.'+str(sim_year)+'.nc',encoding=encoding)
+            print("ncfile saved.")
         return 
 
     ## determine fertilizer application depth
