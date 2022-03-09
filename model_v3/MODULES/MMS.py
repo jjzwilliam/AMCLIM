@@ -145,6 +145,23 @@ f_manure_anoxic = 0.6
 ## lagoon TAN conc; g/mL
 lagoon_TAN_conc = 630.0e-6
 
+# groundtemp_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_datalvl1)  ## degC
+# groundtemp_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=groundtemp_datalvl2)  ## degC
+# rhum_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rhum_data)  ## per cent
+# wind_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=wind_data)  ## m/s
+# evap_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=evap_data) ## g/day
+# # soilmoist_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_data)  ## m3/m3
+# soilmoist_datalvl1 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl1)  ## m3/m3
+# # soilmoist_datalvl2 = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilmoist_datalvl2)  ## m3/m3
+# soilbd_ds = open_ds(file_path+soil_data_path+soilbdfile)
+# soilbd = soilbd_ds.T_BULK_DEN.values
+# soilporosity = 1 - (soilbd/(rho_soil/1000))
+# persm_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=soilporosity)  ## per cent
+# ram1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=ram1_data)  ## s/m
+# rb1_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=rb1_data)  ## s/m
+# # runoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=runoff_data)  ## m/day
+# # subrunoff_data = field_var_fill(sd_template=animal_file['Excreted_N'][lvl_idx],input_field=subrunoff_data)  ## m/day
+
 ##################################
 ## MMS module
 ##################################
@@ -336,6 +353,19 @@ class MMS_module:
         ## housing area that is used to determine MMS area
         self.housingarea = area_housing
 
+    def met_input_interp(self,template):
+        ##################################
+        ## fill land input data
+        ##################################
+        self.T_sim = field_var_fill(sd_template=template,input_field=self.T_sim)  ## degC
+        self.evap_sim = field_var_fill(sd_template=template,input_field=self.evap_sim) ## g/day
+        # soilmoist_data = field_var_fill(sd_template=template,input_field=soilmoist_data)  ## m3/m3
+        self.soilmoist= field_var_fill(sd_template=template,input_field=self.soilmoist)  ## m3/m3
+        self.persm = field_var_fill(sd_template=template,input_field=self.persm)  ## m3/m3
+        self.R_star = field_var_fill(sd_template=template,input_field=self.R_star)  ## s/m
+        self.soilmoist[self.soilmoist>self.persm] = self.persm[self.soilmoist>self.persm]
+        return
+
     def sim_env(self,mms_type,mms_phase):
         if mms_type == 'MMS_barn':
             self.T_sim,self.u_sim = barn_env(temp_data,\
@@ -370,24 +400,34 @@ class MMS_module:
                 print('MMS ENV: mms barn (solid)')
 
         else:
-            self.T_sim = groundtemp_data
+            self.T_sim = groundtemp_datalvl1
             self.u_sim = wind_data
             self.RH_sim = rhum_data
             self.evap_sim = evap_data
-            self.soilmoist = soilmoist_data
-            self.persm = soilmoist_data/(persm_data/100)
             self.rainfall = rain_data
             self.R_star = ram1_data+rb1_data
-            self.T_sim = xr_to_np(self.T_sim)
-            self.RH_sim = xr_to_np(self.RH_sim)
-            self.u_sim = xr_to_np(self.u_sim)
-            self.evap_sim = xr_to_np(self.evap_sim)
-            self.soilmoist = xr_to_np(self.soilmoist)
-            self.persm = xr_to_np(self.persm)
-            self.persm[self.persm>1.0] = 0.9999
-            self.rainfall = xr_to_np(self.rainfall)
-            self.R_star = xr_to_np(self.R_star)
-            self.daily_KNO3 = nitrification_rate_soil(ground_temp=xr_to_np(groundtemp_data),theta=self.soilmoist,theta_sat=self.persm,
+            self.soilmoist = soilmoist_datalvl1
+            # self.persm = persm_data
+            soilbd_ds = open_ds(file_path+soil_data_path+soilbdfile)
+            ## buld density unit: kg/dm3
+            soilbd = soilbd_ds.T_BULK_DEN.values
+            soilporosity = 1 - (soilbd/(rho_soil/1000))
+            self.persm[:] = soilporosity
+            self.persm[self.persm>1.0] = 0.99
+
+            self.met_input_interp(template=animal_file['Excreted_N'][lvl_idx])
+
+            # self.T_sim = xr_to_np(self.T_sim)
+            # self.RH_sim = xr_to_np(self.RH_sim)
+            # self.u_sim = xr_to_np(self.u_sim)
+            # self.evap_sim = xr_to_np(self.evap_sim)
+            # self.soilmoist = xr_to_np(self.soilmoist)
+            # self.persm = xr_to_np(self.persm)
+            # self.persm[self.persm>1.0] = 0.9999
+            # self.rainfall = xr_to_np(self.rainfall)
+            # self.R_star = xr_to_np(self.R_star)
+
+            self.daily_KNO3 = nitrification_rate_soil(ground_temp=xr_to_np(groundtemp_datalvl1),theta=self.soilmoist,theta_sat=self.persm,
                                                         pH = self.pH,fer_type="manure")*timestep*3600
             self.daily_KNO3[self.daily_KNO3<0] = 0.0
             self.daily_KNO3[np.isnan(self.daily_KNO3)] = 0.0

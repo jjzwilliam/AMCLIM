@@ -347,25 +347,38 @@ def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
 ## flux5: [NH3 downwards diffusion]
 ## flux6: [ammonium uptake]
 def TAN_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False,flux5=False,flux6=False):
+    if flux1 is not False:
+        flux1[np.isnan(flux1)] = 0.0
+        flux1[np.isinf(flux1)] = 0.0
+    if flux2 is not False:
+        flux2[np.isnan(flux2)] = 0.0
+        flux2[np.isinf(flux2)] = 0.0
+    if flux3 is not False:
+        flux3[np.isnan(flux3)] = 0.0
+        flux3[np.isinf(flux3)] = 0.0
+    if flux4 is not False:
+        flux4[np.isnan(flux4)] = 0.0
+        flux4[np.isinf(flux4)] = 0.0
+    if flux5 is not False:
+        flux5[np.isnan(flux5)] = 0.0
+        flux5[np.isinf(flux5)] = 0.0
+    if flux6 is not False:
+        flux6[np.isnan(flux6)] = 0.0
+        flux6[np.isinf(flux6)] = 0.0
+    
     totalidx = flux1+flux2+flux3+flux4+flux5+flux6
     massidx = mN-totalidx
     if flux1 is not False:
-        flux1[np.isnan(massidx)] = 0.0
         flux1[massidx<0] = (flux1[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux2 is not False:
-        flux2[np.isnan(massidx)] = 0.0
         flux2[massidx<0] = (flux2[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux3 is not False:
-        flux3[np.isnan(massidx)] = 0.0
         flux3[massidx<0] = (flux3[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux4 is not False:
-        flux4[np.isnan(massidx)] = 0.0
         flux4[massidx<0] = (flux4[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux5 is not False:
-        flux5[np.isnan(massidx)] = 0.0
         flux5[massidx<0] = (flux5[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux6 is not False:
-        flux6[np.isnan(massidx)] = 0.0
         flux6[massidx<0] = (flux6[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     return flux1,flux2,flux3,flux4,flux5,flux6
 
@@ -374,19 +387,28 @@ def TAN_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False,flux5=False,
 ## flux3: [urea/NO3 infiltration/leaching]
 ## flux4: [urea/NO3 downwards diffusion]
 def N_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False):
+    if flux1 is not False:
+        flux1[np.isnan(flux1)] = 0.0
+        flux1[np.isinf(flux1)] = 0.0
+    if flux2 is not False:
+        flux2[np.isnan(flux2)] = 0.0
+        flux2[np.isinf(flux2)] = 0.0
+    if flux3 is not False:
+        flux3[np.isnan(flux3)] = 0.0
+        flux3[np.isinf(flux3)] = 0.0
+    if flux4 is not False:
+        flux4[np.isnan(flux4)] = 0.0
+        flux4[np.isinf(flux4)] = 0.0
+
     totalidx = flux1+flux2+flux3+flux4
     massidx = mN-totalidx
     if flux1 is not False:
-        flux1[np.isnan(massidx)] = 0.0
         flux1[massidx<0] = (flux1[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux2 is not False:
-        flux2[np.isnan(massidx)] = 0.0
         flux2[massidx<0] = (flux2[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux3 is not False:
-        flux3[np.isnan(massidx)] = 0.0
         flux3[massidx<0] = (flux3[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     if flux4 is not False:
-        flux4[np.isnan(massidx)] = 0.0
         flux4[massidx<0] = (flux4[massidx<0]/totalidx[massidx<0])*mN[massidx<0]
     return flux1,flux2,flux3,flux4
 

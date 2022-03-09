@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 
 sim_year = 2018
-output_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/outputs/output_ncfiles/'
-
+# output_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/outputs/output_ncfiles/'
+output_path = '/exports/csce/datastore/geos/users/s1576984/test_transfer/output_ncfiles/'
 ## daily simulation or hourly simulation
 nhours = 24
 if (sim_year%4)==0: Days = 366
