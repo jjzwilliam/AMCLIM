@@ -291,7 +291,7 @@ class LAND_module:
         self.soil_moist[1,:366] = soilmoist_datalvl2
         self.soil_moist[1,366:] = soilmoist_datalvl2[1:]
         self.soil_moist[self.soil_moist<0] = 0.0
-        soilbd_ds = open_ds(file_path+soil_data_path+soilbdfile)
+        soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
         ## buld density unit: kg/dm3
         soilbd = soilbd_ds.T_BULK_DEN.values
         soilporosity = 1 - (soilbd/(rho_soil/1000))
@@ -375,7 +375,7 @@ class LAND_module:
 
     def chem_fert_type(self):
         ## country level chemical fertilizer use: 1) ammonium N, 2) nitrate N, 3) urea N
-        fertds = open_ds(file_path+crop_data_path+fertfilename)
+        fertds = open_ds(infile_path+crop_data_path+fertfilename)
         nitN = fertds.nitrate_fert.sel(year=sim_year).values
         ammN = fertds.ammonium_fert.sel(year=sim_year).values
         ureaN = fertds.urea_fert.sel(year=sim_year).values
@@ -404,12 +404,12 @@ class LAND_module:
 
     def chem_fert_input(self,crop,ncfile_o=False):
         ## read N application rates dataset for crops
-        fertds = open_ds(file_path+crop_data_path+crop+cropfileformat)
+        fertds = open_ds(infile_path+crop_data_path+crop+cropfileformat)
         ## crop calendar dataset
-        cropcalspath = file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
-        # cropcalds = open_ds(file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
+        cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+        # cropcalds = open_ds(infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
         ## base soil pH dataset
-        soilpHds = open_ds(file_path+soil_data_path+soilpHfile)
+        soilpHds = open_ds(infile_path+soil_data_path+soilpHfile)
 
         totalN = fertds.TotalN.values*1e3
         ## N application rate is interpolated;
@@ -530,7 +530,7 @@ class LAND_module:
 
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is: '+str(tech))
-        soilclayds = open_ds(file_path+soil_data_path+soilclayfile)
+        soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
         Kd = ammonium_adsorption(clay_content=soilclay)
 
@@ -552,7 +552,7 @@ class LAND_module:
 
         ## crop calendar that detenmines the N uptake by crops
         if crop is not None:
-            cropcalspath = file_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+            cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
             plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
 
         sourcelayer = self.source_layer(tech)

@@ -3,8 +3,8 @@ import sys
 import os
 from pathlib import Path
 
-## machine: STREAM, JASMIN, ARCHER
-machine = 'STREAM'
+## specify machine: STREAM, JASMIN, ARCHER
+machine = ''
 
 inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
