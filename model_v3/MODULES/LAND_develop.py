@@ -765,7 +765,7 @@ class LAND_module:
                     TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,dd],cnc2=self.TAN_amount[ll-1,dd+1],
                                         resist=self.Rdiffaq[ll-1,dd+1])*timestep*3600  ## TAN aqueous diffusion
                     TANdiffaqdownidx[self.soil_moist[llidx,dd+1]==0]=0.0
-                    TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1],mNO3=self.NO3_pool[ll,dd],
+                    TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1]*fNH4,mNO3=self.NO3_pool[ll,dd],
                                     temp=self.soil_temp[llidx,dd+1],uptake='nh4')*timestep*3600  ## N uptake
                     TANuptakeidx[harvestidx<(dd+1)] = 0.0
                     subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,dd+1],
@@ -816,7 +816,7 @@ class LAND_module:
                     TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,dd],cnc2=self.TAN_amount[ll-1,dd+1],
                                         resist=self.Rdiffaq[ll-1,dd+1])*timestep*3600  ## TAN aqueous diffusion
                     TANdiffaqupidx[self.soil_moist[llidx,dd+1]==0]=0.0
-                    TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1],mNO3=self.NO3_pool[ll,dd],
+                    TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1]*fNH4,mNO3=self.NO3_pool[ll,dd],
                                     temp=self.soil_temp[llidx,dd+1],uptake='nh4')*timestep*3600  ## N uptake
                     TANuptakeidx[harvestidx<(dd+1)] = 0.0
                     subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,dd+1],
@@ -873,7 +873,7 @@ class LAND_module:
                                         resist=self.Rdiffaq[ll,dd+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                     NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,dd],cnc2=self.NO3_amount[ll-1,dd+1],
                                         resist=self.Rdiffaq[ll-1,dd+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                    NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1],mNO3=self.NO3_pool[ll,dd],
+                    NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1]*fNH4,mNO3=self.NO3_pool[ll,dd],
                                     temp=self.soil_temp[llidx,dd+1],uptake='no3')*timestep*3600  ## N uptake
                     NO3uptakeidx[harvestidx<(dd+1)] = 0.0
                     subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,dd+1],
@@ -901,7 +901,7 @@ class LAND_module:
                                         resist=self.Rdiffaq[ll,dd+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                     NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,dd],cnc2=self.NO3_amount[ll-1,dd+1],
                                         resist=self.Rdiffaq[ll-1,dd+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                    NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1],mNO3=self.NO3_pool[ll,dd],
+                    NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,dd+1]*fNH4,mNO3=self.NO3_pool[ll,dd],
                                     temp=self.soil_temp[llidx,dd+1],uptake='no3')*timestep*3600  ## N uptake
                     NO3uptakeidx[harvestidx<(dd+1)] = 0.0
                     subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,dd+1],

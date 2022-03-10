@@ -3,9 +3,25 @@ import sys
 import os
 from pathlib import Path
 
+## machine: STREAM, JASMIN, ARCHER
+machine = 'STREAM'
+
+inputpathdict = {
+        "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
+        "JASMIN": '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/',
+        "ARCHER": '/work/n02/n02/jjz/working_dir/AMCLIM/input_files/',
+}
+
+outputpathdict = {
+        "STREAM": '/exports/csce/datastore/geos/users/s1576984/test_transfer/output_ncfiles/',
+        "JASMIN": '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/outputs/output_ncfiles/',
+        "ARCHER": '/work/n02/n02/jjz/working_dir/AMCLIM/outputs/output_ncfiles/',
+}
+
+infile_path = inputpathdict[machine]
+output_path = outputpathdict[machine]
+
 sim_year = 2018
-# output_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/outputs/output_ncfiles/'
-output_path = '/exports/csce/datastore/geos/users/s1576984/test_transfer/output_ncfiles/'
 ## daily simulation or hourly simulation
 nhours = 24
 if (sim_year%4)==0: Days = 366
