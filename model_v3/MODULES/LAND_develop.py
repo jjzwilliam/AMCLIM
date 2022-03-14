@@ -251,6 +251,9 @@ class LAND_module:
         ## pH and H+ ions concentration
         self.pH = pH_value
         self.cc_H = np.float(10**(-pH_value))
+
+        ## adsorption 
+        self.Kd = np.zeros(array_shape[1:])
         
     
     def met_input_interp(self,template):
@@ -525,8 +528,104 @@ class LAND_module:
             sourcelayer = 2
         return sourcelayer
 
+    ## sensitivity tests
+    def sensitivity_test(self,var,test):
+        
+        ####################
+        ## SOIL TEMPERATURE
+        ####################
+        if var == 'temp':
+            if test == '-':
+                ## soil temperature decrease by 2 degC
+                self.soil_temp = self.soil_temp - 2.0
+                print('Sensitivity tests for soil temp -2 degC')
+            elif test == '+':
+                ## soil temperature increase by 2 degC
+                self.soil_temp = self.soil_temp + 2.0
+                print('Sensitivity tests for soil temp +2 degC')
+            elif test == '+3':
+                ## soil temperature decrease by 3 degC
+                self.soil_temp = self.soil_temp + 3.0
+                print('Sensitivity tests for soil temp +3 degC')
+            elif test == '+5':
+                ## soil temperature decrease by 5 degC
+                self.soil_temp = self.soil_temp + 5.0
+                print('Sensitivity tests for soil temp +5 degC')
+
+        ####################
+        ## SOIL MOISTURE
+        ####################
+        if var == 'sw':
+            if test == '-':
+                ## soil moisture decrease by 10 per cent
+                self.soil_moist = self.soil_moist * 0.9
+                print('Sensitivity tests for soil moisture -10 %')
+            else:
+                ## soil moisture increase by 10 per cent
+                self.soil_moist = self.soil_moist * 1.1
+                self.soil_moist[self.soil_moist>self.soil_satmoist] = self.soil_satmoist[self.soil_moist>self.soil_satmoist]
+                print('Sensitivity tests for soil moisture +10 %')
+
+        #####################
+        ## SURFACE RUNOFF
+        #####################
+        if var == 'srf':
+            if test == '-':
+                ## surface runoff decrease by 10 per cent
+                self.surfrunoffrate = self.surfrunoffrate * 0.9
+                print('Sensitivity tests for surface runoff rate -10 %')
+            else:
+                ## surface runoff increase by 10 per cent
+                self.surfrunoffrate = self.surfrunoffrate * 1.1
+                print('Sensitivity tests for surface runoff rate +10 %')
+
+        #####################
+        ## SUBSURFACE RUNOFF
+        #####################
+        if var == 'sub':
+            if test == '-':
+                ## sub-surface runoff decrease by 10 per cent
+                self.subrunoffrate = self.subrunoffrate * 0.9
+                print('Sensitivity tests for sub-surface runoff rate -10 %')
+            else:
+                ## sub-surface runoff increase by 10 per cent
+                self.subrunoffrate = self.subrunoffrate * 1.1
+                print('Sensitivity tests for sub-surface runoff rate +10 %')
+
+        #####################
+        ## N APPLICATION RATE
+        #####################
+        if var == 'Napp':
+            if test == '-':
+                ## N application rate decrease by 10 per cent
+                self.TAN = self.TAN * 0.9
+                self.urea = self.urea * 0.9
+                print('Sensitivity tests for N application rate -10 %')
+            else:
+                ## N application rate increase by 10 per cent
+                self.TAN = self.TAN * 1.1
+                self.urea = self.urea * 1.1
+                print('Sensitivity tests for N application rate +10 %')
+
+        ###########
+        ## SOIL PH
+        ###########
+        if var == 'ph':
+            if test == '-':
+                ## soil pH decrease by 0.5
+                self.pH = self.pH - 0.5
+                self.soil_pH = self.soil_pH - 0.5
+                print('Sensitivity tests for soil pH -0.5')
+            else:
+                ## soil pH increase by 0.5
+                self.pH = self.pH + 0.5
+                self.soil_pH = self.soil_pH + 0.5
+                print('Sensitivity tests for soil pH +0.5')
+
+        return
+
     ## main function
-    def land_sim(self,start_day_idx,end_day_idx,chem_fert_type,tech,crop=None):
+    def land_sim(self,start_day_idx,end_day_idx,chem_fert_type,tech,crop=None,sim='base',stvar=False,st=False):
 
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is: '+str(tech))
@@ -556,6 +655,9 @@ class LAND_module:
             plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
 
         sourcelayer = self.source_layer(tech)
+
+        if sim == 'sens':
+            self.sensitivity_test(var=stvar,test=st)
 
         for dd in np.arange(start_day_idx,end_day_idx):
             ## resistance for upward diffusion in the surface layer
@@ -1116,10 +1218,13 @@ class LAND_module:
             print("Basic test failed! Please check!")
             print(ptest_stat)
     
-    def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,sim_stat=False,ncfile_o=False,quality_check=False):
+    def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,
+                sim_type='base',senstest_var=False,senstest=False,
+                sim_stat=False,ncfile_o=False,quality_check=False):
         self.sim_env()
         self.chem_fert_input(crop=crop_item)
-        self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item)
+        self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
+                        sim=sim_type,stvar=senstest_var,st=senstest)
         if quality_check is True:
             self.quality_check()
         if sim_stat is True:
