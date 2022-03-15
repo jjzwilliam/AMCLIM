@@ -656,7 +656,7 @@ class LAND_module:
 
         sourcelayer = self.source_layer(tech)
 
-        if sim == 'sens':
+        if sim != 'base':
             self.sensitivity_test(var=stvar,test=st)
 
         for dd in np.arange(start_day_idx,end_day_idx):
