@@ -1026,7 +1026,7 @@ class LAND_module:
         output = sim_result[1:dim1]+sim_result[dim1:]
         return output
     
-    def N_stat(self,crop_item,chem_fert_type,fert_method,ncfile_o=False,quality_check=False):
+    def N_stat(self,crop_item,chem_fert_type,fert_method,sim_type,ncfile_o=False,quality_check=False):
         
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
@@ -1134,7 +1134,7 @@ class LAND_module:
             comp = dict(zlib=True, complevel=9)
             encoding = {var: comp for var in outds.data_vars}
 
-            outds.to_netcdf(output_path+str(crop_item)+'.'+\
+            outds.to_netcdf(output_path+sim_type+'.'+str(crop_item)+'.'+\
                 str(chem_fert_type)+'.'+str(fert_method)+'.'+str(sim_year)+'.nc',encoding=encoding)
             print("ncfile saved.")
         return
@@ -1230,8 +1230,8 @@ class LAND_module:
         if sim_stat is True:
             ## output ncfile
             if ncfile_o is True:
-                self.N_stat(crop_item,chem_fert_type,fert_method,ncfile_o=True,quality_check=quality_check)
+                self.N_stat(crop_item,chem_fert_type,fert_method,sim_type,ncfile_o=True,quality_check=quality_check)
             else:
-                self.N_stat(crop_item,chem_fert_type,fert_method,ncfile_o=False,quality_check=quality_check)
+                self.N_stat(crop_item,chem_fert_type,fert_method,sim_type,ncfile_o=False,quality_check=quality_check)
 
         return
