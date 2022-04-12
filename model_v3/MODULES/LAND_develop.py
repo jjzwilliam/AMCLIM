@@ -77,9 +77,9 @@ class LAND_module:
         print('LAND Module - current fertilizer application is: '+str(fert_type))
 
         ## shape of 2 levels fields
-        dlvl = [2] + array_shape
+        dlvl = (2,) + array_shape
         ## shape of 3 levels fields
-        tlvl = [3] + array_shape
+        tlvl = (3,) + array_shape
 
         if fert_type == 'manure':
             ## feces input from MMS/HOUSING

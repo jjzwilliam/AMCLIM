@@ -44,8 +44,8 @@ levels = 2
 
 ## array dimensions;
 #mtrx = [levels,time,lats,lons]
-mtrx = [time+1,lats,lons]
-mtrx2 = [time*2+1,lats,lons]
+mtrx = (time+1,lats,lons)
+mtrx2 = (time*2+1,lats,lons)
 
 ## define months info
 Months_name = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
