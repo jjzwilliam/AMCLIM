@@ -9,7 +9,6 @@ from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
 from MODULES.FUNC import *
-from POSTPROC.postprocessing import *
 import sys
 
 ###################################
