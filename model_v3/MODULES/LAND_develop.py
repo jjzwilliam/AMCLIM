@@ -76,9 +76,8 @@ class LAND_module:
         print('LAND Module - current fertilizer application is: '+str(fert_type))
 
         ## lat idx for parallelization
-        ## add 40 to get rid of the Antarctica where there are no/very few agriculture
-        self.plat1 = 40 + prank*psize
-        self.plat2 = 40 + (prank+1)*psize
+        self.plat1 = prank*psize
+        self.plat2 = (prank+1)*psize
 
         print(self.plat1,self.plat2)
 
