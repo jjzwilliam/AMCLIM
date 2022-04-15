@@ -71,10 +71,17 @@ pmids = [0.01, 0.045, 0.105, 0.21]
 
 
 class LAND_module:
-    def __init__(self,array_shape,fert_type,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
+    def __init__(self,array_shape,prank,psize,fert_type,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
     TAN_added,NO3_added,water_added,pH_value):
         
         print('LAND Module - current fertilizer application is: '+str(fert_type))
+
+        ## lat idx for parallelization
+        ## add 40 to get rid of the Antarctica where there are no/very few agriculture
+        self.plat1 = 40 + prank*psize
+        self.plat2 = 40 + (prank+1)*psize
+
+        print(self.plat1,self.plat2)
 
         ## shape of 2 levels fields
         dlvl = (2,) + array_shape
@@ -254,25 +261,48 @@ class LAND_module:
 
         ## adsorption 
         self.Kd = np.zeros(array_shape[1:])
+
+        ## output fields
+        self.o_NH3flux = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_washoff = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_nitrif = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_NH4leaching = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_diffaq = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_diffgas = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_ammNuptake = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_nitNuptake = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_NO3washoff = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_NO3leaching = np.zeros((Days,array_shape[1],array_shape[2]))
+        self.o_NO3diff = np.zeros((Days,array_shape[1],array_shape[2]))
         
     
     def met_input_interp(self,template):
         ##################################
         ## fill land input data
         ##################################
-        self.soil_temp[0] = field_var_fill(sd_template=template,input_field=self.soil_temp[0])  ## degC
-        self.soil_temp[1] = field_var_fill(sd_template=template,input_field=self.soil_temp[1])  ## degC
+        self.soil_temp[0] = field_var_fill(sd_template=template,
+                                            input_field=self.soil_temp[0])  ## degC
+        self.soil_temp[1] = field_var_fill(sd_template=template,
+                                            input_field=self.soil_temp[1]) ## degC
         # rhum_data = field_var_fill(sd_template=template,input_field=rhum_data)  ## per cent
         # wind_data = field_var_fill(sd_template=template,input_field=wind_data)  ## m/s
-        self.evap_sim = field_var_fill(sd_template=template,input_field=self.evap_sim) ## g/day
+        self.evap_sim = field_var_fill(sd_template=template,
+                                            input_field=self.evap_sim) ## g/day
         # soilmoist_data = field_var_fill(sd_template=template,input_field=soilmoist_data)  ## m3/m3
-        self.soil_moist[0]= field_var_fill(sd_template=template,input_field=self.soil_moist[0])  ## m3/m3
-        self.soil_moist[1] = field_var_fill(sd_template=template,input_field=self.soil_moist[1])  ## m3/m3
-        self.soil_satmoist[0] = field_var_fill(sd_template=template,input_field=self.soil_satmoist[0])  ## m3/m3
-        self.soil_satmoist[1] = field_var_fill(sd_template=template,input_field=self.soil_satmoist[1])  ## m3/m3
-        self.R_atm = field_var_fill(sd_template=template,input_field=self.R_atm)  ## s/m
-        self.surfrunoffrate = field_var_fill(sd_template=template,input_field=self.surfrunoffrate)  ## m/day
-        self.subrunoffrate = field_var_fill(sd_template=template,input_field=self.subrunoffrate)  ## m/day
+        self.soil_moist[0]= field_var_fill(sd_template=template,
+                                            input_field=self.soil_moist[0])  ## m3/m3
+        self.soil_moist[1] = field_var_fill(sd_template=template,
+                                            input_field=self.soil_moist[1])  ## m3/m3
+        self.soil_satmoist[0] = field_var_fill(sd_template=template,
+                                            input_field=self.soil_satmoist[0]) ## m3/m3
+        self.soil_satmoist[1] = field_var_fill(sd_template=template,
+                                            input_field=self.soil_satmoist[1]) ## m3/m3
+        self.R_atm = field_var_fill(sd_template=template,
+                                            input_field=self.R_atm)  ## s/m
+        self.surfrunoffrate = field_var_fill(sd_template=template,
+                                            input_field=self.surfrunoffrate)  ## m/day
+        self.subrunoffrate = field_var_fill(sd_template=template,
+                                            input_field=self.subrunoffrate)  ## m/day
         self.soil_moist[self.soil_moist>self.soil_satmoist] = self.soil_satmoist[self.soil_moist>self.soil_satmoist]
         return
 
@@ -280,23 +310,23 @@ class LAND_module:
         print('LAND ENV: open env')
         #### environmental conditions
         ## soil temperature
-        self.soil_temp[0,:366] = groundtemp_datalvl1
-        self.soil_temp[0,366:] = groundtemp_datalvl1[1:]
-        self.soil_temp[1,:366] = groundtemp_datalvl2
-        self.soil_temp[1,366:] = groundtemp_datalvl2[1:]
+        self.soil_temp[0,:366] = groundtemp_datalvl1[:,self.plat1:self.plat2,:]
+        self.soil_temp[0,366:] = groundtemp_datalvl1[1:,self.plat1:self.plat2,:]
+        self.soil_temp[1,:366] = groundtemp_datalvl2[:,self.plat1:self.plat2,:]
+        self.soil_temp[1,366:] = groundtemp_datalvl2[1:,self.plat1:self.plat2,:]
         ## soil moisture and porosity
         # self.soil_moist[0,:366] = soilmoist_data
         # self.soil_moist[0,366:] = soilmoist_data[1:]
         # self.soil_moist[1,:366] = soilmoist_data
         # self.soil_moist[1,366:] = soilmoist_data[1:]
-        self.soil_moist[0,:366] = soilmoist_datalvl1
-        self.soil_moist[0,366:] = soilmoist_datalvl1[1:]
-        self.soil_moist[1,:366] = soilmoist_datalvl2
-        self.soil_moist[1,366:] = soilmoist_datalvl2[1:]
+        self.soil_moist[0,:366] = soilmoist_datalvl1[:,self.plat1:self.plat2,:]
+        self.soil_moist[0,366:] = soilmoist_datalvl1[1:,self.plat1:self.plat2,:]
+        self.soil_moist[1,:366] = soilmoist_datalvl2[:,self.plat1:self.plat2,:]
+        self.soil_moist[1,366:] = soilmoist_datalvl2[1:,self.plat1:self.plat2,:]
         self.soil_moist[self.soil_moist<0] = 0.0
         soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
         ## buld density unit: kg/dm3
-        soilbd = soilbd_ds.T_BULK_DEN.values
+        soilbd = soilbd_ds.T_BULK_DEN.values[self.plat1:self.plat2,:]
         soilporosity = 1 - (soilbd/(rho_soil/1000))
         # self.soil_satmoist[0,:366] = soilmoist_data/(persm_data/100)
         # self.soil_satmoist[0,366:] = soilmoist_data[1:]/(persm_data[1:]/100)
@@ -305,19 +335,19 @@ class LAND_module:
         self.soil_satmoist[:] = soilporosity
         self.soil_satmoist[self.soil_satmoist>1.0] = 0.99
         ## evaporation from bare soil
-        self.evap_sim[:366] = evap_data
-        self.evap_sim[366:] = evap_data[1:]
+        self.evap_sim[:366] = evap_data[:,self.plat1:self.plat2,:]
+        self.evap_sim[366:] = evap_data[1:,self.plat1:self.plat2,:]
         ## rainfall
-        self.rainfall[:366] = rain_data
-        self.rainfall[366:] = rain_data[1:]
+        self.rainfall[:366] = rain_data[:,self.plat1:self.plat2,:]
+        self.rainfall[366:] = rain_data[1:,self.plat1:self.plat2,:]
         ## convert into m/s
-        self.surfrunoffrate[:366] = runoff_data/(timestep*3600)
-        self.surfrunoffrate[366:] = runoff_data[1:]/(timestep*3600)
+        self.surfrunoffrate[:366] = runoff_data[:,self.plat1:self.plat2,:]/(timestep*3600)
+        self.surfrunoffrate[366:] = runoff_data[1:,self.plat1:self.plat2,:]/(timestep*3600)
         ## convert into m/s
-        self.subrunoffrate[:366] = subrunoff_data/(timestep*3600)
-        self.subrunoffrate[366:] = subrunoff_data[1:]/(timestep*3600)
-        self.R_atm[:366] = ram1_data+rb1_data
-        self.R_atm[366:] = ram1_data[1:]+rb1_data[1:]
+        self.subrunoffrate[:366] = subrunoff_data[:,self.plat1:self.plat2,:]/(timestep*3600)
+        self.subrunoffrate[366:] = subrunoff_data[1:,self.plat1:self.plat2,:]/(timestep*3600)
+        self.R_atm[:366] = ram1_data[:,self.plat1:self.plat2,:]+rb1_data[:,self.plat1:self.plat2,:]
+        self.R_atm[366:] = ram1_data[1:,self.plat1:self.plat2,:]+rb1_data[1:,self.plat1:self.plat2,:]
         return
 
     def spreading_time(self,fert_type='manure',
@@ -372,7 +402,7 @@ class LAND_module:
         ## determine soil pH after urea application
         if soil_pH is not None:
             # print('check pH over.')
-            self.soil_pH = soil_pH_postapp(base_pH=soil_pH,app_timing_map=N_app_mark,fert_pH=8.5)
+            self.soil_pH = soil_pH_postapp(base_pH=soil_pH,app_timing_map=N_app_mark,fert_pH=8.5)[:,self.plat1:self.plat2,:] 
             self.soil_ccH = 10**(-self.soil_pH)
         return N_app
 
@@ -430,7 +460,7 @@ class LAND_module:
 
         soilph = np.zeros(mtrx2)
         soilph[:] = soilpHds.T_PH_H2O.values
-        self.pH = soilph
+        self.pH = soilph[:,self.plat1:self.plat2,:] 
         self.cc_H = 10**(-self.pH)
 
         chem_N_tocrop = self.spreading_time(fert_type='mineral',
@@ -444,15 +474,15 @@ class LAND_module:
         ## N rate of three types of fertilizer;
         ## the fraction of usage is represented by the 
         ## fractional cropping area that uses the corresponding N fertilizer
-        self.NO3_added = chem_N_tocrop
-        self.nitN_area = fnitN * croparea
-        self.TAN_added = chem_N_tocrop
-        self.ammN_area = fammN * croparea
-        self.urea_added = chem_N_tocrop
-        self.ureaN_area = fureaN * croparea
+        self.NO3_added = chem_N_tocrop[:,self.plat1:self.plat2,:] 
+        self.nitN_area = fnitN[self.plat1:self.plat2,:]  * croparea[self.plat1:self.plat2,:] 
+        self.TAN_added = chem_N_tocrop[:,self.plat1:self.plat2,:] 
+        self.ammN_area = fammN[self.plat1:self.plat2,:]  * croparea[self.plat1:self.plat2,:] 
+        self.urea_added = chem_N_tocrop[:,self.plat1:self.plat2,:] 
+        self.ureaN_area = fureaN[self.plat1:self.plat2,:]  * croparea[self.plat1:self.plat2,:] 
 
         ## met data interpolation
-        self.met_input_interp(totalN)
+        self.met_input_interp(totalN[self.plat1:self.plat2,:])
 
         ## generate an ncfile that contains the N pathways
         if ncfile_o is True:
@@ -500,19 +530,6 @@ class LAND_module:
             outds.to_netcdf(output_path+str(crop)+'.'+str(sim_year)+'.nc',encoding=encoding)
             print("ncfile saved.")
         return 
-
-    ## determine fertilizer application depth
-    ## two basic application techniques:
-    ## 1) surface spreading (broadcasting): depth ~ 4mm (0.004m)
-    ## 2) deep injection: dpeth ~ 10cm (0.1m)
-    ## this will affect the N transport (diffusion to the surface) then affect NH3 emission
-    def app_method(self,application_method):
-        if application_method is None:
-            self.app_depth = 0.004
-        else:
-            self.app_depth = 0.1
-
-        return
 
     ## layer 0: surface source layer 2cm
     ## layer 1: topsoil layer 5cm
@@ -631,7 +648,7 @@ class LAND_module:
         print('technique used is: '+str(tech))
         soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
-        Kd = ammonium_adsorption(clay_content=soilclay)
+        Kd = ammonium_adsorption(clay_content=soilclay)[self.plat1:self.plat2,:]
 
         if chem_fert_type == 'nitrate':
             print('chemical fertilizer applied: nitrate')
@@ -653,7 +670,8 @@ class LAND_module:
         if crop is not None:
             cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
             plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
-
+            plantidx = plantidx[self.plat1:self.plat2,:]
+            harvestidx = harvestidx[self.plat1:self.plat2,:]
         sourcelayer = self.source_layer(tech)
 
         if sim != 'base':
@@ -1138,6 +1156,32 @@ class LAND_module:
                 str(chem_fert_type)+'.'+str(fert_method)+'.'+str(sim_year)+'.nc',encoding=encoding)
             print("ncfile saved.")
         return
+
+    def para_out(self,chem_fert_type):
+        if chem_fert_type == 'ammonium':
+            sim_area = self.ammN_area
+            chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
+
+        elif chem_fert_type == 'urea':
+            sim_area = self.ureaN_area
+            chemfert_Ntotal = self.land_sim_reshape(self.urea_added)*sim_area
+            
+        elif chem_fert_type == 'nitrate':
+            sim_area = self.nitN_area
+            chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area     
+
+        self.o_NH3flux = self.land_sim_reshape(self.NH3flux)*sim_area
+        self.o_washoff = self.land_sim_reshape(self.TANwashoff+self.ureawashoff)*sim_area
+        self.o_nitrif = self.land_sim_reshape(np.nansum(self.NH4nitrif,axis=0))*sim_area
+        self.o_NH4leaching = self.land_sim_reshape(self.TANinfil[-1]+self.ureainfil[-1])*sim_area
+        self.o_diffaq = self.land_sim_reshape(self.TANdiffusiondown[-1]+self.ureadiffusiondown[-1])*sim_area
+        self.o_diffgas = self.land_sim_reshape(self.NH3diffusiondown[-1])*sim_area
+        self.o_ammNuptake = self.land_sim_reshape(np.nansum(self.ammNuptake,axis=0))*sim_area
+        self.o_nitNuptake = self.land_sim_reshape(np.nansum(self.nitNuptake,axis=0))*sim_area
+        self.o_NO3washoff = self.land_sim_reshape(self.NO3washoff)*sim_area
+        self.o_NO3leaching = self.land_sim_reshape(self.NO3infil[-1])*sim_area
+        self.o_NO3diff = self.land_sim_reshape(self.NO3diffusiondown[-1])*sim_area
+
     
     def quality_check(self):
         ptest_stat = {'urea pool': 0,
@@ -1225,6 +1269,8 @@ class LAND_module:
         self.chem_fert_input(crop=crop_item)
         self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
                         sim=sim_type,stvar=senstest_var,st=senstest)
+        self.para_out(chem_fert_type)
+
         if quality_check is True:
             self.quality_check()
         if sim_stat is True:
