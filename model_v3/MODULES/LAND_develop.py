@@ -1029,7 +1029,7 @@ class LAND_module:
                     self.NO3diffusionup[ll-1,dd+1] = diffaqupidx
                     self.nitNuptake[ll-1,dd+1] = uptakeidx
                     ## update NO3 pool
-                    self.NO3_pool[ll,dd+1] = self.NO3_pool[ll,dd+1]-self.NO3infil[ll,dd]-self.NO3diffusionup[ll-1,dd+1]-\
+                    self.NO3_pool[ll,dd+1] = self.NO3_pool[ll,dd+1]-self.NO3infil[ll,dd+1]-self.NO3diffusionup[ll-1,dd+1]-\
                                                 self.NO3diffusiondown[ll,dd+1]-self.nitNuptake[ll-1,dd+1]
                     ## get rid of rounding error
                     self.NO3_pool[ll,dd+1][self.NO3_pool[ll,dd+1]<0.0] = 0.0

@@ -317,7 +317,7 @@ def TAN_nitrif(tan_pool,temp,theta,theta_sat,pH,fert_type,frac_nh4):
     return tan_nitrif
 ## calculate plant N uptake rate (to be removed from PARAMETER.py and to be put in LAND.py)
 ## Ammonium and Nitrate N in g/m2; soil C in gC
-def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
+def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.045,substrateN=0.0045):
     ## root activity weighting parameters
     v1,v2,v3,v4 = 1.0,0.5,0.25,0.1
     ## root structural dry matter components; g/m2
