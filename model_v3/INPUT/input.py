@@ -14,7 +14,7 @@ from MODULES.FUNC import *
 # infile_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/'
 # infile_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/' 
 animal_data_path = 'animal_data/'
-met_data_path = 'met_data/hourly_data'
+met_data_path = 'met_data/hourly_data/'
 crop_data_path = 'crop_data/'
 soil_data_path ='soil_data/'
 ## Open animal data files and meteorological files
