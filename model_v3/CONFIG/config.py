@@ -28,7 +28,7 @@ if (sim_year%4)==0: Days = 366
 else: Days = 365
 Hours = nhours * Days
 time = Days
-timestep = 24
+timestep = 1
 
 ## resolution; e.g. 0.5 degree
 dlat = 0.5

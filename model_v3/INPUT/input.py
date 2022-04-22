@@ -14,7 +14,7 @@ from MODULES.FUNC import *
 # infile_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/'
 # infile_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/' 
 animal_data_path = 'animal_data/'
-met_data_path = 'met_data/'
+met_data_path = 'met_data/hourly_data'
 crop_data_path = 'crop_data/'
 soil_data_path ='soil_data/'
 ## Open animal data files and meteorological files
@@ -24,37 +24,37 @@ animal_file = xr.open_dataset(infile_path+animal_data_path+animal_file_name)
 ## meteorological data in 2018: 1) temperature (2m air; ground), 2) relative humidity, 3) 10m wind speed, 4) evaporation from soil,
 ##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s)(not used) 8) rainfall (kg/m^2) 
 ##     9) aerogynamic and boundary layer resistance (s/m)
-temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-2018d-05.nc')
-groundtemp_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1temp-2018d-05.nc')
-groundtemp_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2temp-2018d-05.nc')
-rhum_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-rhum2m-2018d-05.nc')
-wind_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-wind10m-2018d-05.nc')
-evap_file = xr.open_dataset(infile_path+met_data_path+'ERA5-evapfromsoil-2018d-05.nc')
+# temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-2018d-05.nc')
+groundtemp_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1temp-2018h-05.nc')
+groundtemp_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2temp-2018h-05.nc')
+# rhum_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-rhum2m-2018d-05.nc')
+# wind_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-wind10m-2018d-05.nc')
+# evap_file = xr.open_dataset(infile_path+met_data_path+'ERA5-evapfromsoil-2018d-05.nc')
 # soilmoist_file = xr.open_dataset(infile_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
-soilmoist_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1moist-2018d-05.nc')
-soilmoist_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2moist-2018d-05.nc')
-soilsm_file = xr.open_dataset(infile_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
-rain_file = xr.open_dataset(infile_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
-ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
-runoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-srfrunoff-2018d-05.nc')
-subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-2018d-05.nc')
+soilmoist_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1moist-2018h-05.nc')
+soilmoist_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2moist-2018h-05.nc')
+# soilsm_file = xr.open_dataset(infile_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
+# rain_file = xr.open_dataset(infile_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
+ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50-RATM-2018h-05.nc')
+runoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-surfrunoff-2018h-05.nc')
+subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-2018h-05.nc')
 
-temp_data = temp_file['t2m'] - 273.15  ## degC
-groundtemp_datalvl1 = groundtemp_filelvl1['stl1'] - 273.15  ## degC
-groundtemp_datalvl2 = groundtemp_filelvl2['stl2'] - 273.15  ## degC
-rhum_data = rhum_file['Relative_Humidity_2m_06h']  ## per cent
-wind_data = wind_file['Wind_Speed_10m_Mean']  ## m/s
-evap_data = evap_file['evabs']*(-1e6)  ## g/day
-# soilmoist_data = soilmoist_file['sm']  ## m3/m3
-soilmoist_datalvl1 = soilmoist_filelvl1['swvl1']  ## m3/m3
-soilmoist_datalvl2 = soilmoist_filelvl2['swvl2']  ## m3/m3
-persm_data = soilsm_file['sm']  ## per cent
-# sshf_data = sshf_file['sshf']/(24*3600)  ## J/m2/s
-rain_data = rain_file['tcrw']*1000  ## g/m2
-ram1_data = ratm_file['RAM1']  ## s/m
-rb1_data = ratm_file['RB1']  ## s/m
-runoff_data = runoff_file['sro']  ## m/day
-subrunoff_data = subrunoff_file['ssro']  ## m/day
+# temp_data = temp_file['t2m'] - 273.15  ## degC
+# groundtemp_datalvl1 = groundtemp_filelvl1['stl1'] - 273.15  ## degC
+# groundtemp_datalvl2 = groundtemp_filelvl2['stl2'] - 273.15  ## degC
+# rhum_data = rhum_file['Relative_Humidity_2m_06h']  ## per cent
+# wind_data = wind_file['Wind_Speed_10m_Mean']  ## m/s
+# evap_data = evap_file['evabs']*(-1e6)  ## g/day
+# # soilmoist_data = soilmoist_file['sm']  ## m3/m3
+# soilmoist_datalvl1 = soilmoist_filelvl1['swvl1']  ## m3/m3
+# soilmoist_datalvl2 = soilmoist_filelvl2['swvl2']  ## m3/m3
+# persm_data = soilsm_file['sm']  ## per cent
+# # sshf_data = sshf_file['sshf']/(24*3600)  ## J/m2/s
+# rain_data = rain_file['tcrw']*1000  ## g/m2
+# ram1_data = ratm_file['RAM1']  ## s/m
+# rb1_data = ratm_file['RB1']  ## s/m
+# runoff_data = runoff_file['sro']  ## m/day
+# subrunoff_data = subrunoff_file['ssro']  ## m/day
 
 ##################################
 ## fill land input data
@@ -76,21 +76,21 @@ subrunoff_data = subrunoff_file['ssro']  ## m/day
 ###############################################
 ## insert an extra time slice to met fields
 ###############################################
-temp_data = insert_time_slice(temp_data.values)
-groundtemp_datalvl1 = insert_time_slice(groundtemp_datalvl1)
-groundtemp_datalvl2 = insert_time_slice(groundtemp_datalvl2)
-rhum_data = insert_time_slice(rhum_data)
-wind_data = insert_time_slice(wind_data)
-evap_data = insert_time_slice(evap_data)
-# soilmoist_data = insert_time_slice(soilmoist_data)
-soilmoist_datalvl1 = insert_time_slice(soilmoist_datalvl1)
-soilmoist_datalvl2 = insert_time_slice(soilmoist_datalvl2)
-persm_data = insert_time_slice(persm_data)
-rain_data = insert_time_slice(rain_data)
-ram1_data = insert_time_slice(ram1_data)
-rb1_data = insert_time_slice(rb1_data)
-runoff_data = insert_time_slice(runoff_data)
-subrunoff_data = insert_time_slice(subrunoff_data)
+# temp_data = insert_time_slice(temp_data.values)
+# groundtemp_datalvl1 = insert_time_slice(groundtemp_datalvl1)
+# groundtemp_datalvl2 = insert_time_slice(groundtemp_datalvl2)
+# rhum_data = insert_time_slice(rhum_data)
+# wind_data = insert_time_slice(wind_data)
+# evap_data = insert_time_slice(evap_data)
+# # soilmoist_data = insert_time_slice(soilmoist_data)
+# soilmoist_datalvl1 = insert_time_slice(soilmoist_datalvl1)
+# soilmoist_datalvl2 = insert_time_slice(soilmoist_datalvl2)
+# persm_data = insert_time_slice(persm_data)
+# rain_data = insert_time_slice(rain_data)
+# ram1_data = insert_time_slice(ram1_data)
+# rb1_data = insert_time_slice(rb1_data)
+# runoff_data = insert_time_slice(runoff_data)
+# subrunoff_data = insert_time_slice(subrunoff_data)
 
 #temp_file = xr.open_dataset(infile_path+met_data_path+'Regridded_airT_2010.nc')
 #rhum_file = xr.open_dataset(infile_path+met_data_path+'Regridded_rhum_2010.nc')

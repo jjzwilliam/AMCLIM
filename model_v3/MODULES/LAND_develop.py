@@ -288,15 +288,15 @@ class LAND_module:
         #### environmental conditions
         ## soil temperature
         hhidx = dayidx*24
-        # self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
-        # self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
-        self.soil_temp[0,1:] = 20
-        self.soil_temp[1,1:] = self.soil_temp[0,1:] - 2.0
+        self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
+        self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
+        # self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[dayidx,self.plat1:self.plat2,:] - 273.15
+        # self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[dayidx,self.plat1:self.plat2,:] - 273.15
 
-        # self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[hhidx:hhidx+24,self.plat1:self.plat2,:]
-        # self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[hhidx:hhidx+24,self.plat1:self.plat2,:]
-        self.soil_moist[0,1:] = 0.3
-        self.soil_moist[1,1:] = self.soil_moist[0,1:] + 0.01
+        self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[hhidx:hhidx+24,self.plat1:self.plat2,:]
+        self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[hhidx:hhidx+24,self.plat1:self.plat2,:]
+        # self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[dayidx,self.plat1:self.plat2,:]
+        # self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[dayidx,self.plat1:self.plat2,:]
         self.soil_moist[self.soil_moist<0] = 0.0
 
         soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
@@ -311,14 +311,14 @@ class LAND_module:
         ## rainfall
         # self.rainfall[1:] = rain_file.tcrw[hhidx:hhidx+24,self.plat1:self.plat2,:]*1e3
         ## convert into m/s
-        # self.surfrunoffrate[1:] = runoff_file.sro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
-        self.surfrunoffrate[1:] = 0.00000006/(timestep*3600)
+        self.surfrunoffrate[1:] = runoff_file.sro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
+        # self.surfrunoffrate[1:] = runoff_file.sro[dayidx,self.plat1:self.plat2,:]/(24*3600)
         ## convert into m/s
-        # self.subrunoffrate[1:] = subrunoff_file.ssro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
-        self.subrunoffrate[1:] = 0.000008/(timestep*3600)
+        self.subrunoffrate[1:] = subrunoff_file.ssro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
+        # self.subrunoffrate[1:] = subrunoff_file.ssro[dayidx,self.plat1:self.plat2,:]/(24*3600)
         ## atmospheric resistances
-        # self.R_atm[1:] = ram1_data[hhidx:hhidx+24,self.plat1:self.plat2,:]+rb1_data[hhidx:hhidx+24,self.plat1:self.plat2,:]
-        self.R_atm[1:] = 200 
+        self.R_atm[1:] = ratm_file.RAM1[hhidx:hhidx+24,self.plat1:self.plat2,:]+ratm_file.RB1[hhidx:hhidx+24,self.plat1:self.plat2,:]
+        # self.R_atm[1:] = ratm_file.RAM1[dayidx,self.plat1:self.plat2,:]+ratm_file.RB1[dayidx,self.plat1:self.plat2,:]
            
     
     def met_input_interp(self,template):
@@ -522,31 +522,32 @@ class LAND_module:
 
     ##
     def daily_output(self,dayidx):
-        if dayidx < Days:
+        if dayidx >= Days:
+            dayidx = dayidx - Days
             self.o_NH3flux[dayidx] = np.nansum(self.NH3flux[1:],axis=0)
             self.o_washoff[dayidx] = np.nansum(self.TANwashoff[1:]+self.ureawashoff[1:],axis=0)
             self.o_nitrif[dayidx] = np.nansum(self.NH4nitrif[:,1:],axis=(0,1))
-            self.o_NH4leaching[dayidx] = np.nansum(self.TANinfil[-1,1:]+self.ureainfil[-1,1:],axis=(0,1))
-            self.o_diffaq[dayidx] = np.nansum(self.TANdiffusiondown[-1,1:]+self.ureadiffusiondown[-1,1:],axis=(0,1))
-            self.o_diffgas[dayidx] = np.nansum(self.NH3diffusiondown[-1,1:],axis=(0,1))
+            self.o_NH4leaching[dayidx] = np.nansum(self.TANinfil[-1,1:]+self.ureainfil[-1,1:],axis=0)
+            self.o_diffaq[dayidx] = np.nansum(self.TANdiffusiondown[-1,1:]+self.ureadiffusiondown[-1,1:],axis=0)
+            self.o_diffgas[dayidx] = np.nansum(self.NH3diffusiondown[-1,1:],axis=0)
             self.o_ammNuptake[dayidx] = np.nansum(self.ammNuptake[:,1:],axis=(0,1))
             self.o_nitNuptake[dayidx] = np.nansum(self.nitNuptake[:,1:],axis=(0,1))
             self.o_NO3washoff[dayidx] = np.nansum(self.NO3washoff[1:],axis=0)
-            self.o_NO3leaching[dayidx] = np.nansum(self.NO3infil[-1,1:],axis=(0,1))
-            self.o_NO3diff[dayidx] = np.nansum(self.NO3diffusiondown[-1,1:],axis=(0,1))
-        else:
-            dayidx = dayidx - Days
-            self.o_NH3flux[dayidx] = self.o_NH3flux[dayidx] + np.nansum(self.NH3flux[1:],axis=0)
-            self.o_washoff[dayidx] = self.o_washoff[dayidx] + np.nansum(self.TANwashoff[1:]+self.ureawashoff[1:],axis=0)
-            self.o_nitrif[dayidx] = self.o_nitrif[dayidx] + np.nansum(self.NH4nitrif[:,1:],axis=(0,1))
-            self.o_NH4leaching[dayidx] = self.o_NH4leaching[dayidx] + np.nansum(self.TANinfil[-1,1:]+self.ureainfil[-1,1:],axis=(0,1))
-            self.o_diffaq[dayidx] = self.o_diffaq[dayidx] + np.nansum(self.TANdiffusiondown[-1,1:]+self.ureadiffusiondown[-1,1:],axis=(0,1))
-            self.o_diffgas[dayidx] = self.o_diffgas[dayidx] + np.nansum(self.NH3diffusiondown[-1,1:],axis=(0,1))
-            self.o_ammNuptake[dayidx] = self.o_ammNuptake[dayidx] + np.nansum(self.ammNuptake[:,1:],axis=(0,1))
-            self.o_nitNuptake[dayidx] = self.o_nitNuptake[dayidx] + np.nansum(self.nitNuptake[:,1:],axis=(0,1))
-            self.o_NO3washoff[dayidx] = self.o_NO3washoff[dayidx] + np.nansum(self.NO3washoff[1:],axis=0)
-            self.o_NO3leaching[dayidx] = self.o_NO3leaching[dayidx] + np.nansum(self.NO3infil[-1,1:],axis=(0,1))
-            self.o_NO3diff[dayidx] = self.o_NO3diff[dayidx] + np.nansum(self.NO3diffusiondown[-1,1:],axis=(0,1))
+            self.o_NO3leaching[dayidx] = np.nansum(self.NO3infil[-1,1:],axis=0)
+            self.o_NO3diff[dayidx] = np.nansum(self.NO3diffusiondown[-1,1:],axis=0)
+        # else:
+        #     dayidx = dayidx - Days
+        #     self.o_NH3flux[dayidx] = self.o_NH3flux[dayidx] + np.nansum(self.NH3flux[1:],axis=0)
+        #     self.o_washoff[dayidx] = self.o_washoff[dayidx] + np.nansum(self.TANwashoff[1:]+self.ureawashoff[1:],axis=0)
+        #     self.o_nitrif[dayidx] = self.o_nitrif[dayidx] + np.nansum(self.NH4nitrif[:,1:],axis=(0,1))
+        #     self.o_NH4leaching[dayidx] = self.o_NH4leaching[dayidx] + np.nansum(self.TANinfil[-1,1:]+self.ureainfil[-1,1:],axis=(0,1))
+        #     self.o_diffaq[dayidx] = self.o_diffaq[dayidx] + np.nansum(self.TANdiffusiondown[-1,1:]+self.ureadiffusiondown[-1,1:],axis=(0,1))
+        #     self.o_diffgas[dayidx] = self.o_diffgas[dayidx] + np.nansum(self.NH3diffusiondown[-1,1:],axis=(0,1))
+        #     self.o_ammNuptake[dayidx] = self.o_ammNuptake[dayidx] + np.nansum(self.ammNuptake[:,1:],axis=(0,1))
+        #     self.o_nitNuptake[dayidx] = self.o_nitNuptake[dayidx] + np.nansum(self.nitNuptake[:,1:],axis=(0,1))
+        #     self.o_NO3washoff[dayidx] = self.o_NO3washoff[dayidx] + np.nansum(self.NO3washoff[1:],axis=0)
+        #     self.o_NO3leaching[dayidx] = self.o_NO3leaching[dayidx] + np.nansum(self.NO3infil[-1,1:],axis=(0,1))
+        #     self.o_NO3diff[dayidx] = self.o_NO3diff[dayidx] + np.nansum(self.NO3diffusiondown[-1,1:],axis=(0,1))
         return
 
     ## sensitivity tests
@@ -745,11 +746,15 @@ class LAND_module:
                             self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],
                                                                         theta=self.soil_moist[llidx,hh+1])
                             ## urea concentration at the compensation point
-                            ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
+                            ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,
+                                                            qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))
+                            # ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                             ## determine the potential of each flux
                             ureawashoffidx = surf_runoff(N_surfcnc=ureasurfamount,
+                                                        # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600
                                                          qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600
                             ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
+                                                            # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                             qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600
                             ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
                                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600
@@ -780,6 +785,7 @@ class LAND_module:
                             ## determine the potential of each flux
                             ureawashoffidx = False
                             ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
+                                                            # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                             qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600
                             ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
                                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600
@@ -809,6 +815,7 @@ class LAND_module:
                             ## determine the potential of each flux
                             ureawashoffidx = False
                             ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
+                                                            # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                             qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600
                             ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=0.0,
                                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600
@@ -851,14 +858,17 @@ class LAND_module:
                                                 theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.soil_moist[llidx,hh+1])
                         ## TAN concentration at the compensation surface
                         TANsurfamount = surf_TAN_cnc(tan_cnc=self.TAN_amount[ll,hh+1],rliq=Rdiffsrfaq,rgas=Rdiffsrfgas,
-                                            knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=self.surfrunoffrate[hh+1])
+                                            knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))
+                                            # knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=self.surfrunoffrate[hh+1])
                         NH3surfamount = TANsurfamount*KNH3
                         ## determining the potential of each flux
                         emissidx = NH3_vol(nh3_surfcnc=NH3surfamount,ratm=self.R_atm[hh+1])*timestep*3600  ## NH3 volatlization
                         TANwashoffidx = surf_runoff(N_surfcnc=TANsurfamount,
+                                                    # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600 
                                                     qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600  ## TAN washoff
                         TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
-                                                            qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
+                                                        # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
+                                                        qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
                         TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
                         TANdiffaqdownidx[self.soil_moist[llidx,hh+1]==0]=0.0
@@ -901,6 +911,7 @@ class LAND_module:
                                                 theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.soil_moist[llidx,hh+1])
                         ## determining the potential of each flux
                         TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                            # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                             qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
                         TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
@@ -952,6 +963,7 @@ class LAND_module:
                                                 theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.soil_moist[llidx,hh+1])
                         ## determining the potential of each flux
                         TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                            # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                             qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
                         TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=0,
                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
@@ -991,11 +1003,15 @@ class LAND_module:
                         ## NO3 concentration
                         self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.soil_moist[llidx,hh+1])
                         ## NO3 concentration at the compensation surface
-                        NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
+                        NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,
+                                                qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))
+                        # NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                         ## determining the potential of each flux
                         NO3washoffidx = surf_runoff(N_surfcnc=NO3surfamount,
-                                                    qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600  ## NO3 washoff
+                                                    qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600
+                                                    # qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600  ## NO3 washoff
                         NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                        qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## NO3 leaching
                         NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
@@ -1016,10 +1032,9 @@ class LAND_module:
                                                     self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
                         ## NO3 concentration
                         self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.soil_moist[llidx,hh+1])
-                        ## NO3 concentration at the compensation surface
-                        NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                         ## determining the potential of each flux
                         NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600 
                                                        qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## NO3 leaching
                         NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
@@ -1045,10 +1060,9 @@ class LAND_module:
                                                     self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
                         ## NO3 concentration
                         self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.soil_moist[llidx,hh+1])
-                        ## NO3 concentration at the compensation surface
-                        NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                         ## determining the potential of each flux
                         NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
                                                        qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## NO3 leaching
                         NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=0,
                                             resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
@@ -1072,18 +1086,25 @@ class LAND_module:
             self.daily_init()            
         return
 
-    def para_out(self,chem_fert_type):
+    def land_sim_reshape(self,sim_result):
+        shape = sim_result.shape
+        dim1 = int((shape[0]-1)/2+1)
+        output = np.zeros([dim1,shape[1],shape[2]])
+        output = sim_result[1:dim1]+sim_result[dim1:]
+        return output
+
+    def para_out(self,chem_fert_type,output_stat=False,quality_check=False):
+
         if chem_fert_type == 'ammonium':
             sim_area = self.ammN_area
-            print(np.nansum(sim_area*self.TAN_added)/1e9, ' GgN applied')
+            chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
         elif chem_fert_type == 'urea':
             sim_area = self.ureaN_area
-            print(np.nansum(sim_area*self.urea_added)/1e9, ' GgN applied')
-            
+            chemfert_Ntotal = self.land_sim_reshape(self.urea_added)*sim_area
         elif chem_fert_type == 'nitrate':
             sim_area = self.nitN_area
-            print(np.nansum(sim_area*self.NO3_added)/1e9, ' GgN applied')
-        
+            chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area   
+
         self.o_NH3flux = self.o_NH3flux*sim_area
         self.o_washoff = self.o_washoff*sim_area
         self.o_nitrif = self.o_nitrif*sim_area
@@ -1095,11 +1116,31 @@ class LAND_module:
         self.o_NO3washoff = self.o_NO3washoff*sim_area
         self.o_NO3leaching = self.o_NO3leaching*sim_area
         self.o_NO3diff = self.o_NO3diff*sim_area
+
+        if output_stat is True:
+            print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal))+' Gg')
+            print('NH3 emission: '+str(sum_totalGg(self.o_NH3flux))+' Gg')
+            print('TAN washoff: '+str(sum_totalGg(self.o_washoff))+' Gg')
+            print('NH4 nitrification: '+str(sum_totalGg(self.o_nitrif))+' Gg')
+            print('NH4 leaching: '+str(sum_totalGg(self.o_NH4leaching))+' Gg')
+            print('TAN diffusion (aq) to deeper soil: '+ str(sum_totalGg(self.o_diffaq))+' Gg')
+            print('NH3 diffusion (gas) to deeper soil: '+ str(sum_totalGg(self.o_diffgas))+' Gg')
+            print('NH4 uptake by plants: '+ str(sum_totalGg(self.o_ammNuptake))+' Gg')
+            print('NO3 uptake by plants: '+ str(sum_totalGg(self.o_nitNuptake))+' Gg')
+            print('NO3 washoff: '+str(sum_totalGg(self.o_NO3washoff))+' Gg')
+            print('NO3 leaching: '+ str(sum_totalGg(self.o_NO3leaching))+' Gg')
+            print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(self.o_NO3diff))+' Gg')
+
+        if quality_check is True:
+            check = chemfert_Ntotal-self.o_NH3flux-self.o_washoff-self.o_nitrif-self.o_NH4leaching-\
+                    self.o_diffaq-self.o_diffgas-self.o_ammNuptake
+            result = np.round(sum_totalGg(check)/sum_totalGg(chemfert_Ntotal)*100,decimals=3)
+            print("Integrity check result: "+str(result)+' %')        
     
     def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,
-                sim_type='base',senstest_var=False,senstest=False):
+                sim_type='base',senstest_var=False,senstest=False,output_stat=False,quality_check=False):
         self.chem_fert_input(crop=crop_item)
         self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
                         sim=sim_type,stvar=senstest_var,st=senstest)
-        self.para_out(chem_fert_type)
+        self.para_out(chem_fert_type,output_stat,quality_check)
         return
