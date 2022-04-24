@@ -707,6 +707,10 @@ class LAND_module:
                             theta_sat=self.soil_satmoist[0,hh+1],theta=self.soil_moist[0,hh+1],temp=self.soil_temp[0,hh+1])
                 Rdiffsrfgas = diff_resistance(distance=pmids[0],phase='gaseous',
                             theta_sat=self.soil_satmoist[0,hh+1],theta=self.soil_moist[0,hh+1],temp=self.soil_temp[0,hh+1])
+                surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                surfrunoffrate[surfrunoffrate<0] = 0.0
+                subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                subrunoffrate[subrunoffrate<0] = 0.0
                 for ll in np.arange(3):
                     ## lldix: index for soil temp, moisture
                     llidx = int(np.floor(ll/2))
@@ -746,15 +750,15 @@ class LAND_module:
                                                                         theta=self.soil_moist[llidx,hh+1])
                             ## urea concentration at the compensation point
                             ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,
-                                                            qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))
+                                                            qrunoff=surfrunoffrate)
                             # ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                             ## determine the potential of each flux
                             ureawashoffidx = surf_runoff(N_surfcnc=ureasurfamount,
                                                         # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600
-                                                         qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600
+                                                         qrunoff=surfrunoffrate)*timestep*3600
                             ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
                                                             # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                            qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600
+                                                            qsubrunoff=subrunoffrate)*timestep*3600
                             ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
                                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600
                             ureadiffupidx = False
@@ -779,13 +783,11 @@ class LAND_module:
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
                             ## urea concentration
                             self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.soil_moist[llidx,hh+1])
-                            ## urea concentration at the compensation point
-                            ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                             ## determine the potential of each flux
                             ureawashoffidx = False
                             ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
                                                             # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                            qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600
+                                                            qsubrunoff=subrunoffrate)*timestep*3600
                             ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
                                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600
                             ureadiffupidx = N_diffusion(cnc1=self.urea_amount[ll,hh],cnc2=self.urea_amount[ll-1,hh+1],
@@ -809,13 +811,11 @@ class LAND_module:
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
                             ## urea concentration
                             self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.soil_moist[llidx,hh+1])
-                            ## urea concentration at the compensation point
-                            ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                             ## determine the potential of each flux
                             ureawashoffidx = False
                             ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
                                                             # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                            qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600
+                                                            qsubrunoff=subrunoffrate)*timestep*3600
                             ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=0.0,
                                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600
                             ureadiffupidx = N_diffusion(cnc1=self.urea_amount[ll,hh],cnc2=self.urea_amount[ll-1,hh+1],
@@ -857,17 +857,17 @@ class LAND_module:
                                                 theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.soil_moist[llidx,hh+1])
                         ## TAN concentration at the compensation surface
                         TANsurfamount = surf_TAN_cnc(tan_cnc=self.TAN_amount[ll,hh+1],rliq=Rdiffsrfaq,rgas=Rdiffsrfgas,
-                                            knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))
+                                            knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=surfrunoffrate)
                                             # knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=self.surfrunoffrate[hh+1])
                         NH3surfamount = TANsurfamount*KNH3
                         ## determining the potential of each flux
                         emissidx = NH3_vol(nh3_surfcnc=NH3surfamount,ratm=self.R_atm[hh+1])*timestep*3600  ## NH3 volatlization
                         TANwashoffidx = surf_runoff(N_surfcnc=TANsurfamount,
                                                     # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600 
-                                                    qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600  ## TAN washoff
+                                                    qrunoff=surfrunoffrate)*timestep*3600  ## TAN washoff
                         TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
                                                         # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                        qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
+                                                        qsubrunoff=subrunoffrate)*timestep*3600  ## TAN infiltration/leaching
                         TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
                         TANdiffaqdownidx[self.soil_moist[llidx,hh+1]==0]=0.0
@@ -911,7 +911,7 @@ class LAND_module:
                         ## determining the potential of each flux
                         TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
                                                             # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                            qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
+                                                            qsubrunoff=subrunoffrate)*timestep*3600  ## TAN infiltration/leaching
                         TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
                         TANdiffaqdownidx[self.soil_moist[llidx,hh+1]==0]=0.0
@@ -963,7 +963,7 @@ class LAND_module:
                         ## determining the potential of each flux
                         TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
                                                             # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                            qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## TAN infiltration/leaching
+                                                            qsubrunoff=subrunoffrate)*timestep*3600  ## TAN infiltration/leaching
                         TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=0,
                                             resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
                         TANdiffaqdownidx[self.soil_moist[llidx,hh+1]==0]=0.0
@@ -1003,15 +1003,15 @@ class LAND_module:
                         self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.soil_moist[llidx,hh+1])
                         ## NO3 concentration at the compensation surface
                         NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,
-                                                qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))
+                                                qrunoff=surfrunoffrate)
                         # NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
                         ## determining the potential of each flux
                         NO3washoffidx = surf_runoff(N_surfcnc=NO3surfamount,
-                                                    qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600
-                                                    # qrunoff=(self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]))*timestep*3600  ## NO3 washoff
+                                                    # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600
+                                                    qrunoff=surfrunoffrate)*timestep*3600  ## NO3 washoff
                         NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
                                                         # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                       qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## NO3 leaching
+                                                       qsubrunoff=subrunoffrate)*timestep*3600  ## NO3 leaching
                         NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                         NO3diffupidx = False
@@ -1034,7 +1034,7 @@ class LAND_module:
                         ## determining the potential of each flux
                         NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
                                                         # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600 
-                                                       qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## NO3 leaching
+                                                       qsubrunoff=subrunoffrate)*timestep*3600  ## NO3 leaching
                         NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
                                             resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                         NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
@@ -1062,7 +1062,7 @@ class LAND_module:
                         ## determining the potential of each flux
                         NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
                                                         # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                       qsubrunoff=(self.subrunoffrate[hh+1]-self.subrunoffrate[hh]))*timestep*3600  ## NO3 leaching
+                                                       qsubrunoff=subrunoffrate)*timestep*3600  ## NO3 leaching
                         NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=0,
                                             resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                         NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
