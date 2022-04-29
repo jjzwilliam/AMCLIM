@@ -114,11 +114,12 @@ def ua_hydrolysis_rate(temp,rhum,ph):
 #     ## WFPS is water-filled porosity, i.e. in this simulation, is the moisture content of manure for housing
 #     ## it remains unclear of k_h and WFPS
 #     ## k_h = 1.2 * WFPS
-def urea_hydrolysis_rate(temp,delta_t,k_h=0.23): 
+def urea_hydrolysis_rate(temp,delta_t,theta,k_h=0.23): 
     ## DEFAULT:k_h equals 0.23 per hour at 20 degC; Goh and Sherlock, 1985; Muck, 1981;
     ## Ah_t is a temeprature scaling factor for k_h; temperature dependence Q10 is ~2. 
     Ah_t = 0.25 * np.exp(0.0693*temp)
-    hydrolysis_rate = 1 - np.exp((-k_h*delta_t)*Ah_t)  
+    hydrolysis_rate = 1 - np.exp((-k_h*theta*delta_t)*Ah_t)  
+    hydrolysis_rate[np.isnan(hydrolysis_rate)] = 0.0
     return hydrolysis_rate
 ## EMPIRICAL - rate: TAN production from the decompostion of N_avail and N_resist; temp in degC
 ## ref: Vigil and Kissel (1995)

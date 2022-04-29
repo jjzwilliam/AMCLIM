@@ -742,7 +742,7 @@ class LAND_module:
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]
                             ## urea hydrolysis
                             self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                        delta_t=timestep,k_h=0.03)
+                                                                                                        theta=self.soil_moist[llidx,hh+1],delta_t=timestep,k_h=0.03)
                             ## subtracting chemical losses
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
                             ## urea concentration
@@ -778,7 +778,7 @@ class LAND_module:
                                                         self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
                             ## urea hydrolysis
                             self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                        delta_t=timestep,k_h=0.03)
+                                                                                        theta=self.soil_moist[llidx,hh+1],delta_t=timestep,k_h=0.03)
                             ## subtracting chemical losses
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
                             ## urea concentration
@@ -806,7 +806,7 @@ class LAND_module:
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
                             ## urea hydrolysis
                             self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                        delta_t=timestep,k_h=0.03)
+                                                                                        theta=self.soil_moist[llidx,hh+1],delta_t=timestep,k_h=0.03)
                             ## subtracting chemical losses
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
                             ## urea concentration
