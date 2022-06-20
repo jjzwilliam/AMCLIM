@@ -78,19 +78,22 @@ def barn_env(temp,wind):
     temp = np.array(temp)
     wind = np.array(wind)
     t_barn = np.zeros(temp.shape)
+    t_gnd = np.zeros(temp.shape)
     u_barn = np.zeros(wind.shape)
     
     Gnd_temp = 4.0
     tempdiff = 4.0
     temp_idx = Gnd_temp - tempdiff  
-    t_barn[temp<=temp_idx] = Gnd_temp
-    t_barn[temp>temp_idx] = temp[temp>temp_idx] + tempdiff
+    t_gnd[temp<=temp_idx] = Gnd_temp
+    t_gnd[temp>temp_idx] = temp[temp>temp_idx] + tempdiff
+    t_barn = temp + 3.0
+    # t_gnd = temp + 0.6*(20-temp)
     
     blocking_factor1 = 0.2
     blocking_factor2 = 0.8
     u_barn[temp<=temp_idx] = (1-blocking_factor1)*wind[temp<=temp_idx]
     u_barn[temp>temp_idx] = (1-blocking_factor2)*wind[temp>temp_idx]
-    return t_barn, u_barn
+    return t_barn, t_gnd, u_barn
 
 ####################
 ## Reaction rates
@@ -278,13 +281,21 @@ def diffusivity_NH4(temp,phase):
         d_nh4 = 9.8e-10*1.03**temp
     elif phase == 'gaseous':
         temp = temp + 273.15
-        d_nh4 = (1e-7*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+        d_nh4 = (1e-7*(temp)**1.75*(1/M_air+1/M_NH3)**
                  0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
     return d_nh4
 
 #######################
 ## Fluxes/Pathways
 #######################
+## NH3 release from the slat
+def NH3_volslat(slat_conc,conc_in,Rslat):
+    NH3flux = (slat_conc-conc_in)/Rslat
+    return NH3flux
+## NH3 release from the pit
+def NH3_volpit(pit_tanconc,conc_in,Rpit):
+    NH3flux = (pit_tanconc-conc_in)/Rpit
+    return NH3flux
 ## calculate flux: NH3 volatilization (g/m2/s)
 ## tan_surfcnc in g/m3, ratm in s/m
 def NH3_vol(nh3_surfcnc,ratm,nh3_atmcnc=0.0):
@@ -450,31 +461,22 @@ def water_evap_a(temp,rhum,u,zo):
     # evap = evap*1000*3600*24
     return evap
 ## EMPIRICAL - mass tranfer coefficient for NH4 in liquid boundary layer
-## wind at 8m in m/s; temp in deg C
-def k_aq_NH4(wind_8m,temp):
+## temp in deg C
+def k_aq_NH4(temp):
     temp = temp + 273.15
-    ## cm/h
-    k_aq0 = 0.6034*np.exp(0.2361*wind_8m)
-    d_aq_nh4 = 6.14526e-15*temp/(np.exp(1622/temp-12.40581))
-    d_aq_O2 = 7.28236e-15*temp/(np.exp(1622/temp-12.40581))
-    kL = k_aq0*((d_aq_nh4/d_aq_O2)**0.57)/3.6e5
-    return kL
+    kl = 1.417*1e-12*(temp**4)
+    return kl
 ## EMPIRICAL - mass transfer coefficient for NH3 in gas boudnary layer
-def k_gas_NH3(wind_8m,temp):
-    temp = temp + 273.15
-    ## cm/h
-    k_gas0 = 18.568 + 703.61 * wind_8m
-    d_gas_NH3 = (1e-7*(temp)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
-                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
-    d_gas_H2O = (1e-7*(temp)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
-                 0.5)/(1.0*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
-    ## m/s
-    kG = k_gas0 *((d_gas_NH3/d_gas_H2O)**0.67)/3.6e5
-    return kG
+def k_gas_NH3(temp,u,Z,zo):
+    k = 0.41
+    Sc = Sc_num(temp)
+    ustar = k*u/(np.log(Z/zo))
+    kg = 0.001+0.0462*ustar*(Sc**(-0.67))
+    return kg
 ## calculate resistance for diffusion of aq,gas TAN
 ## for NO3-, a correction must be applied (after calling this function)
 def diff_resistance(distance,phase,theta_sat,theta,temp):
-    f_soil = soil_tuotorsity(theta_sat,theta,phase)
+    f_soil = soil_tortuosity(theta_sat,theta,phase)
     diff_val = diffusivity_NH4(temp,phase)
     rdiff = distance/(f_soil*diff_val)
     return rdiff
@@ -497,35 +499,12 @@ def resistance_water_air(temp,rhum,evap_flux):
     sigma_v_H2O = 12.7
     ## pressure in the atmoshpere in pa
     Pressure = 101.3 * 1e3
-    # D_air_NH3 = (1e-7*(T)**1.75*((M_air+M_NH3)/M_air*M_NH3)**
+    # D_air_NH3 = (1e-7*(T)**1.75*(1/M_air+1/M_NH3)**
     #              0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_NH3**(1/3))**2)
-    # D_air_H2O = (1e-7*(T)**1.75*((M_air+M_H2O)/M_air*M_H2O)**
+    # D_air_H2O = (1e-7*(T)**1.75*(1/M_air+1/M_NH3)**
     #              0.5)/(Pressure*(sigma_v_air**(1/3)+sigma_v_H2O**(1/3))**2)
     Rc = (rho_air/rho_water)*((Q_sat-Q_atm)/evap_flux)
     return Rc
-## resistance: resistance for manure in houses and in storage; temp in degC, u in m/s
-##              also return corresponding evaporation
-def resistance_manure(temp, u, rhum):
-    ## converting degC to Kelvin
-    T = temp + 273.15
-    ## avoid dividing zero
-    u = np.array(u)
-    u[u<=0] = 1e-5
-    u[np.isnan(u)] = 1e-5
-    # resistance with no crust; m/day; Pinder et al., 2004; probability > 0.3
-    # we assumed that this corresponds to T = 25, u = 0.1 m/s (low ventilaiton), R = 0.04 day/m ~ 3400 s/m
-    r_standard = 0.04
-    ## mass transfer coefficient = A*V^0.8*T^(-1.4); A is a parameterised constant; Muck & Steenhius, 1982;
-    a = 0.8
-    b = -1.4
-    T_correction = T**b/(298.15**b)
-    u_correction = u**a/(0.1**a)
-    r_correct = r_standard/(T_correction*u_correction)
-    r_ab_star = r_correct*24*3600
-    Q_sat, Q_atm, e_sat, e_vp = humidity_measures(temp, rhum)
-    ## evap flux in m/s (1000 kg/m^2/s)
-    evap_flux = (rho_air/rho_water)*((Q_sat-Q_atm)/r_ab_star)
-    return r_ab_star, evap_flux
 ## resistance: resistance for aerodynamic and boundary layer resistance; 
 ## temp in degC; rhum in %; u in m/s; H is sensible heat flux in J/(m^2 s); Z is reference height in m; zo is surface roughness in m 
 def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
@@ -585,6 +564,23 @@ def resistance_aero_boundary(temp,rhum,u,H,Z,zo):
 def wind_profile(uref,height_ref,height_out,zo):
     uout = uref*(np.log(height_out/zo)/np.log(height_ref/zo))
     return uout   
+## Reynold's number
+def Re_num(temp,u,Z,zo):
+    k=0.41
+    ## friction velocity m/s
+    ustar = k*u/(np.log(Z/zo))
+    ## kinematic viscosity of air; m2/s
+    v = 1.56e-5*((temp+273.15)/298.15)**(3/2)
+    Re = ustar*zo/v
+    return Re
+## Schmidt number
+def Sc_num(temp):
+    ## diffusivity of NH3 in the air
+    DNH3 = diffusivity_NH4(temp,phase="gaseous")
+    ## kinematic viscosity of air; m2/s
+    v = 1.56e-5*((temp+273.15)/298.15)**(3/2)
+    Sc = v/DNH3
+    return Sc
 
 #######################################
 ## Soil properties/characteristics
@@ -592,12 +588,14 @@ def wind_profile(uref,height_ref,height_out,zo):
 ## soil characteristics: tortuosity for diffusion
 ## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
 ## theta in m3/m3
-def soil_tuotorsity(theta_sat,theta,phase):
+def soil_tortuosity(theta_sat,theta,phase):
     ## soil tuotorsity in aqueous phase and gaeous phase (Millington and Quirk, 1961)
+    ## implementing parameter tuning 
+    F_correct = 0.85
     if phase == 'aqueous':
-        soil_tor = ((theta)**(10/3))/(theta_sat**2)
+        soil_tor = (((theta)**(10/3))/(theta_sat**2))**F_correct
     elif phase == 'gaseous':
-        soil_tor = ((theta_sat-theta)**(10/3))/(theta_sat**2)
+        soil_tor = (((theta_sat-theta)**(10/3))/(theta_sat**2))*F_correct
     return soil_tor
 ## soil characteristics: infiltration rate (m/s) - empirical method 
 ## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
@@ -659,16 +657,21 @@ def manure_properties(solidmass,watermass):
     vtotal = solidmass/(manure_BD*1e3)
     ## gravimetric water content of manure
     theta_g = watermass/solidmass
+    theta_g[np.isnan(theta_g)] = 0.0
     ## volumetric water content
     theta_v = theta_g*manure_BD/rho_water
     ## WFPS: volumetric water content/porosity
     WFPS = theta_v/manure_porosity
     return vtotal,theta_v,WFPS
+## manure minimum moisture
+def min_manurewc(temp,rhum):
+    mois_coeff = (-np.log(1.01-(rhum/100))/(0.0000534*(temp+273)))**(1/1.41)
+    return mois_coeff/100
 ## aniaml info: waste N should be consistent to livestock_N
 ## unit in kg N per head per year; returning daily values
 def livestock_waste_info(livestock_type, waste_N):
     ## daily N excretion from urine and feces
-    dN = 1000*waste_N/365
+    dN = 1000*waste_N/(365*24)
     N_durine = dN * frac_N[livestock_type]['urine_N']
     N_durea = N_durine * frac_urea[livestock_type]
     N_ddung = dN * frac_N[livestock_type]['dung_N']
@@ -694,7 +697,7 @@ m_DM = defaultdict(dict)
 solid_m_DM = defaultdict(dict)
 rho_m = defaultdict(dict)
 pH_info = defaultdict(dict)
-name = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
+name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 ## regions include: 1)North America, 2)Western Europe, 3) Eastern Europe, 4)Oceania, 5)Latin America, 6)Africa
 ##                  7) Middle East, 8)Asia, 9) India
 region = ['NA','WE','EE','OC','LA','AF','ME','AS','IN']
@@ -726,7 +729,7 @@ N_rates =[[0.29,0.31,0.32,0.44,0.35,0.59,0.74,0.34],
           [0.83,0.83,0.82,0.82,0.82,0.82,0.82,0.82],
           [0.32,0.32,0.32,0.32,0.32,0.32,0.32,0.32]]
 ## livestock stocking density in animal houses (needs to be updated)
-name = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
+name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 den_stock = [200.0, 200.0, 200.0, 120.0, 120.0, 60.0, 100.0, 100.0, 30.0, 200.0]
 ## fraction of urine N and dung N; proportion
 f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
@@ -765,7 +768,43 @@ for ii in np.arange(10):
         m_DM[name[ii]] = f_DM[ii]
         solid_m_DM[name[ii]] = f_solid_DM[ii]
         rho_m[name[ii]] = rho_manure[ii]
-        pH_info[name[ii]] = pH_val[ii] 
+        pH_info[name[ii]] = pH_val[ii]
+
+
+##############################
+## Manure Management Systems
+##############################
+## provisional MMS categories
+## loss (untraceable): fishpond, discahrge, public sewage
+loss_list = ['fishpond','discharge','publsewage','dumping']
+## sold (untraceable): sold
+sold_list = ['sold']
+## Cat I.D: no significant emission; used as fuel: biogas(digester,liquid), burned (solid)
+MMS_fuel_list = ['mmsbiogas','mmsburned']
+## Cat I.C.1: N mostly preserved for further use (as solid): thermal drying 
+MMS_preserve_solid_list = ['mmsthermal']
+## Cat I.C.2: N mostly preserved for further use (as liquid), e.g., manure stored in liquid phase with emission mitigation measures: lagoon (typically with cover), liquid crust
+MMS_preserve_liquid_list = ['mmsliqcrust']
+## Cat I.A.1: manure stored in barns (as solid): composting, deep litter, litter (poultry), no litter (poultry), pit (layer),solid storage (inc. ot)
+MMS_indoor_solid_list = ['mmscompost','mmssolid','mmsolidot']
+##  Cat I.A.2: manure stored in barns (as liquid): aerobic processing, liquid, pit1, pit2
+MMS_indoor_liquid_list = ['mmslagoon']
+## Cat I.B.1: manure in open/outdoor environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
+MMS_outdoor_solid_list = ['mmsconfin','mmsdrylot','mmspasture','mmspastpad']
+## Cat I.B.2: manure in open/ooutdoor environment (as liquid): aerobic lagoon, liquid
+MMS_outdoor_liquid_list = ['mmsaerproc','mmsliquid','mmsliqoth']
+## Cat I.B.3: manure in open environment (as liquid): aerobic lagoon, liquid
+MMS_outdoor_lagoon_list = ['mmsaerobic']
+
+## MMS for housing module (in-situ storage of manure in animal houses)
+## Cat II.A.1: in-situ storage of manure (as solid)
+MMS_house_storage_solid_list = ['mmsdeeplitt','mmslitter','mmsnolitt'] 
+## Cat II.A.2: in-situ storgate of manure (as liquid)
+MMS_house_storage_liquid_list = ['mmspit1','mmspit2']
+
+## MMS for land module
+## Cat III
+MMS_land_spread_list = ['mmsdaily']
 
 ############################
 ## model variables

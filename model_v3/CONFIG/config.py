@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ## specify machine: STREAM, JASMIN, ARCHER
-machine = ''
+machine = 'STREAM'
 
 inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
@@ -55,37 +55,65 @@ Months_days = [31,28,31,30,31,30,31,31,30,31,30,31]
 Months_idx = [1,32,60,91,121,152,182,213,244,274,305,335,366]
 
 ## specify livestock type and production sytem
-## livestock_list = ['CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
-livestock = 'PIG'
-animal_file_dict = {
-        'PIG':'Pig_FAO_Gleam_new.nc',
-        'CATTLE':'',
-        'POULTRY':''
-        }
-animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
+## livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
+livestock = 'BEEF_CATTLE'
+
 ## level index: 
 ## PIG: industrial-0; intermediate-1, backyard-2
-lvl_idx = 2
+## BEEF: grassland-0; mixed-1
+## DAIRY: grassland-0; mixed-1
+## OTHER CATTLE: grassland-0; mixed-1
+## SHEEP: grassland-0; mixed-1
+## POULTRY: broiler-0, layer-1, backyard-2
+lvl_idx = 1
 production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
-        'CATTLE':[],
+        'BEEF_CATTLE':['grassland','mixed',None],
+        'DAIRY_CATTLE':['grassland','mixed',None],
+        'OTHER_CATTLE':['grassland','mixed',None],
+        'SHEEP':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
 production_system = production_system_dict[livestock][lvl_idx]
 ## housing_system: 1. insulated building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
 ## housing_system_list = ['slat/pit house','barn','poultry_house','bck_poultry']
 housing_system_dict = {
-        'PIG':['slat/pit house','barn','barn'],
-        'CATTLE':[],
+        'PIG':['insulated','naturally ventilated','naturally ventilated'],
+        'BEEF_CATTLE':[None,'naturally ventilated',None],
+        'DAIRY_CATTLE':[None,'naturally ventilated',None],
+        'OTHER_CATTLE':[None,'naturally ventilated',None],
+        'SHEEP':[None,'naturally ventilated',None],
         'POULTRY':['poultry_house','poultry_house','bck_poultry']
         }
 housing_system = housing_system_dict[livestock][lvl_idx]
-## MMS_type: ind, med, bck
+
+animal_file_dict = {
+        'PIG':'piginfo_faogleam.nc',
+        'BEEF_CATTLE':'beefinfo_faogleam.nc',
+        'DAIRY_CATTLE':'dairyinfo_faogleam.nc',
+        'OTHER_CATTLE':'otherdairyinfo_faogleam.nc',
+        'SHEEP':'sheepinfo_faogleam.nc',
+        'POULTRY':'chickeninfo_faogleam.nc'
+        }
+animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
+
+MMS_file_dict = {
+        'PIG':'pigmms_faogleam.nc',
+        'BEEF_CATTLE':'beefmms_faogleam.nc',
+        'DAIRY_CATTLE':'dairymms_faogleam.nc',
+        'OTHER_CATTLE':'otherdairymms_faogleam.nc',
+        'SHEEP':'sheepmms_faogleam.nc',
+        'POULTRY':'chickenmms_faogleam.nc'
+        }
+# MMS_file_name ='ind_MMS.nc'                           ## input files should be put in AMCLIM/INPUT/
+MMS_file_name = MMS_file_dict[livestock]
+
 MMS_type_dict = {
         'PIG':['ind','med','bck'],
-        'CATTLE':[],
-        'POULTRY':['bro','lay','bck']
+        'BEEF_CATTLE':['grassland','mixed',None],
+        'DAIRY_CATTLE':['grassland','mixed',None],
+        'OTHER_CATTLE':['grassland','mixed',None],
+        'SHEEP':['grassland','mixed',None],
+        'POULTRY':['broiler','layer','backyard']
         }
 MMS_type = MMS_type_dict[livestock][lvl_idx]
-# MMS_file_dict = {}
-MMS_file_name ='ind_MMS.nc'                           ## input files should be put in AMCLIM/INPUT/
