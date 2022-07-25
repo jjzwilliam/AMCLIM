@@ -115,6 +115,7 @@ crop_filledcalendar = 'ALL_CROPS_netCDF_0.5deg_filled_dir/'
 crop_unfilledcalendar = 'ALL_CROPS_netCDF_0.5deg_unfilled_dir/'
 crop_filledcalendarformat = '.crop.calendar.fill.nc'
 crop_unfilledcalendarformat = '.crop.calendar.nc'
+manure_appcalendar ='manure_app_calendar.nc'
 
 ##################################
 ## soil data
@@ -122,4 +123,7 @@ crop_unfilledcalendarformat = '.crop.calendar.nc'
 soilpHfile = 'topsoil_pH_H2O.nc'
 soilCECfile = 'topsoil_CEC_clay.nc'
 soilclayfile = 'topsoil_clay.nc'
+soilsandfile = 'topsoil_sand.nc'
+soilsiltfile = 'topsoil_silt.nc'
+soilorgCfile = 'topsoil_OC.nc'
 soilbdfile = 'topsoil_BD.nc'

@@ -585,6 +585,24 @@ def Sc_num(temp):
 #######################################
 ## Soil properties/characteristics
 #######################################
+## soil characteristics: saturated hydraulic conductivity
+## fsilt - % of silt; fclay - % of clay; fsom - % of soil organic matter; BD - bulk density
+def soil_hydraulic_conductivity(fsilt,fclay,fsom,BD):
+    x = 7.755+0.0352*fsilt-0.967*(BD**2)-0.000484*(fclay**2)-\
+                0.000322*(fsilt**2)+0.001/fsilt-0.748/fsom-0.643*np.log(fsilt)-\
+                0.01398*BD*fsilt-0.1673*BD*fsom
+    Ks = 2.2e-7*np.exp(x)
+    return Ks
+## soil characteristics: field capacity
+def soil_fc(BD):
+    fc = 0.45-0.06*(BD**2)
+    return fc
+## soil characteristics: wilting point
+def soil_wp(fsand,fclay):
+    a = np.exp(-4.396-7.15e-2*fclay-4.88e-4*fsand**2-4.285e-5*fsand**2*fclay)
+    b = -3.14-2.22e-3*fclay**2-3.483e-5*fsand**2*fclay
+    wp = (150/a)**(1.0/b)
+    return wp
 ## soil characteristics: tortuosity for diffusion
 ## theta is the volumetric soil water content, and theta_sat is the volumetric soil water content at saturation (equivalent as porosity)
 ## theta in m3/m3
@@ -597,6 +615,16 @@ def soil_tortuosity(theta_sat,theta,phase):
     elif phase == 'gaseous':
         soil_tor = (((theta_sat-theta)**(10/3))/(theta_sat**2))*F_correct
     return soil_tor
+## soil water drainage (note the difference between infiltration and drainage)
+## span time is set to 24 hrs by default (field capacity is normally reached after 1 day)
+def water_drainage(theta,theta_sat,Ksat,fc,layerthickness,spantime=24):
+    ## hydraulic conductivity: approximated by a linear relationship
+    ks = Ksat*(theta/theta_sat)
+    ## water drainage: excessive water which is over the field capacity
+    drainpotential = np.maximum(0,(theta - fc)*layerthickness/(spantime*3600))
+    ## determine the water drainage
+    drainage = np.minimum(ks,drainpotential)
+    return drainage
 ## soil characteristics: infiltration rate (m/s) - empirical method 
 ## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
 ## data source: Patle et al., Geo.Eco.Landscale 2019
@@ -625,6 +653,23 @@ def infiltration_rate_method(dailyinfil,theta_sat,theta):
     ## infiltration rate; m/s
     Ki = (dailyinfil - z_layer*(theta_sat-theta))/(24*3600)
     return Ki
+## slurry infiltration rate; ref: Hutchings & Sommer, 1996
+## DM content in fraction
+def infil_rate_slurry(frac_DM):
+    ## daily infiltration rate determined by slurry (kg m2/day or mm/day)
+    daily_infil_rate = np.exp(6.95-31.9*frac_DM)
+    ## convert to m/s
+    infil_rate = daily_infil_rate/(1000*3600*24)
+    return infil_rate
+## slurry initial infiltration: percent of volume of slurry that infiltrates into the soil within 1hr after application
+## ref: Misselbrook, 2005
+def initial_infil(frac_DM):
+    ## percent of dry matter content of slurry
+    per_DM = frac_DM*100
+    ## percent of volume of initial infiltration into the soil
+    init_infil = 110*np.exp(-0.357*per_DM)
+    init_infil[init_infil>100] = 100.0
+    return init_infil/100
 ## EMPIRICAL - soil characteristics: soil pH after manure/fertilizer application
 ## soil pH will increase due to application of urea, peak within 24-48 h, then decrease
 ## urea decomposition consumes H+ ion, which leads to pH increase
@@ -663,6 +708,11 @@ def manure_properties(solidmass,watermass):
     ## WFPS: volumetric water content/porosity
     WFPS = theta_v/manure_porosity
     return vtotal,theta_v,WFPS
+## manure DM content
+def manure_DM(solidmass,watermass):
+    frac_DM = solidmass/(solidmass+watermass)
+    frac_DM[np.isnan(frac_DM)] = 0.0
+    return frac_DM
 ## manure minimum moisture
 def min_manurewc(temp,rhum):
     mois_coeff = (-np.log(1.01-(rhum/100))/(0.0000534*(temp+273)))**(1/1.41)
@@ -839,3 +889,5 @@ sigma_v_air = 20.1
 sigma_v_NH3 = 14.9
 sigma_v_H2O = 12.7
 
+## assuming the water holding capacity of manure is 3.0 g water/ g manure
+absorb_factor = 3.0

@@ -904,8 +904,8 @@ class HOUSING_MODULE:
         yearidx = str(sim_year)+'-01-01'
         times = pd.date_range(yearidx,periods=ntime)
         if housing_type.lower() == 'slat/pit house':
-            slat_emiss = self.o_NH3flux_slat*self.floor_area
-            pit_emiss = self.o_NH3flux_pit*self.pit_area
+            slat_emiss = self.o_NH3flux_slat*self.floor_area.values
+            pit_emiss = self.o_NH3flux_pit*self.pit_area.values
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss_slat=(['time','lat','lon'],slat_emiss),
@@ -917,8 +917,7 @@ class HOUSING_MODULE:
                     lat=(["lat"], lats),
                             ),
                 attrs=dict(
-                    description="AMCLIM-Housing: \
-                        NH3 emissions from "+\
+                    description="AMCLIM-Housing: NH3 emissions from "+\
                             production_system+" "+livestock+" "+housing_type+"housing in " +str(sim_year),
                     info = production_system+" "+livestock+" "+housing_type,
                     units="gN per grid",
@@ -931,7 +930,7 @@ class HOUSING_MODULE:
             outds.NH3emiss_pit.attrs["long name"] = 'NH3 emission from housing (pit)'
 
         elif housing_type.lower() == 'barn':
-            housing_NH3emiss = self.o_NH3flux*self.floor_area
+            housing_NH3emiss = self.o_NH3flux*self.floor_area.values
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],housing_NH3emiss),
@@ -942,8 +941,7 @@ class HOUSING_MODULE:
                     lat=(["lat"], lats),
                             ),
                 attrs=dict(
-                    description="AMCLIM-Housing: \
-                        NH3 emissions from "+\
+                    description="AMCLIM-Housing: NH3 emissions from "+\
                             production_system+" "+livestock+" "+housing_type+"housing in " +str(sim_year),
                     info = production_system+" "+livestock+" "+housing_type,
                     units="gN per grid",
@@ -972,6 +970,7 @@ class HOUSING_MODULE:
                 self.slat_pit_housing_sim(dd,end_idx,house_env,self.fslat,self.fgap)
         self.housing_2nd_init(housing_type)
         self.slat_pit_housing_sim(0,start_idx,house_env,self.fslat,self.fgap)
+        self.sim_out(housing_type)
         return
 
     def barn_sim_main(self,house_env,housing_type,start_idx,end_idx,cleaning_frequency,litter=False):
@@ -991,6 +990,7 @@ class HOUSING_MODULE:
                 self.barn_housing_sim(dd,end_idx,house_env)
         self.housing_2nd_init(housing_type)
         self.barn_housing_sim(0,start_idx,house_env)
+        self.sim_out(housing_type)
         return
 
     def poultry_house_sim_main(self,house_env,housing_type,start_idx,end_idx,cleaning_frequency):

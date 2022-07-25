@@ -300,14 +300,31 @@ class MMS_module:
         ## output of NH3 flux
         self.o_NH3flux = np.zeros(outarray_shape)
 
+        ## spring/winter manure application calendar
+        self.spring_app_cal = np.zeros(field_shape)
+        self.winter_app_cal = np.zeros(field_shape)
+
+        self.spring_Napp = np.zeros(field_shape)
+        self.spring_manureapp = np.zeros(field_shape)
+        self.spring_waterapp = np.zeros(field_shape)
+        self.spring_availNapp = np.zeros(field_shape)
+        self.spring_resistNapp = np.zeros(field_shape)
+        self.spring_unavailNapp = np.zeros(field_shape)
+
+        self.winter_Napp = np.zeros(field_shape)
+        self.winter_manureapp = np.zeros(field_shape)
+        self.winter_waterapp = np.zeros(field_shape)
+        self.winter_availNapp = np.zeros(field_shape)
+        self.winter_resistNapp = np.zeros(field_shape)
+        self.winter_unavailNapp = np.zeros(field_shape)
+
         ## manure N to land spreading from MMS
-        self.manure_to_land = np.zeros(outarray_shape)
-        self.avail_N_to_land = np.zeros(outarray_shape)
-        self.resist_N_to_land = np.zeros(outarray_shape)
-        self.unavail_N_to_land = np.zeros(outarray_shape)
-        self.urea_to_land = np.zeros(outarray_shape)
-        self.TAN_to_land = np.zeros(outarray_shape)
-        self.water_to_land = np.zeros(outarray_shape) 
+        # self.manure_to_land = np.zeros(outarray_shape)
+        # self.avail_N_to_land = np.zeros(outarray_shape)
+        # self.resist_N_to_land = np.zeros(outarray_shape)
+        # self.unavail_N_to_land = np.zeros(outarray_shape)
+        # self.TAN_to_land = np.zeros(outarray_shape)
+        # self.water_to_land = np.zeros(outarray_shape) 
 
         if phase == "solid":
             ## TAN concentration at surface (compensation point)
@@ -430,17 +447,17 @@ class MMS_module:
     ## Simulation: Cat A.2 and B.2 manure stored as liquid
     ## water pool is transfered from housing to slurry tank/barn
     def MMS_liquid_sim(self,mms_cat,start_day_idx,end_day_idx):
-        print('current simulation is for: ['+str(mms_cat)+' ,liquid], '+str(livestock))
+        print('current simulation is for: ['+str(mms_cat)+', liquid], '+str(livestock))
         if mms_cat == "MMS_indoor":
             f_MMSarea = f_MMS_indoor_liquid/f_MMS
             ## area of MMS_indoor_liquid
             MMS_area["mms_indoor_liquid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMSarea*MMS_area_factor['mms_indoor_liquid']
-            self.mmsarea = MMS_area["mms_indoor_liquid_area"]
+            self.mmsarea = MMS_area["mms_indoor_liquid_area"].values
         elif mms_cat == "MMS_open":
             f_MMSarea = f_MMS_open_liquid/f_MMS
             ## area of MMS_open_liquid
             MMS_area["mms_open_liquid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMSarea*MMS_area_factor['mms_open_liquid']
-            self.mmsarea = MMS_area["mms_indoor_liquid_area"]
+            self.mmsarea = MMS_area["mms_indoor_liquid_area"].values
         
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
@@ -448,8 +465,11 @@ class MMS_module:
 
         else:
             for dd in np.arange(start_day_idx,end_day_idx):
-
-                self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd)
+                if dd<Days:
+                    self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd)
+                if dd>=Days:
+                    self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd-Days)
+                
                 if mms_cat == "MMS_indoor":
                     self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
                 elif mms_cat == "MMS_open":
@@ -541,6 +561,7 @@ class MMS_module:
                     self.daily_output(dayidx=ddidx,mms_info="mms_indoor_liquid")
                 elif mms_cat == "MMS_open":
                     self.daily_output(dayidx=ddidx,mms_info="mms_open_liquid")
+                self.mms_to_landspreading(dayidx=ddidx)
         return
 
     ## Simulation: Cat A.1 manure stored in barns (as solid) //// under development 31/Aug
@@ -579,15 +600,15 @@ class MMS_module:
     ##       NO3- aqueous diffusion is moderated by a scaling factor regarding the different diffusivity of NO3- from NH4+ 
 
     def MMS_solid_sim(self,mms_cat,start_day_idx,end_day_idx):
-        print('current simulation is for: ['+str(mms_cat)+' ,solid], '+str(livestock))
+        print('current simulation is for: ['+str(mms_cat)+', solid], '+str(livestock))
         if mms_cat == "MMS_indoor":
             f_MMSarea = f_MMS_indoor_solid/f_MMS
             MMS_area["mms_indoor_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMSarea*MMS_area_factor["mms_indoor_solid"]
-            self.mmsarea = MMS_area["mms_indoor_solid_area"]
+            self.mmsarea = MMS_area["mms_indoor_solid_area"].values
         elif mms_cat == "MMS_open":
             f_MMSarea = f_MMS_open_solid/f_MMS
             MMS_area["mms_open_solid_area"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMSarea*MMS_area_factor["mms_open_solid"]
-            self.mmsarea = MMS_area["mms_open_solid_area"]
+            self.mmsarea = MMS_area["mms_open_solid_area"].values
 
         if livestock.lower()=="poultry":
             # for dd in np.arange(start_day_idx,end_day_idx-1):
@@ -595,7 +616,10 @@ class MMS_module:
 
         else:
             for dd in np.arange(start_day_idx,end_day_idx):
-                self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd)
+                if dd < Days:
+                    self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd)
+                if dd>=Days:
+                    self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd-Days)
                 if mms_cat == "MMS_indoor":
                     self.daily_init(dayidx=dd,mms_info="mms_indoor_solid")
                 elif mms_cat == "MMS_open":
@@ -875,6 +899,7 @@ class MMS_module:
                     self.daily_output(dayidx=ddidx,mms_info="mms_indoor_solid")
                 elif mms_cat == "MMS_open":
                     self.daily_output(dayidx=ddidx,mms_info="mms_open_solid")
+                self.mms_to_landspreading(dayidx=ddidx)
         return
   
     ## Simulation: Cat B.3 manure stored in open environment (as solid) //// under development 08/Sep
@@ -921,6 +946,8 @@ class MMS_module:
         if mms_info == "mms_indoor_solid":
             self.NO3_pool[0] = self.NO3_pool[-1]
 
+        if dayidx >= Days:
+            dayidx = dayidx - Days
         ## inputs from housing (added in the mid-day)
         self.manure[12] = self.manure_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
         ## N input in multiple forms
@@ -935,6 +962,8 @@ class MMS_module:
         return
 
     def daily_output(self,dayidx,mms_info):
+        # if dayidx >= Days:
+        #     dayidx = dayidx - Days
         self.o_NH3flux[dayidx] = np.nansum(self.NH3flux[1:],axis=0)
         if mms_info == "mms_indoor_solid":
             self.o_NH4nitrif[dayidx] = np.nansum(self.TANnitrif_manure[1:],axis=0)
@@ -943,20 +972,87 @@ class MMS_module:
                             np.nansum(self.avail_N_washoff[1:],axis=0)+np.nansum(self.resist_N_washoff[1:],axis=0)
             self.o_NH4nitrif[dayidx] = np.nansum(self.TANnitrif_manure[1:],axis=0)
 
-    def mms_to_landspreading(self,dayidx):
-        self.manure_to_land[dayidx] = self.manure_pool[-1]*self.mmsarea
-        self.avail_N_to_land[dayidx] = self.avail_N_pool[-1]*self.mmsarea
-        self.resist_N_to_land[dayidx] = self.resist_N_pool[-1]*self.mmsarea
-        self.unavail_N_to_land[dayidx] = self.unavail_N_pool[-1]*self.mmsarea
-        self.urea_to_land[dayidx] = self.urea_pool*self.mmsarea
-        self.TAN_to_land[dayidx] = self.TAN_pool[-1]*self.mmsarea
+    def manure_app_calendar(self):
+        manureappcalpath = infile_path+crop_data_path+manure_appcalendar
+        appcalds = open_ds(manureappcalpath)
+        self.spring_app_cal = appcalds.spring_plant_mean.values
+        self.winter_app_cal = appcalds.winter_plant_mean.values
 
-        self.manure_pool[:] = 0.0
-        self.avail_N_pool[:] = 0.0
-        self.resist_N_pool[:] = 0.0
-        self.unavail_N_pool[:] = 0.0
-        self.urea_pool[:] = 0.0
-        self.TAN_pool[:] = 0.0
+    def mms_to_landspreading(self,dayidx):
+        ## spring season for manure application
+        # self.manure_to_land[dayidx][self.spring_app_cal==dayidx] = self.manure_pool[-1][self.spring_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.spring_app_cal==dayidx]
+        # self.water_to_land[dayidx][self.spring_app_cal==dayidx] = self.Total_water_pool[-1][self.spring_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.spring_app_cal==dayidx]
+        # self.avail_N_to_land[dayidx][self.spring_app_cal==dayidx] = self.avail_N_pool[-1][self.spring_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.spring_app_cal==dayidx]
+        # self.resist_N_to_land[dayidx][self.spring_app_cal==dayidx] = self.resist_N_pool[-1][self.spring_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.spring_app_cal==dayidx]
+        # self.unavail_N_to_land[dayidx][self.spring_app_cal==dayidx] = self.unavail_N_pool[-1][self.spring_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.spring_app_cal==dayidx]
+        # self.TAN_to_land[dayidx][self.spring_app_cal==dayidx] = (self.TAN_pool[-1][self.spring_app_cal==dayidx]+\
+        #                                                         self.urea_pool[-1][self.spring_app_cal==dayidx])*\
+        #                                                             self.mmsarea[self.spring_app_cal==dayidx]
+        # if dayidx >= Days:
+        #     dayidx = dayidx - Days
+        self.spring_Napp[self.spring_app_cal==dayidx] = (self.TAN_pool[-1][self.spring_app_cal==dayidx]+\
+                                                        self.urea_pool[-1][self.spring_app_cal==dayidx])*\
+                                                        self.mmsarea[self.spring_app_cal==dayidx]
+        self.spring_manureapp[self.spring_app_cal==dayidx] = self.manure_pool[-1][self.spring_app_cal==dayidx]*\
+                                                            self.mmsarea[self.spring_app_cal==dayidx]
+        self.spring_waterapp[self.spring_app_cal==dayidx] = self.Total_water_pool[-1][self.spring_app_cal==dayidx]*\
+                                                            self.mmsarea[self.spring_app_cal==dayidx]
+        self.spring_availNapp[self.spring_app_cal==dayidx] = self.avail_N_pool[-1][self.spring_app_cal==dayidx]*\
+                                                            self.mmsarea[self.spring_app_cal==dayidx]
+        self.spring_resistNapp[self.spring_app_cal==dayidx] = self.resist_N_pool[-1][self.spring_app_cal==dayidx]*\
+                                                            self.mmsarea[self.spring_app_cal==dayidx]
+        self.spring_unavailNapp[self.spring_app_cal==dayidx] = self.unavail_N_pool[-1][self.spring_app_cal==dayidx]*\
+                                                                self.mmsarea[self.spring_app_cal==dayidx]
+
+        self.manure_pool[-1][self.spring_app_cal==dayidx] = 0.0
+        self.Total_water_pool[-1][self.spring_app_cal==dayidx]  = 0.0
+        self.avail_N_pool[-1][self.spring_app_cal==dayidx] = 0.0
+        self.resist_N_pool[-1][self.spring_app_cal==dayidx]  = 0.0
+        self.unavail_N_pool[-1][self.spring_app_cal==dayidx]  = 0.0
+        self.urea_pool[-1][self.spring_app_cal==dayidx]  = 0.0
+        self.TAN_pool[-1][self.spring_app_cal==dayidx]  = 0.0
+
+        ## winter season for manure application
+        # self.manure_to_land[dayidx][self.winter_app_cal==dayidx] = self.manure_pool[-1][self.winter_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.winter_app_cal==dayidx]
+        # self.water_to_land[dayidx][self.winter_app_cal==dayidx] = self.Total_water_pool[-1][self.winter_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.winter_app_cal==dayidx]
+        # self.avail_N_to_land[dayidx][self.winter_app_cal==dayidx] = self.avail_N_pool[-1][self.winter_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.winter_app_cal==dayidx]
+        # self.resist_N_to_land[dayidx][self.winter_app_cal==dayidx] = self.resist_N_pool[-1][self.winter_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.winter_app_cal==dayidx]
+        # self.unavail_N_to_land[dayidx][self.winter_app_cal==dayidx] = self.unavail_N_pool[-1][self.winter_app_cal==dayidx]*\
+        #                                                             self.mmsarea[self.winter_app_cal==dayidx]
+        # self.TAN_to_land[dayidx][self.winter_app_cal==dayidx] = (self.TAN_pool[-1][self.winter_app_cal==dayidx]+\
+        #                                                             self.urea_pool[self.winter_app_cal==dayidx])*\
+        #                                                             self.mmsarea[self.winter_app_cal==dayidx]
+
+        self.winter_Napp[self.winter_app_cal==dayidx] = (self.TAN_pool[-1][self.winter_app_cal==dayidx]+\
+                                                        self.urea_pool[-1][self.winter_app_cal==dayidx])*\
+                                                        self.mmsarea[self.winter_app_cal==dayidx]
+        self.winter_manureapp[self.winter_app_cal==dayidx] = self.manure_pool[-1][self.winter_app_cal==dayidx]*\
+                                                        self.mmsarea[self.winter_app_cal==dayidx]
+        self.winter_waterapp[self.winter_app_cal==dayidx] = self.Total_water_pool[-1][self.winter_app_cal==dayidx]*\
+                                                        self.mmsarea[self.winter_app_cal==dayidx]
+        self.winter_availNapp[self.winter_app_cal==dayidx] = self.avail_N_pool[-1][self.winter_app_cal==dayidx]*\
+                                                        self.mmsarea[self.winter_app_cal==dayidx]
+        self.winter_resistNapp[self.winter_app_cal==dayidx] = self.resist_N_pool[-1][self.winter_app_cal==dayidx]*\
+                                                            self.mmsarea[self.winter_app_cal==dayidx]
+        self.winter_unavailNapp[self.winter_app_cal==dayidx] = self.unavail_N_pool[-1][self.winter_app_cal==dayidx]*\
+                                                            self.mmsarea[self.winter_app_cal==dayidx]
+
+        self.manure_pool[-1][self.winter_app_cal==dayidx] = 0.0
+        self.Total_water_pool[-1][self.winter_app_cal==dayidx]  = 0.0
+        self.avail_N_pool[-1][self.winter_app_cal==dayidx] = 0.0
+        self.resist_N_pool[-1][self.winter_app_cal==dayidx]  = 0.0
+        self.unavail_N_pool[-1][self.winter_app_cal==dayidx]  = 0.0
+        self.urea_pool[-1][self.winter_app_cal==dayidx]  = 0.0
+        self.TAN_pool[-1][self.winter_app_cal==dayidx]  = 0.0
     
     def sim_out(self,mms_cat,phase):
         nlat = int(180.0/dlat)
@@ -978,8 +1074,7 @@ class MMS_module:
                     lat=(["lat"], lats),
                             ),
                 attrs=dict(
-                    description="AMCLIM-MMS: \
-                        NH3 emissions from "+\
+                    description="AMCLIM-MMS: NH3 emissions from "+\
                             production_system+" "+livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
                     info = production_system+" "+livestock+" "+mms_cat+" "+phase,
                     units="gN per grid",
@@ -1005,8 +1100,7 @@ class MMS_module:
                         lat=(["lat"], lats),
                                 ),
                     attrs=dict(
-                        description="AMCLIM-MMS: \
-                            NH3 emissions from "+\
+                        description="AMCLIM-MMS: NH3 emissions from "+\
                                 production_system+" "+livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
                         info = production_system+" "+livestock+" "+mms_cat+" "+phase,
                         units="gN per grid",
@@ -1032,8 +1126,7 @@ class MMS_module:
                         lat=(["lat"], lats),
                                 ),
                     attrs=dict(
-                        description="AMCLIM-MMS: \
-                            NH3 emissions from "+\
+                        description="AMCLIM-MMS: NH3 emissions from "+\
                                 production_system+" "+livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
                         info = production_system+" "+livestock+" "+mms_cat+" "+phase,
                         units="gN per grid",
@@ -1051,13 +1144,51 @@ class MMS_module:
         outds.to_netcdf(output_path+livestock+'.'+production_system+'.'+mms_cat+'.'+phase+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
+
+        outds = xr.Dataset(
+                data_vars=dict(
+                    spring_TAN=(['lat','lon'],self.spring_Napp),
+                    spring_manure=(['lat','lon'],self.spring_manureapp),
+                    spring_water=(['lat','lon'],self.spring_waterapp),
+                    spring_availN=(['lat','lon'],self.spring_availNapp),
+                    spring_resistN=(['lat','lon'],self.spring_resistNapp),
+                    spring_unavailN=(['lat','lon'],self.spring_unavailNapp),
+                    winter_TAN=(['lat','lon'],self.winter_Napp),
+                    winter_manure=(['lat','lon'],self.winter_manureapp),
+                    winter_water=(['lat','lon'],self.winter_waterapp),
+                    winter_availN=(['lat','lon'],self.winter_availNapp),
+                    winter_resistN=(['lat','lon'],self.winter_resistNapp),
+                    winter_unavailN=(['lat','lon'],self.winter_unavailNapp),
+                            ),
+                coords = dict(
+                    lon=(["lon"], lons),
+                    lat=(["lat"], lats),
+                            ),
+                attrs=dict(
+                    description="AMCLIM-MMS: manure application to land in spring and winter season "+\
+                            production_system+" "+livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
+                    info = production_system+" "+livestock+" "+mms_cat+" "+phase,
+                    units="gN per grid",
+                ),
+            )
+
+        comp = dict(zlib=True, complevel=9)
+        encoding = {var: comp for var in outds.data_vars}
+
+        outds.to_netcdf(output_path+livestock+'.'+production_system+'.'+mms_cat+'.'+phase+\
+                            '.'+str(sim_year)+'.manureapp.nc',encoding=encoding)
+        print("manure app ncfile saved.")
         return
 
     def MMS_sim_main(self,mms_cat,phase,start_day_idx,end_day_idx):
+        spinup = np.floor((end_day_idx - Days)/Days)
+        print("Spinup year is: "+str(spinup)+" yr(s)")
+        self.manure_app_calendar()
         if phase == "liquid":
             self.MMS_liquid_sim(mms_cat,start_day_idx,end_day_idx)
         elif phase == "solid":
             self.MMS_solid_sim(mms_cat,start_day_idx,end_day_idx)
         else:
             self.MMS_open_lagoon_sim(start_day_idx,end_day_idx)
+        self.sim_out(mms_cat,phase)
         return
