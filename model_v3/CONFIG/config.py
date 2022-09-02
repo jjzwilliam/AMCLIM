@@ -44,8 +44,8 @@ levels = 2
 
 ## array dimensions;
 #mtrx = [levels,time,lats,lons]
-mtrx = (time+1,lats,lons)
-mtrx2 = (time*2+1,lats,lons)
+mtrx = (time,lats,lons)
+mtrx2 = (time*2,lats,lons)
 
 ## define months info
 Months_name = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
@@ -56,7 +56,8 @@ Months_idx = [1,32,60,91,121,152,182,213,244,274,305,335,366]
 
 ## specify livestock type and production sytem
 ## livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
-livestock = 'BEEF_CATTLE'
+# livestock = 'BEEF_CATTLE'
+livestock = 'POULTRY'
 
 ## level index: 
 ## PIG: industrial-0; intermediate-1, backyard-2
@@ -65,7 +66,7 @@ livestock = 'BEEF_CATTLE'
 ## OTHER CATTLE: grassland-0; mixed-1
 ## SHEEP: grassland-0; mixed-1
 ## POULTRY: broiler-0, layer-1, backyard-2
-lvl_idx = 1
+lvl_idx = 0
 production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
         'BEEF_CATTLE':['grassland','mixed',None],
@@ -83,9 +84,9 @@ housing_system_dict = {
         'DAIRY_CATTLE':[None,'naturally ventilated',None],
         'OTHER_CATTLE':[None,'naturally ventilated',None],
         'SHEEP':[None,'naturally ventilated',None],
-        'POULTRY':['poultry_house','poultry_house','bck_poultry']
+        'POULTRY':['insulated','insulated','naturally ventilated']
         }
-housing_system = housing_system_dict[livestock][lvl_idx]
+# housing_system = housing_system_dict[livestock][lvl_idx]
 
 animal_file_dict = {
         'PIG':'piginfo_faogleam.nc',
@@ -95,7 +96,7 @@ animal_file_dict = {
         'SHEEP':'sheepinfo_faogleam.nc',
         'POULTRY':'chickeninfo_faogleam.nc'
         }
-animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
+# animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
 
 MMS_file_dict = {
         'PIG':'pigmms_faogleam.nc',
@@ -106,7 +107,7 @@ MMS_file_dict = {
         'POULTRY':'chickenmms_faogleam.nc'
         }
 # MMS_file_name ='ind_MMS.nc'                           ## input files should be put in AMCLIM/INPUT/
-MMS_file_name = MMS_file_dict[livestock]
+# MMS_file_name = MMS_file_dict[livestock]
 
 MMS_type_dict = {
         'PIG':['ind','med','bck'],
@@ -116,4 +117,4 @@ MMS_type_dict = {
         'SHEEP':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
-MMS_type = MMS_type_dict[livestock][lvl_idx]
+# MMS_type = MMS_type_dict[livestock][lvl_idx]

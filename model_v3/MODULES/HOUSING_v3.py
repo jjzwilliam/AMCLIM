@@ -13,27 +13,6 @@ from CONFIG.config import *
 from MODULES.PARAMETERS import *
 from MODULES.FUNC import *
 
-
-######################################
-## excreted N data
-######################################
-excretN_info = animal_file['Excreted_N'][lvl_idx]
-animal_head = animal_file['Animal_head'][lvl_idx]
-animal_weight = animal_file['Animal_weight'][lvl_idx]
-
-animal_weight.values[np.where((animal_head!=0)&(animal_weight==0)&(~np.isnan(animal_head)))] = np.nanmedian(animal_weight.values[np.where(animal_weight!=0)])
-animal_weight.values[np.where((animal_head!=0)&(np.isnan(animal_weight))&(~np.isnan(animal_head)))] = np.nanmedian(animal_weight.values[np.where(animal_weight!=0)])
-## pig density 1: 120 kg/m^2
-#animal_density = 120.0
-animal_density = stocking_desity[livestock]
-# print(str(livestock)+" stocking density is "+str(animal_density)+" kg/m^2")
-massgrid = animal_head*animal_weight.values
-housing_area = animal_head*animal_weight.values/animal_density
-
-F_Ncorrect = 1.0
-excret_N = F_Ncorrect*excretN_info/housing_area   ## unit: kg N per m^2 per year
-excret_N = xr_to_np(excret_N)
-
 ###################################
 ## housing parameters
 ###################################
@@ -55,38 +34,6 @@ zo_water = 0.002
 ## assuming the roughness height of manure storage barn is ~ 0.5m (<ref height of 2m)
 zo_barn = 0.5 
 
-## shape in [lat,lon]
-f_loss = np.zeros(mtrx[1:])
-f_sold = np.zeros(mtrx[1:])
-f_housing_litter = np.zeros(mtrx[1:])
-f_housing_pit = np.zeros(mtrx[1:])
-
-for mms in loss_list:
-    try:
-        f_mms = MMS_file[mms][lvl_idx].values
-        f_mms[np.isnan(f_mms)] = 0.0
-        f_loss = f_loss + f_mms   
-    except:pass
-for mms in sold_list:
-    try:
-        f_mms = MMS_file[mms][lvl_idx].values
-        f_mms[np.isnan(f_mms)] = 0.0
-        f_sold = f_sold + f_mms
-    except:pass
-for mms in MMS_house_storage_solid_list:
-    try:
-        f_mms = MMS_file[mms][lvl_idx].values
-        f_mms[np.isnan(f_mms)] = 0.0
-        f_housing_litter = f_housing_litter + f_mms
-    except:pass
-for mms in MMS_house_storage_liquid_list:
-    try:
-        f_mms = MMS_file[mms][lvl_idx].values
-        f_mms[np.isnan(f_mms)] = 0.0
-        f_housing_pit = f_housing_pit + f_mms
-    except:pass
-
-
 ############################################
 ## HOUSING MODULE: various housing systems
 ############################################
@@ -100,21 +47,115 @@ class HOUSING_MODULE:
     ##               3. 'poultry house'
     ##               ...
 
-    def __init__(self,N_input,livestock_name,house_env,housing_type,housing_area,fslat=0.8,fpit=1.0,idealised_sim=False,idealised_setting=None):
+    def __init__(self,livestock_name,production_system_lvl_idx,housing_type,fslat=0.8,fpit=1.0,idealised_sim=False,idealised_setting=None):
+        ## show current config settings, e.g., livestock, production sys, etc.
+        self.livestock = livestock_name
+        self.lvl_idx = production_system_lvl_idx
+        ## production system of the livestock
+        self.production_system = production_system_dict[self.livestock][self.lvl_idx]
+        ## housing system/env for the livestock
+        self.house_env = housing_system_dict[self.livestock][self.lvl_idx]
+        print('HOUSING Module - current livestock is: '+str(self.livestock))
+        if self.production_system is None:
+            raise ValueError("ERROR - incorrect production system for "+str(self.livestock))
+        else:
+            print('HOUSING Module - current production system is: '+str(self.production_system))
+        if self.house_env is None:
+            raise ValueError("ERROR - incorrect housing system for "+str(self.livestock))
+        else:
+            print('HOUSING Module - current housing system is: '+str(self.house_env))
+        print("Housing env is: "+str(self.house_env))
+        print("Housing system is: "+str(housing_type))
+        #####################################################
+        ## livestock info and MMS info
+        #####################################################
+        ## read livestock and the corresponding MMS datasets
+        self.animal_file_name = animal_file_dict[self.livestock]
+        self.MMS_file_name = MMS_file_dict[self.livestock] 
+        self.animal_file = xr.open_dataset(infile_path+animal_data_path+self.animal_file_name)
+        self.MMS_file = xr.open_dataset(infile_path+animal_data_path+self.MMS_file_name)
+        ## livestock info: N excretion, heads, body weights
+        self.excretN_info = self.animal_file['Excreted_N'][self.lvl_idx]
+        print("test total N: ",np.nansum(self.excretN_info)/1e9)
+        self.animal_head = self.animal_file['Animal_head'][self.lvl_idx]
+        if self.livestock == "POULTRY":
+            self.animal_weight = xr.DataArray(
+                        data=np.zeros(self.animal_head.shape),
+                        dims=self.animal_head.dims,
+                        coords=self.animal_head.coords,
+                    )
+            self.animal_weight.values[np.where(self.animal_head!=0)] = 1.5
+        else:
+            self.animal_weight = self.animal_file['Animal_weight'][self.lvl_idx]
+            self.animal_weight.values[np.where((self.animal_head!=0)&(self.animal_weight==0)&(~np.isnan(self.animal_head)))] =\
+                np.nanmedian(self.animal_weight.values[np.where(self.animal_weight!=0)])
+            self.animal_weight.values[np.where((self.animal_head!=0)&(np.isnan(self.animal_weight))&(~np.isnan(self.animal_head)))] =\
+                 np.nanmedian(self.animal_weight.values[np.where(self.animal_weight!=0)])
+        self.animal_density = stocking_desity[self.livestock]
+        # print(str(livestock)+" stocking density is "+str(animal_density)+" kg/m^2")
+        self.massgrid = self.animal_head*self.animal_weight.values
+        ## calculate housing area
+        self.housing_area = self.animal_head*self.animal_weight.values/self.animal_density
+        ## N excretion 
+        self.excret_N = self.excretN_info/self.housing_area   ## unit: kg N per m^2 per year
+        self.excret_N = xr_to_np(self.excret_N)
+        print("test total N 2: ",np.nansum(self.excret_N*self.housing_area)/1e9)
+        ## MMS info
+        self.f_loss = np.zeros(mtrx[1:])
+        self.f_sold = np.zeros(mtrx[1:])
+        self.f_housing_litter = np.zeros(mtrx[1:])
+        self.f_housing_pit = np.zeros(mtrx[1:])
+        # self.f_dailyspread = np.zeros(mtrx[1:])
+        ## attribute pathways to each cluster
+        for mms in loss_list:
+            try:
+                f_mms = self.MMS_file[mms][self.lvl_idx].values
+                # f_mms[np.isnan(f_mms)] = 0.0
+                f_mms = np.nan_to_num(f_mms)
+                self.f_loss = self.f_loss + f_mms   
+            except:pass
+        for mms in sold_list:
+            try:
+                f_mms = self.MMS_file[mms][self.lvl_idx].values
+                # f_mms[np.isnan(f_mms)] = 0.0
+                f_mms = np.nan_to_num(f_mms)
+                self.f_sold = self.f_sold + f_mms
+            except:pass
+        for mms in MMS_house_storage_solid_list:
+            try:
+                f_mms = self.MMS_file[mms][self.lvl_idx].values
+                # f_mms[np.isnan(f_mms)] = 0.0
+                f_mms = np.nan_to_num(f_mms)
+                self.f_housing_litter = self.f_housing_litter + f_mms
+            except:pass
+        for mms in MMS_house_storage_liquid_list:
+            try:
+                f_mms = self.MMS_file[mms][self.lvl_idx].values
+                # f_mms[np.isnan(f_mms)] = 0.0
+                f_mms = np.nan_to_num(f_mms)
+                self.f_housing_pit = self.f_housing_pit + f_mms
+            except:pass
+        # for mms in MMS_land_spread_list:
+        #     try:
+        #         f_mms = self.MMS_file[mms][self.lvl_idx].values
+        #         f_mms[np.isnan(f_mms)] = 0.0
+        #         self.f_dailyspread = self.f_dailyspread + f_mms
+        #     except:pass
+        
         if idealised_sim is True:
             print("NOTICE - This is an idealised simulation.\n Set [idealised_sim=False] for normal simulations.")
             try:
                 if idealised_setting is not None:
-                    self.idealised_animal_head = animal_head.copy()
+                    self.idealised_animal_head = self.animal_head.copy()
                     self.idealised_animal_head.values[~np.isnan(self.idealised_animal_head.values)] = idealised_setting['head']
-                    self.idealised_animal_weight = animal_weight.copy()
+                    self.idealised_animal_weight = self.animal_weight.copy()
                     self.idealised_animal_weight.values[~np.isnan(self.idealised_animal_weight.values)] = idealised_setting['weight']
                     self.idealised_housing_area = self.idealised_animal_head*self.idealised_animal_weight/\
                                                 idealised_setting['density']
-                    self.idealised_N_input = F_Ncorrect*self.idealised_animal_head*idealised_setting['Nexcret_rate']/\
+                    self.idealised_N_input = self.idealised_animal_head*idealised_setting['Nexcret_rate']/\
                                                 self.idealised_housing_area
                     self.idealised_N_input = xr_to_np(self.idealised_N_input)
-                    self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=livestock_name, 
+                    self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
                                                     waste_N=self.idealised_N_input)
                 else:
                     raise ValueError('Invalid [idealised settings]')
@@ -122,20 +163,9 @@ class HOUSING_MODULE:
                 print("Error occurrs! Please check [idealised settings]")
         else:
             ## animal waste info    
-            self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=livestock_name, 
-                        waste_N=N_input)
+            self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
+                        waste_N=self.excret_N)
 
-        ## show current config settings, e.g., livestock, production sys, etc.
-        print('HOUSING Module - current livestock is: '+str(livestock))
-        if production_system is None:
-            raise ValueError("ERROR - incorrect production system for "+str(livestock))
-        else:
-            print('HOUSING Module - current production system is: '+str(production_system))
-        if housing_system is None:
-            raise ValueError("ERROR - incorrect housing system for "+str(livestock))
-        else:
-            print('HOUSING Module - current housing system is: '+str(housing_system))
-        
         self.durine = self.durine * 1000
         self.manure_wc = self.manure_wc * 1000
         ## pH and H+ ions concentration
@@ -165,8 +195,7 @@ class HOUSING_MODULE:
         ## for housing simulation
         self.NH3_inconc = np.zeros(array_shape)
         self.NH3_out = np.zeros(array_shape)
-        print("Housing env is: "+str(house_env))
-        print("Housing system is: "+str(housing_type))
+        
         ## feces input
         self.manure = np.zeros(array_shape)
         ## urine input
@@ -255,9 +284,9 @@ class HOUSING_MODULE:
             self.fpit = fpit
 
             ## area of slatted floor: multiplied by the fraction of slat/pit housing
-            self.floor_area = housing_area*(1.0-f_loss-f_sold)*f_housing_pit
+            self.floor_area = self.housing_area*self.f_housing_pit/(1.0-self.f_loss-self.f_sold)
             ## area of pit: multiplied by the fraction of slat/pit housing
-            self.pit_area = fpit * housing_area*(1.0-f_loss-f_sold)*f_housing_pit
+            self.pit_area = fpit * self.floor_area
         
         else:
             self.evap = np.zeros(array_shape)
@@ -309,22 +338,24 @@ class HOUSING_MODULE:
             self.o_NH3flux = np.zeros(outarray_shape)
 
             ## area of housing area
-            self.floor_area = housing_area*(1.0-(1.0-f_loss-f_sold)*f_housing_pit)
+            self.floor_area = self.housing_area*(1.0-self.f_housing_pit/(1.0-self.f_loss-self.f_sold))
 
             if housing_type.lower() == 'barn':
                 ## urea pool
                 self.urea_pool = np.zeros(array_shape)
                 self.urea_pool_to_storage = np.zeros(outarray_shape)
-            elif housing_type.lower() == 'poultry house':
+            elif housing_type.lower() == 'poultry_house':
                 ## 
-                self.N_birds_UAN = N_input * 1000/365 * f_uan
-                self.manure = self.N_birds_UA/f_excretn
+                # self.N_birds_UAN = N_input * 1000/365 * f_uan
+                # self.manure = self.N_birds_UA/f_excretn
                 ## uric acid pool
+                self.UA = np.zeros(array_shape)
                 self.UA_pool = np.zeros(array_shape)
-                self.UA_pool_to_storage = np.zeros(array_shape)
+                self.UA_pool_to_storage = np.zeros(outarray_shape)
                 ## uric acid hydrolysis rate
-                self.ua_conv_factor = ua_hydrolysis_rate(temp=self.T_sim,rhum=self.RH_sim,ph=self.pH)
-    
+                self.ua_conv_factor = np.zeros(array_shape)
+                ## area of housing area
+                self.floor_area = self.housing_area
     
     ## surface resistance assumed to be 100 s/m (for bedding etc.)
     R_surf = 100.0
@@ -354,16 +385,16 @@ class HOUSING_MODULE:
         ## housing environmental conditions
         if house_env.lower() == 'insulated':
             # print("HOUSING ENV: House with slatted floor")
-            self.T_sim[1:], self.u_sim[1:], self.RH_sim[1:] = housing_env(temp_data,rhum_data,livestock,production_system)
+            self.T_sim[1:], self.u_sim[1:], self.RH_sim[1:] = housing_env(temp_data,rhum_data,self.livestock,self.production_system)
             self.T_gnd = self.T_sim
         elif house_env.lower() == 'naturally ventilated':
             # print("HOUSING ENV: Naturally ventilated barn")
             self.T_sim[1:], self.T_gnd[1:], self.u_sim[1:] = barn_env(temp_data,
                         wind_profile(uref=wind_data,height_ref=wind_data_height,height_out=ref_height,zo=zo_house))
             self.RH_sim[1:] = rhum_data
-        # elif house_env.lower() == 'poultry house':
-        #     # print("HOUSING ENV: Poultry house")
-        #     self.T_sim[1:], self.u_sim[1:], self.RH_sim[1:] = housing_env(temp_data,rhum_data,livestock,production_system)
+        # elif house_env.lower() == 'poultry_house':
+        #     # print("HOUSING ENV: poultry_house")
+        #     self.T_sim[1:], self.u_sim[1:], self.RH_sim[1:] = housing_env(temp_data,rhum_data,self.livestock,self.production_system)
         else:
             # print("HOUSING ENV: Other housing systems")
             self.T_sim[1:] = temp_data
@@ -374,7 +405,7 @@ class HOUSING_MODULE:
         self.T_sim = xr_to_np(self.T_sim)
         self.u_sim = xr_to_np(self.u_sim)
         self.RH_sim = xr_to_np(self.RH_sim)
-        self.met_input_interp(template=animal_file['Excreted_N'][lvl_idx])
+        self.met_input_interp(template=self.animal_file['Excreted_N'][self.lvl_idx])
 
         ###################################################
         ## calculating diagnostic variables
@@ -393,9 +424,9 @@ class HOUSING_MODULE:
             self.evap = water_evap_a(temp=self.T_sim,rhum=self.RH_sim,u=self.u_sim,zo=zo_house)
             self.evap = self.evap*1e6*timestep*3600
 
-            if housing_type.lower() == 'poultry house':
-                ## housing resistance; 16700 s/m for poultry houses
-                self.R_star[:] = 16700
+            # if housing_type.lower() == 'poultry_house':
+            #     ## housing resistance; 16700 s/m for poultry_houses
+            #     self.R_star[:] = 16700
         
 
 
@@ -403,13 +434,13 @@ class HOUSING_MODULE:
     ## define model functions
     ###################################
     ## simulation: for houses with slatted floor (two-source model: slat+pit); industrial production system
-    def slat_pit_housing_sim(self,start_day_idx,end_day_idx,house_env,f_slat,f_gap):
+    def slat_pit_housing_sim(self,start_day_idx,end_day_idx,f_slat,f_gap):
         fpitcorrect = 1/self.fpit
         for dd in np.arange(start_day_idx,end_day_idx):
             if dd<Days:
-                self.sim_env(house_env,"slat/pit house",dd)
+                self.sim_env(self.house_env,"slat/pit house",dd)
             else:
-                self.sim_env(house_env,"slat/pit house",dd-Days)
+                self.sim_env(self.house_env,"slat/pit house",dd-Days)
             self.daily_init(housing_type="slat/pit house")
             for hh in np.arange(24):
                 self.manure[hh+1] = self.dmanure
@@ -487,13 +518,15 @@ class HOUSING_MODULE:
                 ## slat water pool
                 self.Total_water_pool_slat[hh+1] = self.Total_water_pool_slat[hh]+self.urine[hh+1]*f_slat +\
                                                     self.manure_initwc_slat[hh+1] - self.evap_slat[hh+1]
-                water_slat_idx = self.Total_water_pool_slat[hh+1] - self.manure_minwc_slat[hh+1]
-                self.Total_water_pool_slat[hh+1][water_slat_idx<0] = self.manure_minwc_slat[hh+1][water_slat_idx<0]
+                # water_slat_idx = self.Total_water_pool_slat[hh+1] - self.manure_minwc_slat[hh+1]
+                # self.Total_water_pool_slat[hh+1][water_slat_idx<0] = self.manure_minwc_slat[hh+1][water_slat_idx<0]
+                self.Total_water_pool_slat[hh+1] = np.maximum(self.Total_water_pool_slat[hh+1],self.manure_minwc_slat[hh+1])
                 ## pit water pool
                 self.Total_water_pool_pit[hh+1] = self.Total_water_pool_pit[hh]+self.urine[hh+1]*f_gap*fpitcorrect +\
                                                     self.manure_initwc_pit[hh+1]-self.evap_pit[hh]
-                water_pit_idx = self.Total_water_pool_pit[hh+1] - self.manure_minwc_pit[hh+1]
-                self.Total_water_pool_pit[hh+1][water_pit_idx<0] = self.manure_minwc_pit[hh+1][water_pit_idx<0]
+                # water_pit_idx = self.Total_water_pool_pit[hh+1] - self.manure_minwc_pit[hh+1]
+                # self.Total_water_pool_pit[hh+1][water_pit_idx<0] = self.manure_minwc_pit[hh+1][water_pit_idx<0]
+                self.Total_water_pool_pit[hh+1] = np.maximum(self.Total_water_pool_pit[hh+1],self.manure_minwc_pit[hh+1])
 
 
                 ## TAN pool of slat and pit
@@ -503,10 +536,12 @@ class HOUSING_MODULE:
 
                 ## TAN conc on slat and in pit (currently in g/ml)
                 self.TAN_amount_slat[hh+1] = self.TAN_pool_slat[hh+1]/self.Total_water_pool_slat[hh+1]
-                self.TAN_amount_slat[hh+1][self.Total_water_pool_slat[hh+1]==0] = 0.0
+                # self.TAN_amount_slat[hh+1][self.Total_water_pool_slat[hh+1]==0] = 0.0
+                self.TAN_amount_slat[hh+1] = np.nan_to_num(self.TAN_amount_slat[hh+1],posinf=0.0,neginf=0.0)
 
                 self.TAN_amount_pit[hh+1] = self.TAN_pool_pit[hh+1]/self.Total_water_pool_pit[hh+1]
-                self.TAN_amount_pit[hh+1][self.Total_water_pool_pit[hh+1]==0] = 0.0
+                # self.TAN_amount_pit[hh+1][self.Total_water_pool_pit[hh+1]==0] = 0.0
+                self.TAN_amount_pit[hh+1] = np.nan_to_num(self.TAN_amount_pit[hh+1],posinf=0.0,neginf=0.0)
 
                 ## TAN conc in g/m3
                 self.TAN_amount_slat[hh+1] = self.TAN_amount_slat[hh+1] * 1e6
@@ -525,13 +560,15 @@ class HOUSING_MODULE:
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss_slat[hh+1] = NH3_volslat(slat_conc=self.NH3_gas_slat[hh+1],conc_in=0.0,
                                                     Rslat=self.R_slat[hh+1])*timestep*3600
-                emiss_slat_idx = self.TAN_pool_slat[hh+1] - self.modelled_emiss_slat[hh+1] 
-                self.modelled_emiss_slat[hh+1][emiss_slat_idx<0] = self.TAN_pool_slat[hh+1][emiss_slat_idx<0]
+                # emiss_slat_idx = self.TAN_pool_slat[hh+1] - self.modelled_emiss_slat[hh+1] 
+                # self.modelled_emiss_slat[hh+1][emiss_slat_idx<0] = self.TAN_pool_slat[hh+1][emiss_slat_idx<0]
+                self.modelled_emiss_slat[hh+1] = np.minimum(self.modelled_emiss_slat[hh+1],self.TAN_pool_slat[hh+1])
 
                 self.modelled_emiss_pit[hh+1] = NH3_volpit(pit_tanconc=self.TAN_amount_pit[hh+1],conc_in=0.0,
                                                 Rpit=self.R_pit[hh+1])*timestep*3600
-                emiss_pit_idx = self.TAN_pool_pit[hh+1] - self.modelled_emiss_pit[hh+1]
-                self.modelled_emiss_pit[hh+1][emiss_pit_idx<0] = self.TAN_pool_pit[hh+1][emiss_pit_idx<0]
+                # emiss_pit_idx = self.TAN_pool_pit[hh+1] - self.modelled_emiss_pit[hh+1]
+                # self.modelled_emiss_pit[hh+1][emiss_pit_idx<0] = self.TAN_pool_pit[hh+1][emiss_pit_idx<0]
+                self.modelled_emiss_pit[hh+1] = np.minimum(self.modelled_emiss_pit[hh+1],self.TAN_pool_pit[hh+1])
 
                 ## final emission flux from slat and pit; flux are additive
                 self.NH3flux_slat[hh+1] = self.modelled_emiss_slat[hh+1]
@@ -551,12 +588,12 @@ class HOUSING_MODULE:
 
     ## simulation: for houses with concrete floor (singe-source model); 
     ## intermediate/backyard production system (pig/ruminants)
-    def barn_housing_sim(self,start_day_idx,end_day_idx,house_env):
+    def barn_housing_sim(self,start_day_idx,end_day_idx):
         for dd in np.arange(start_day_idx,end_day_idx):
             if dd<Days:
-                self.sim_env(house_env,"barn",dd)
+                self.sim_env(self.house_env,"barn",dd)
             else:
-                self.sim_env(house_env,"barn",dd-Days)
+                self.sim_env(self.house_env,"barn",dd-Days)
             self.daily_init(housing_type="barn")
             for hh in np.arange(24):
                 self.manure[hh+1] = self.dmanure
@@ -602,15 +639,17 @@ class HOUSING_MODULE:
                 self.manure_minwc[hh+1] = self.manure_pool[hh+1]*mois_coeff
                 ## water pool 
                 self.Total_water_pool[hh+1] = self.Total_water_pool[hh]+self.urine[hh+1]+self.manure_initwc[hh+1]-self.evap[hh+1]
-                water_idx = self.Total_water_pool[hh+1] - self.manure_minwc[hh+1] 
-                self.Total_water_pool[hh+1][water_idx<0] = self.manure_minwc[hh+1][water_idx<=0] 
+                # water_idx = self.Total_water_pool[hh+1] - self.manure_minwc[hh+1] 
+                # self.Total_water_pool[hh+1][water_idx<0] = self.manure_minwc[hh+1][water_idx<=0] 
+                self.Total_water_pool[hh+1] = np.maximum(self.Total_water_pool[hh+1],self.manure_minwc[hh+1])
 
                 ## TAN pool 
                 self.TAN_pool[hh+1] = self.TAN_pool[hh]+self.TAN_prod[hh+1]
 
                 ## TAN conc (currently in g/ml)
                 self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/self.Total_water_pool[hh+1]
-                self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0.0
+                # self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0.0
+                self.TAN_amount[hh+1] = np.nan_to_num(self.TAN_amount[hh+1],posinf=0.0,neginf=0.0)
                 ## TAN conc in g/m3
                 self.TAN_amount[hh+1] = self.TAN_amount[hh+1] * 1e6
 
@@ -624,8 +663,9 @@ class HOUSING_MODULE:
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss[hh+1] = NH3_volslat(slat_conc=self.NH3_gas[hh+1],conc_in=0.0,
                                                         Rslat=self.R_star[hh+1])*timestep*3600
-                emiss_idx = self.TAN_pool[hh+1] - self.modelled_emiss[hh+1]
-                self.modelled_emiss[hh+1][emiss_idx<0] = self.TAN_pool[hh+1][emiss_idx<0]
+                # emiss_idx = self.TAN_pool[hh+1] - self.modelled_emiss[hh+1]
+                # self.modelled_emiss[hh+1][emiss_idx<0] = self.TAN_pool[hh+1][emiss_idx<0]
+                self.modelled_emiss[hh+1] = np.minimum(self.modelled_emiss[hh+1],self.TAN_pool[hh+1])
 
                 ## final emission flux 
                 self.NH3flux[hh+1] = self.modelled_emiss[hh+1]
@@ -642,49 +682,107 @@ class HOUSING_MODULE:
 
     ## simulation: for poultry housing;
     ## broilers/layers; housing resistance is assumed to be 16700 s/m
-    def poultry_housing_sim(self,start_day_idx,end_day_idx,house_env):
+    def poultry_housing_sim(self,start_day_idx,end_day_idx):
         for dd in np.arange(start_day_idx,end_day_idx):
             if dd<Days:
-                self.sim_env(house_env,"barn",dd)
+                self.sim_env(self.house_env,"poultry_house",dd)
             else:
-                self.sim_env(house_env,"barn",dd-Days)
+                self.sim_env(self.house_env,"poultry_house",dd-Days)
+            self.daily_init(housing_type="poultry_house")
             for hh in np.arange(24):
                 ## excretion pool; Eq.1
-                self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure
-                self.TAN_prod[hh+1] = self.ua_conv_factor[hh+1] * self.UA_pool[hh]
-                ## UA pool; Eq.2
-                UA_idx = self.UA_pool[hh] - self.TAN_prod[hh+1]
-                self.UA_pool[hh+1][UA_idx>0] = self.UA_pool[hh][UA_idx>0] + self.N_birds_UAN[UA_idx>0] - self.TAN_prod[hh+1][UA_idx>0]
-                self.UA_pool[hh+1][UA_idx<=0] = self.N_birds_UAN[UA_idx<=0]
+                self.manure[hh+1] = self.dmanure
+                self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1]
+                
+                ## N input in multiple forms
+                self.UA[hh+1] = self.durine_N
+                self.avail_N[hh+1] = 0.0
+                self.resist_N[hh+1] = 0.0
+                self.unavail_N[hh+1] = 0.0
+                self.avail_N[hh+1] = self.dmanure_N*f_avail
+                self.resist_N[hh+1] = self.dmanure_N*f_resist
+                self.unavail_N[hh+1] = self.dmanure_N*f_unavail
 
-                ## manure_water calculation; Eq.9  
-                self.manure_water[hh+1][self.mois_coeff[hh+1]>=5] = self.manure_pool[hh+1][self.mois_coeff[hh+1]>=5] * self.mois_coeff[hh+1][self.mois_coeff[hh+1]>=5] / 100
-                self.manure_water[hh+1][self.mois_coeff[hh+1]<5] = 0
-                self.Total_water_pool[hh+1] = self.manure_water[hh+1]
+                ## urea hydrolysis rate
+                self.ua_conv_factor[hh+1] = ua_hydrolysis_rate(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1],ph=self.pH,
+                                        delta_t=timestep)
+                ## decomposition rate of available and resistant N components
+                self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_gnd[hh+1], 
+                                                                                                    delta_t=timestep)
+
+                ## UA pool
+                self.UA_pool[hh+1] = self.UA_pool[hh] + self.UA[hh+1]
+                ## Org N pools in various forms
+                self.avail_N_pool[hh+1] = self.avail_N_pool[hh] + self.avail_N[hh+1]
+                self.resist_N_pool[hh+1] = self.resist_N_pool[hh] + self.resist_N[hh+1]            
+                self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh] + self.unavail_N[hh+1] 
+
+                ## TAN production from uric acid hydrolysis and the N decomposition rate from orgN
+                self.TAN_prod[hh+1] = self.ua_conv_factor[hh+1]*self.UA_pool[hh+1]+\
+                                        self.Na_decomp_rate[hh+1]*self.avail_N_pool[hh+1] +\
+                                        self.Nr_decomp_rate[hh+1]*self.resist_N_pool[hh+1]
+
+                ## update UA pool and orgN pools
+                self.UA_pool[hh+1] = self.UA_pool[hh+1]*(1 - self.ua_conv_factor[hh+1]) 
+                self.avail_N_pool[hh+1] = self.avail_N_pool[hh+1]*(1 - self.Na_decomp_rate[hh+1]) 
+                self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]* (1 - self.Nr_decomp_rate[hh+1])  
+
+                ## manure_water calculation 
+                self.manure_initwc[hh+1] = self.manure_wc
+                self.Total_water_pool[hh+1] = self.Total_water_pool[hh] + self.manure_initwc[hh+1]
+
+                # mois_coeff = min_manurewc(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1])
+                # self.manure_minwc[hh+1] = self.manure_pool[hh+1]*mois_coeff
+                # self.Total_water_pool[hh+1] = self.Total_water_pool[hh] + self.manure_initwc[hh+1] - self.evap[hh+1]
+                # self.Total_water_pool[hh+1][self.Total_water_pool[hh+1]<self.manure_minwc[hh+1]] = self.manure_minwc[hh+1][self.Total_water_pool[hh+1]<self.manure_minwc[hh+1]]
                 
-                ## TAN pool; Eq.3
-                TAN_idx = self.TAN_pool[hh] - self.NH3flux[hh]
-                self.TAN_pool[hh+1][TAN_idx<=0] = self.TAN_prod[hh+1][TAN_idx<=0]
-                self.TAN_pool[hh+1][TAN_idx>0] = TAN_idx[TAN_idx>0] + self.TAN_prod[hh+1][TAN_idx>0]
-                self.TAN_pool_ug[hh+1] = self.TAN_pool[hh+1] * 1e6
+                # mois_coeff = min_manurewc(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1])
+                # self.Total_water_pool[hh+1] = self.manure_pool[hh+1]*mois_coeff
+
+                ## TAN pool
+                self.TAN_pool[hh+1] = self.TAN_pool[hh] + self.TAN_prod[hh+1]
                 
-                ## TAN concentration
+                ## TAN concentration; g/cm3
+                self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1]*Kd/(manure_PD/1e3))
+                # self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1])
                 self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0
-                self.TAN_amount[hh+1][self.Total_water_pool[hh+1]!=0] = self.TAN_pool[hh+1][self.Total_water_pool[hh+1]!=0] / self.Total_water_pool[hh+1][self.Total_water_pool[hh+1]!=0]
-                self.TAN_amount_M[hh+1] = self.TAN_amount[hh+1] / 14 * 1000
+                ## TAN concentration in g/m3
+                self.TAN_amount[hh+1] = self.TAN_amount[hh+1] * 1e6
 
-                ## Gamma value; Eq.7
-                self.Gamma_manure[hh+1] =  self.TAN_amount_M[hh+1] / (self.cc_H + self.k_NH4[hh+1])
-                
-                ## Gaseous concentration of NH3 at the surface; Eq.6
-                self.NH3_gas_M[hh+1] = self.Henry_constant[hh+1] * self.Gamma_manure[hh+1]
-                self.NH3_gas_ug[hh+1] = self.NH3_gas_M[hh+1] * 14 * 1e9
+                ## NH3 conc in g/m3
+                KNH3 = NH3_par_coeff(temp=self.T_sim[hh+1],cncH=self.cc_H)
+                # self.NH3_gas[hh+1] = self.TAN_amount[hh+1]*KNH3
 
-                ## Emissions; see Eq.8 in general, and Sect.2.2.2; Eq.14~17
-                emiss_idx = (self.NH3_gas_ug[hh+1]*3600*timestep/self.R_star) - self.TAN_pool_ug[hh+1]
-                self.modelled_emiss[hh+1][emiss_idx>0] = self.TAN_pool_ug[hh+1][emiss_idx>0]
-                self.modelled_emiss[hh+1][emiss_idx<0] = self.NH3_gas_ug[hh+1][emiss_idx<0]*3600*timestep/self.R_star
-                self.NH3flux[hh+1] = self.Modelled_emiss[hh+1]/1e6 
+                ## resistance
+                # self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house)+16500
+                self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house)
+
+                ## the thickness of accumulated manure
+                z_manure = (self.manure_pool[hh+1] + self.Total_water_pool[hh+1])/1e6
+                manure_wc = self.Total_water_pool[hh+1]/(self.manure_pool[hh+1] + self.Total_water_pool[hh+1])
+                Rmanure = diff_resistance(distance=z_manure,phase='aqueous',
+                            theta_sat=manure_wc,theta=manure_wc,temp=self.T_sim[hh+1])
+                ## equilibrium TAN concentration at the surface
+                TAN_surf = (self.TAN_amount[hh+1]/Rmanure)/(KNH3/self.R_star[hh+1]+1/Rmanure)
+                self.NH3_gas[hh+1] = TAN_surf*KNH3
+
+                ## determining the maximum emission; emission cannot exceed TAN pool
+                self.modelled_emiss[hh+1] = NH3_volslat(slat_conc=self.NH3_gas[hh+1],conc_in=0.0,
+                                                        Rslat=self.R_star[hh+1])*timestep*3600
+                # emiss_idx = self.TAN_pool[hh+1] - self.modelled_emiss[hh+1]
+                # self.modelled_emiss[hh+1][emiss_idx<0] = self.TAN_pool[hh+1][emiss_idx<0]
+                self.modelled_emiss[hh+1] = np.minimum(self.modelled_emiss[hh+1],self.TAN_pool[hh+1])
+
+                ## final emission flux 
+                self.NH3flux[hh+1] = self.modelled_emiss[hh+1]
+
+                ## update TAN pool
+                self.TAN_pool[hh+1] = self.TAN_pool[hh+1] - self.NH3flux[hh+1]
+            if dd >= Days:
+                ddidx = dd - Days
+            else:
+                ddidx = dd
+            self.daily_output(housing_type="poultry_house",dayidx=ddidx)
         return
 
     ## initialisation: model initialisation for housing simulation
@@ -746,46 +844,27 @@ class HOUSING_MODULE:
     ## initialisation: 2nd initialisation for housing simulation
     def housing_2nd_init(self,housing_type):
         if housing_type.lower() == 'slat/pit house':
-            aa2 = self.manure_pool_slat[-1]
-            aa3 = self.manure_pool_pit[-1]
-            bb2 = self.urea_pool_slat[-1]
-            bb3 = self.urea_pool_pit[-1]
-            cc2 = self.TAN_pool_slat[-1]
-            cc3 = self.TAN_pool_pit[-1]
-            dd2 = self.NH3flux_slat[-1]
-            dd3 = self.NH3flux_pit[-1]
-            ee2 = self.Total_water_pool_slat[-1]
-            ee3 = self.Total_water_pool_pit[-1]
+            self.manure_pool_slat[0] = self.manure_pool_slat[-1]
+            self.manure_pool_pit[0] = self.manure_pool_pit[-1]
+            self.urea_pool_slat[0] = self.urea_pool_slat[-1]
+            self.urea_pool_pit[0] = self.urea_pool_pit[-1]
+            self.TAN_pool_slat[0] = self.TAN_pool_slat[-1]
+            self.TAN_pool_pit[0] = self.TAN_pool_pit[-1]
+            self.NH3flux_slat[0] = self.NH3flux_slat[-1]
+            self.NH3flux_pit[0] = self.NH3flux_pit[-1]
+            self.Total_water_pool_slat[0]= self.Total_water_pool_slat[-1]
+            self.Total_water_pool_pit[0] = self.Total_water_pool_pit[-1]
 
-            self.manure_pool_slat[0] = aa2
-            self.manure_pool_pit[0] = aa3
-            self.urea_pool_slat[0] = bb2
-            self.urea_pool_pit[0] = bb3
-            self.TAN_pool_slat[0] = cc2
-            self.TAN_pool_pit[0] = cc3
-            self.NH3flux_slat[0] = dd2
-            self.NH3flux_pit[0] = dd3
-            self.Total_water_pool_slat[0] = ee2
-            self.Total_water_pool_pit[0] = ee3  
         else:
-            aa1 = self.manure_pool[-1]
-            
-            cc1 = self.TAN_pool[-1]
-            dd1 = self.NH3flux[-1]
-            ee1 = self.Total_water_pool[-1]
-
-            self.manure_pool[0] = aa1
-            
-            self.TAN_pool[0] = cc1
-            self.NH3flux[0] = dd1
-            self.Total_water_pool[0] = ee1
+            self.manure_pool[0] = self.manure_pool[-1]
+            self.TAN_pool[0] = self.TAN_pool[-1]
+            self.NH3flux[0] = self.NH3flux[-1]
+            self.Total_water_pool[0] = self.Total_water_pool[-1]
 
             if housing_type.lower() == 'barn':
-                bb1 = self.urea_pool[-1]
-                self.urea_pool[0] = bb1
-            elif housing_type.lower() == 'poultry house':
-                bb1 = self.UA_pool[-1]
-                self.UA_pool[0] = bb1
+                self.urea_pool[0] = self.urea_pool[-1]
+            elif housing_type.lower() == 'poultry_house':
+                self.UA_pool[0] = self.UA_pool[-1]
 
     def daily_init(self,housing_type):
         if housing_type == 'slat/pit house':
@@ -808,16 +887,20 @@ class HOUSING_MODULE:
             self.avail_N_pool[0] = self.avail_N_pool[-1]
             self.resist_N_pool[0] = self.resist_N_pool[-1]
             self.unavail_N_pool[0] = self.unavail_N_pool[-1]
-            self.urea_pool[0] = self.urea_pool[-1]
             self.TAN_pool[0] = self.TAN_pool[-1]
             self.Total_water_pool[0] = self.Total_water_pool[-1]
+            if housing_type == "barn":
+                self.urea_pool[0] = self.urea_pool[-1]
+            if housing_type == "poultry_house":
+                self.UA_pool[0] = self.UA_pool[-1]
 
     ## output daily sum
     def daily_output(self,housing_type,dayidx):
         if housing_type == "slat/pit house":
             self.o_NH3flux_slat[dayidx] = np.nansum(self.NH3flux_slat[1:],axis=0)
             self.o_NH3flux_pit[dayidx] = np.nansum(self.NH3flux_pit[1:],axis=0)
-        if housing_type == "barn":
+        # if housing_type == "barn":
+        else:
             self.o_NH3flux[dayidx] = np.nansum(self.NH3flux[1:],axis=0)
 
     ## initialisation for house (barn) cleaning; all variables at the cleaning day are reset to zero
@@ -870,7 +953,7 @@ class HOUSING_MODULE:
             if housing_type.lower() == 'barn':
                 self.urea_pool_to_storage[dayidx] = self.urea_pool[-1]*self.floor_area
                 self.urea_pool[:] = 0.0
-            elif housing_type.lower() == 'poultry house':
+            elif housing_type.lower() == 'poultry_house':
                 self.UA_pool_to_storage[dayidx] = self.UA_pool[-1]*self.floor_area
                 self.UA_pool[:] = 0.0
 
@@ -892,10 +975,10 @@ class HOUSING_MODULE:
             self.NH3flux_from_barn[:] = 0.0
             if housing_type.lower() == 'barn':
                 self.urea_pool_to_storage[:] = 0.0
-            elif housing_type.lower() == 'poultry house':
+            elif housing_type.lower() == 'poultry_house':
                 self.UA_pool_to_storage[:] = 0.0
 
-    def sim_out(self,housing_type):
+    def sim_out(self,housing_type,poultry_insitu=False):
         nlat = int(180.0/dlat)
         nlon = int(360.0/dlon)
         ntime = Days
@@ -906,10 +989,16 @@ class HOUSING_MODULE:
         if housing_type.lower() == 'slat/pit house':
             slat_emiss = self.o_NH3flux_slat*self.floor_area.values
             pit_emiss = self.o_NH3flux_pit*self.pit_area.values
+            n_excret = self.excret_N*self.floor_area.values
+            source_area_slat = self.floor_area.values
+            source_area_pit = self.pit_area.values
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss_slat=(['time','lat','lon'],slat_emiss),
                     NH3emiss_pit=(['time','lat','lon'],pit_emiss),
+                    Nexcret=(['lat','lon'],n_excret),
+                    sourcearea_slat=(['lat','lon'],source_area_slat),
+                    sourcearea_pit=(['lat','lon'],source_area_pit),
                             ),
                 coords = dict(
                     time=(["time"], times),
@@ -918,9 +1007,9 @@ class HOUSING_MODULE:
                             ),
                 attrs=dict(
                     description="AMCLIM-Housing: NH3 emissions from "+\
-                            production_system+" "+livestock+" "+housing_type+"housing in " +str(sim_year),
-                    info = production_system+" "+livestock+" "+housing_type,
-                    units="gN per grid",
+                            self.production_system+" "+self.livestock+" "+housing_type+"housing in " +str(sim_year),
+                    info = self.production_system+" "+self.livestock+" "+housing_type,
+                    units="gN per grid; m2 per grid",
                 ),
             )
             outds.NH3emiss_slat.attrs["unit"] = 'gN/day'
@@ -929,11 +1018,29 @@ class HOUSING_MODULE:
             outds.NH3emiss_pit.attrs["unit"] = 'gN/day'
             outds.NH3emiss_pit.attrs["long name"] = 'NH3 emission from housing (pit)'
 
-        elif housing_type.lower() == 'barn':
+            outds.Nexcret.attrs["unit"] = 'gN'
+            outds.Nexcret.attrs["long name"] = 'N excreted (under current category)'
+
+            outds.sourcearea_slat.attrs["unit"] = 'm2'
+            outds.sourcearea_slat.attrs["long name"] = 'Source area for NH3 emission (slat)'
+
+            outds.sourcearea_pit.attrs["unit"] = 'm2'
+            outds.sourcearea_pit.attrs["long name"] = 'Source area for NH3 emission (pit)'
+
+        # elif housing_type.lower() == 'barn':
+        else:
+            if poultry_insitu is True:
+                insitu = '_in-situ_storage'
+            else:
+                insitu = ''
             housing_NH3emiss = self.o_NH3flux*self.floor_area.values
+            n_excret = self.excret_N*self.floor_area.values
+            source_area = self.floor_area.values
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],housing_NH3emiss),
+                    Nexcret=(['lat','lon'],n_excret),
+                    sourcearea_slat=(['lat','lon'],source_area),
                             ),
                 coords = dict(
                     time=(["time"], times),
@@ -942,59 +1049,73 @@ class HOUSING_MODULE:
                             ),
                 attrs=dict(
                     description="AMCLIM-Housing: NH3 emissions from "+\
-                            production_system+" "+livestock+" "+housing_type+"housing in " +str(sim_year),
-                    info = production_system+" "+livestock+" "+housing_type,
+                            self.production_system+" "+self.livestock+" "+housing_type+"housing in " +str(sim_year),
+                    info = self.production_system+" "+self.livestock+" "+housing_type+insitu,
                     units="gN per grid",
                 ),
             )
             outds.NH3emiss.attrs["unit"] = 'gN/day'
             outds.NH3emiss.attrs["long name"] = 'NH3 emission from housing'
 
+            outds.Nexcret.attrs["unit"] = 'gN'
+            outds.Nexcret.attrs["long name"] = 'N excreted (under current category)'
+
+            outds.sourcearea_slat.attrs["unit"] = 'm2'
+            outds.sourcearea_slat.attrs["long name"] = 'Source area for NH3 emission (floor)'
+
         comp = dict(zlib=True, complevel=9)
         encoding = {var: comp for var in outds.data_vars}
 
-        outds.to_netcdf(output_path+livestock+'.'+production_system+'.'+housing_type+\
+        outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+housing_type+insitu+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
         return
     
-    def slat_pit_sim_main(self,house_env,housing_type,start_idx,end_idx,cleaning_frequency):
-        print('HOUSING Sim - current simulation is for: '+str(house_env)+', slat/pit housing, '+str(livestock))
+    def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency):
+        print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', slat/pit housing, '+\
+                                                            str(self.livestock)+', '+str(self.production_system))
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
-                self.slat_pit_housing_sim(dd,dd+cleaning_frequency,house_env,self.fslat,self.fgap)
+                self.slat_pit_housing_sim(dd,dd+cleaning_frequency,self.fslat,self.fgap)
                 self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
-                self.slat_pit_housing_sim(dd,end_idx,house_env,self.fslat,self.fgap)
+                self.slat_pit_housing_sim(dd,end_idx,self.fslat,self.fgap)
         self.housing_2nd_init(housing_type)
-        self.slat_pit_housing_sim(0,start_idx,house_env,self.fslat,self.fgap)
+        self.slat_pit_housing_sim(0,start_idx,self.fslat,self.fgap)
         self.sim_out(housing_type)
         return
 
-    def barn_sim_main(self,house_env,housing_type,start_idx,end_idx,cleaning_frequency,litter=False):
-        print('HOUSING Sim - current simulation is for: '+str(house_env)+', barn, '+str(livestock))
+    def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False):
+        print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', barn, '+\
+                                                            str(self.livestock)+', '+str(self.production_system))
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
         if litter is True:
             self.R_surf = 100.0
-            self.floor_area = self.floor_area*f_housing_litter
+            self.floor_area = self.floor_area*self.f_housing_litter
         else:
-            self.floor_area = self.floor_area*(1.0-f_housing_litter)
+            self.floor_area = self.floor_area*(1.0-self.f_housing_litter)
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
-                self.barn_housing_sim(dd,dd+cleaning_frequency,house_env)
+                self.barn_housing_sim(dd,dd+cleaning_frequency)
                 self.cleaning_pit(dd+cleaning_frequency,housing_type)
             else:
-                self.barn_housing_sim(dd,end_idx,house_env)
+                self.barn_housing_sim(dd,end_idx)
         self.housing_2nd_init(housing_type)
-        self.barn_housing_sim(0,start_idx,house_env)
+        self.barn_housing_sim(0,start_idx)
         self.sim_out(housing_type)
         return
 
-    def poultry_house_sim_main(self,house_env,housing_type,start_idx,end_idx,cleaning_frequency):
-        self.sim_env(housing_type)
+    def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,insitu_storage=False):
+        print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', poultry_house, '+\
+                                                            str(self.livestock)+', '+str(self.production_system))
+        if insitu_storage is True:
+            ## in-situ storage of poultry housing: pit, litter, no-litter 
+            self.floor_area = self.floor_area*(self.f_housing_litter+self.f_housing_pit)/(1.0-self.f_loss-self.f_sold)
+        else:
+            self.floor_area = self.floor_area*(1.0-(self.f_housing_litter+self.f_housing_pit))/(1.0-self.f_loss-self.f_sold)
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
@@ -1005,6 +1126,7 @@ class HOUSING_MODULE:
                 self.poultry_housing_sim(dd,end_idx)
         self.housing_2nd_init(housing_type)
         self.poultry_housing_sim(0,start_idx)
+        self.sim_out(housing_type,insitu_storage)
         return 
 
     

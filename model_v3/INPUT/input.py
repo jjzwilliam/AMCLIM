@@ -18,7 +18,7 @@ met_data_path = 'met_data/met_data/'
 crop_data_path = 'crop_data/'
 soil_data_path ='soil_data/'
 ## Open animal data files and meteorological files
-animal_file = xr.open_dataset(infile_path+animal_data_path+animal_file_name)
+# animal_file = xr.open_dataset(infile_path+animal_data_path+animal_file_name)
 
 ## open meteorology/parameter/variable files
 ## meteorological data in 2018: 1) temperature (2m air; ground), 2) relative humidity, 3) 10m wind speed, 4) evaporation from soil,
@@ -100,11 +100,11 @@ subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-2018d
 #evap_data = np.zeros(mtrx)
 
 ## open MMS data
-try:
-    MMS_file = xr.open_dataset(infile_path+animal_data_path+MMS_file_name)
-    #MMS_data = MMS_file[MMS_type]
-except:
-    pass
+# try:
+#     MMS_file = xr.open_dataset(infile_path+animal_data_path+MMS_file_name)
+#     #MMS_data = MMS_file[MMS_type]
+# except:
+#     pass
 
 #################################
 ## crop and fertilizer data

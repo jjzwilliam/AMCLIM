@@ -39,37 +39,53 @@ def housing_env(temp,rhum,livestock_type,production_system_type):
     u_in = np.zeros(temp.shape)
     if livestock_type.lower() == 'cattle':
         t_in = temp
-        u_in[temp<0] = 0.2
-        u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
-        u_in[temp>=12.5] = 0.38
+        # u_in[temp<0] = 0.2
+        # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
+        # u_in[temp>=12.5] = 0.38
+        ## maximum ventilation is 0.38; minimum is 0.2
+        u_in = 0.2+temp*(0.18/12.5)
+        u_in = np.maximum(u_in,0.2)
+        u_in = np.minimum(u_in,0.38)
         rhum_in = rhum
     if livestock_type.lower() == 'dairy':
         t_in = temp
-        u_in[temp<0] = 0.2
-        u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
-        u_in[temp>=12.5] = 0.38
+        # u_in[temp<0] = 0.2
+        # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
+        # u_in[temp>=12.5] = 0.38
+        u_in = 0.2+temp*(0.18/12.5)
+        u_in = np.maximum(u_in,0.2)
+        u_in = np.minimum(u_in,0.38)
         rhum_in = rhum
     elif livestock_type.lower() == 'pig':
         t_in = np.zeros(temp.shape)
         t_in[temp<0] = 20+0.25*temp[temp<0]
         t_in[(temp>0)&(temp<12.5)] = 20
         t_in[temp>=12.5] = 20+(temp[temp>=12.5]-12.5)
-        u_in[temp<0] = 0.2
-        u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
-        u_in[temp>=12.5] = 0.38
+        # u_in[temp<0] = 0.2
+        # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
+        # u_in[temp>=12.5] = 0.38
+        u_in = 0.2+temp*(0.18/12.5)
+        u_in = np.maximum(u_in,0.2)
+        u_in = np.minimum(u_in,0.38)
         rhum_in = rhum - 10
     elif livestock_type.lower() == 'poultry':
         if production_system_type.lower() == 'broiler':
             t_in = 0.00020*temp**3 + 0.0010*temp**2 + 0.024*temp + 22.1        ## Jiang et a., 2021
-            u_in[temp<0] = 0.2  
-            u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.23/12.5)
-            u_in[temp>=12.5] = 0.43 
+            # u_in[temp<0] = 0.2  
+            # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.23/12.5)
+            # u_in[temp>=12.5] = 0.43 
+            u_in = 0.2+temp*(0.23/12.5)
+            u_in = np.maximum(u_in,0.2)
+            u_in = np.minimum(u_in,0.43)
             rhum_in = rhum
         elif production_system_type.lower() == 'layer':
             t_in = 0.00014*temp**3 + 0.0023*temp**2 + 0.011*temp + 23.8        ## Jiang et a., 2021
-            u_in[temp<0] = 0.2
-            u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.23/12.5)
-            u_in[temp>=12.5] = 0.43
+            # u_in[temp<0] = 0.2
+            # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.23/12.5)
+            # u_in[temp>=12.5] = 0.43
+            u_in = 0.2+temp*(0.23/12.5)
+            u_in = np.maximum(u_in,0.2)
+            u_in = np.minimum(u_in,0.43)
             rhum_in = rhum
     return t_in, u_in, rhum_in
 ## EMPIRICAL - barn conditions, including open barns for livestock; ref: Gyldenkærne et al., 2005
@@ -84,8 +100,10 @@ def barn_env(temp,wind):
     Gnd_temp = 4.0
     tempdiff = 4.0
     temp_idx = Gnd_temp - tempdiff  
-    t_gnd[temp<=temp_idx] = Gnd_temp
-    t_gnd[temp>temp_idx] = temp[temp>temp_idx] + tempdiff
+    # t_gnd[temp<=temp_idx] = Gnd_temp
+    # t_gnd[temp>temp_idx] = temp[temp>temp_idx] + tempdiff
+    t_gnd = temp + tempdiff
+    t_gnd = np.maximum(t_gnd,Gnd_temp)
     t_barn = temp + 3.0
     # t_gnd = temp + 0.6*(20-temp)
     
@@ -99,30 +117,32 @@ def barn_env(temp,wind):
 ## Reaction rates
 ####################
 ## EMPIRICAL - rate: uric acid hydrolysis to TAN; temp in degC, rhum in per cent
-def ua_hydrolysis_rate(temp,rhum,ph):
+def ua_hydrolysis_rate(temp,rhum,ph,delta_t):
     ## maximum daily hydrolysis rate is 20%
-    dmax_rate = 0.2
+    dmax_rate = 0.2/24
     ft = np.array(np.exp(0.165*(temp-10) + 1.8)/np.exp(0.165*(35-10) + 1.8))
-    ft[ft>1.0] = 1.0
+    # ft[ft>1.0] = 1.0
+    ft = np.minimum(ft,1.0)
     erh = np.array((-np.log(1.01 - (rhum/100))/(0.0000534*(temp+273.15)))**(1/1.41))
     frh = np.array(np.round(0.0025*np.exp(0.1676*erh),3))
-    frh[erh>35.5] = 1.0
+    # frh[erh>35.5] = 1.0
+    frh = np.minimum(frh,1.0)
+    # frh = 0.0125*rhum-0.0014
     fph = (1.34*ph - 7.2)/(1.34*9 - 7.2)
-    ## daily conversion rate
-    drate = dmax_rate*ft*frh*fph
+    ## conversion rate
+    fenv = ft*frh*fph
+    # fenv[fenv>1.0] = 1.0
+    fenv = np.minimum(fenv,1.0)
+    drate = (dmax_rate*delta_t)*fenv
     return drate
 ## EMPIRICAL - rate: urea hydrolysis to TAN; temp in degC, delta_t is the time step, i.e 1 hour, daily res: delta_t=24
-# def urea_hydrolysis_rate(temp,WFPS,delta_t):
-#     ## T is the soil temperature (or air temperature for housing)
-#     ## WFPS is water-filled porosity, i.e. in this simulation, is the moisture content of manure for housing
-#     ## it remains unclear of k_h and WFPS
-#     ## k_h = 1.2 * WFPS
 def urea_hydrolysis_rate(temp,theta,delta_t,k_h=0.23): 
     ## DEFAULT:k_h equals 0.23 per hour at 20 degC; Goh and Sherlock, 1985; Muck, 1981;
     ## Ah_t is a temeprature scaling factor for k_h; temperature dependence Q10 is ~2. 
     Ah_t = 0.25 * np.exp(0.0693*temp)
     hydrolysis_rate = 1 - np.exp((-k_h*theta*delta_t)*Ah_t)  
-    hydrolysis_rate[np.isnan(hydrolysis_rate)] = 0.0
+    # hydrolysis_rate[np.isnan(hydrolysis_rate)] = 0.0
+    hydrolysis_rate = np.nan_to_num(hydrolysis_rate)
     return hydrolysis_rate
 ## EMPIRICAL - rate: TAN production from the decompostion of N_avail and N_resist; temp in degC
 ## ref: Vigil and Kissel (1995)
@@ -169,6 +189,7 @@ def nitrification_rate_soil(ground_temp,theta,theta_sat,pH,fer_type):
         #b = 16
     ## temperature responce funtion
     func_tg = ((tmax-ground_temp)/(tmax-topt))**asigma*np.exp(asigma*(ground_temp-topt)/(tmax-topt))
+    func_tg = np.minimum(func_tg,1.0)
     ## water in soil
     # soilwc = theta*rho_water/((1-theta_sat)*rho_soil)
     ## moisture response function
@@ -181,8 +202,10 @@ def nitrification_rate_soil(ground_temp,theta,theta_sat,pH,fer_type):
     c = -0.007
     d = 3.22
     func_wfps = (((WFPS-b)/(a-b))**(d*(b-a)/(a-c)))*(((WFPS-c)/(a-c))**d)
+    func_wfps = np.minimum(func_wfps,1.0)
     ## soil pH responce function
     func_pH = 0.56+(np.arctan(np.pi*0.45*(-5+pH))/np.pi)
+    func_pH = np.minimum(func_pH,1.0)
     ## maximum rate of nitrification; s^-1
     rmax = 1.16e-6
     # rmax = 1.16e-6/2   ## test rmax
@@ -193,7 +216,7 @@ def nitrification_rate_soil(ground_temp,theta,theta_sat,pH,fer_type):
 ## EMPIRICAL - rate: nitrification rate of manure (analogy to nitrification rate in soils)
 ## ref: Stange&Neue, 2009; Riddick at al, FANv1, 2016BG; Vira et al., FANv2, 2020GMD
 ## manure temp in degC; WFPS in fraction
-def nitrification_rate_manure(manure_temp,WFPS):
+def nitrification_rate_manure(manure_temp,WFPS,pH):
     ## convert degC to K
     manure_temp = manure_temp + 273.15
     ## maximum and optimum temp for microbial activity
@@ -203,6 +226,7 @@ def nitrification_rate_manure(manure_temp,WFPS):
     asigma = 2.4
     ## temperature response funtion
     func_tg = ((tmax-manure_temp)/(tmax-topt))**asigma*np.exp(asigma*(manure_temp-topt)/(tmax-topt))
+    func_tg = np.minimum(func_tg,1.0)
     ## WFPS response function; a 4th order polynomial regression
     # a1 = 26.34
     # a2 = -54.51
@@ -215,12 +239,15 @@ def nitrification_rate_manure(manure_temp,WFPS):
     c = -0.007
     d = 3.22
     func_wfps = (((WFPS-b)/(a-b))**(d*(b-a)/(a-c)))*(((WFPS-c)/(a-c))**d)
+    func_wfps = np.minimum(func_wfps,1.0)
+    func_pH = 0.56+(np.arctan(np.pi*0.45*(-5+pH))/np.pi)
+    func_pH = np.minimum(func_pH,1.0)
     ## maximum rate of nitrification; s^-1
     rmax = 1.16e-6
     # rmax = 1.16e-6/2   ## test rmax
     ## nitrification rate; per second
     # nitrif_rate = (2*rmax*func_tg*func_wfps)/(func_tg+func_wfps)
-    nitrif_rate = rmax*func_tg*func_wfps
+    nitrif_rate = rmax*func_tg*func_wfps*func_pH
     return nitrif_rate
 
 #####################
@@ -315,17 +342,21 @@ def subsurf_leaching(N_cnc,qsubrunoff):
 ## cnc in g/m3, resist in s/m  
 def N_diffusion(cnc1,cnc2,resist):
     diffusion = (cnc1-cnc2)/resist
-    diffusion[diffusion<0.0] = 0.0
+    # diffusion[diffusion<0.0] = 0.0
+    diffusion = np.maximum(diffusion,0.0)
     return diffusion
 ## calculate chemical transformation: nitrification (g/m2/s)
 def TAN_nitrif(tan_pool,temp,theta,theta_sat,pH,fert_type,frac_nh4):
     nitrif_rate = nitrification_rate_soil(temp,theta,theta_sat,pH,fert_type)
-    nitrif_rate[nitrif_rate>0.1] = 0.1
+    # nitrif_rate[nitrif_rate>0.1] = 0.1
+    nitrif_rate = np.minimum(nitrif_rate,0.1)
     ## correction for WPFS response
-    nitrif_rate[nitrif_rate<0.0] = 0.0
+    # nitrif_rate[nitrif_rate<0.0] = 0.0
+    nitrif_rate = np.maximum(nitrif_rate,0.0)
     # nitrif_rate[np.isnan(nitrif_rate)] = 0.0
     tan_nitrif = tan_pool*nitrif_rate*frac_nh4
-    tan_nitrif[np.isnan(tan_nitrif)] = 0.0
+    # tan_nitrif[np.isnan(tan_nitrif)] = 0.0
+    tan_nitrif = np.nan_to_num(tan_nitrif)
     return tan_nitrif
 ## calculate plant N uptake rate (to be removed from PARAMETER.py and to be put in LAND.py)
 ## Ammonium and Nitrate N in g/m2; soil C in gC
@@ -340,7 +371,8 @@ def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
     K_C, J_N, K_Neff = 0.05, 0.005, 5
     ## temperature response
     func_temp = 0.25*np.exp(0.0693*temp)
-    func_temp[func_temp>1.0] = 1.0
+    # func_temp[func_temp>1.0] = 1.0
+    func_temp = np.minimum(func_temp,1.0)
     ## soil mineral concentration; 
     Neff = mNH4 + func_temp*mNO3
     ## non-linear relationship between N uptake and effective soil mineral concentration
@@ -360,23 +392,29 @@ def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
 ## flux6: [ammonium uptake]
 def TAN_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False,flux5=False,flux6=False):
     if flux1 is not False:
-        flux1[np.isnan(flux1)] = 0.0
-        flux1[np.isinf(flux1)] = 0.0
+        # flux1[np.isnan(flux1)] = 0.0
+        # flux1[np.isinf(flux1)] = 0.0
+        flux1 = np.nan_to_num(flux1,posinf=0.0, neginf=0.0)
     if flux2 is not False:
-        flux2[np.isnan(flux2)] = 0.0
-        flux2[np.isinf(flux2)] = 0.0
+        # flux2[np.isnan(flux2)] = 0.0
+        # flux2[np.isinf(flux2)] = 0.0
+        flux2 = np.nan_to_num(flux2,posinf=0.0, neginf=0.0)
     if flux3 is not False:
-        flux3[np.isnan(flux3)] = 0.0
-        flux3[np.isinf(flux3)] = 0.0
+        # flux3[np.isnan(flux3)] = 0.0
+        # flux3[np.isinf(flux3)] = 0.0
+        flux3 = np.nan_to_num(flux3,posinf=0.0, neginf=0.0)
     if flux4 is not False:
-        flux4[np.isnan(flux4)] = 0.0
-        flux4[np.isinf(flux4)] = 0.0
+        # flux4[np.isnan(flux4)] = 0.0
+        # flux4[np.isinf(flux4)] = 0.0
+        flux4 = np.nan_to_num(flux4,posinf=0.0, neginf=0.0)
     if flux5 is not False:
-        flux5[np.isnan(flux5)] = 0.0
-        flux5[np.isinf(flux5)] = 0.0
+        # flux5[np.isnan(flux5)] = 0.0
+        # flux5[np.isinf(flux5)] = 0.0
+        flux5 = np.nan_to_num(flux5,posinf=0.0, neginf=0.0)
     if flux6 is not False:
-        flux6[np.isnan(flux6)] = 0.0
-        flux6[np.isinf(flux6)] = 0.0
+        # flux6[np.isnan(flux6)] = 0.0
+        # flux6[np.isinf(flux6)] = 0.0
+        flux6 = np.nan_to_num(flux6,posinf=0.0, neginf=0.0)
     
     totalidx = flux1+flux2+flux3+flux4+flux5+flux6
     massidx = mN-totalidx
@@ -400,17 +438,21 @@ def TAN_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False,flux5=False,
 ## flux4: [urea/NO3 downwards diffusion]
 def N_pathways(mN,flux1=False,flux2=False,flux3=False,flux4=False):
     if flux1 is not False:
-        flux1[np.isnan(flux1)] = 0.0
-        flux1[np.isinf(flux1)] = 0.0
+        # flux1[np.isnan(flux1)] = 0.0
+        # flux1[np.isinf(flux1)] = 0.0
+        flux1 = np.nan_to_num(flux1,posinf=0.0, neginf=0.0)
     if flux2 is not False:
-        flux2[np.isnan(flux2)] = 0.0
-        flux2[np.isinf(flux2)] = 0.0
+        # flux2[np.isnan(flux2)] = 0.0
+        # flux2[np.isinf(flux2)] = 0.0
+        flux2 = np.nan_to_num(flux2,posinf=0.0, neginf=0.0)
     if flux3 is not False:
-        flux3[np.isnan(flux3)] = 0.0
-        flux3[np.isinf(flux3)] = 0.0
+        # flux3[np.isnan(flux3)] = 0.0
+        # flux3[np.isinf(flux3)] = 0.0
+        flux3 = np.nan_to_num(flux3,posinf=0.0, neginf=0.0)
     if flux4 is not False:
-        flux4[np.isnan(flux4)] = 0.0
-        flux4[np.isinf(flux4)] = 0.0
+        # flux4[np.isnan(flux4)] = 0.0
+        # flux4[np.isinf(flux4)] = 0.0
+        flux4 = np.nan_to_num(flux4,posinf=0.0, neginf=0.0)
 
     totalidx = flux1+flux2+flux3+flux4
     massidx = mN-totalidx
@@ -585,7 +627,7 @@ def Sc_num(temp):
 #######################################
 ## Soil properties/characteristics
 #######################################
-## soil characteristics: saturated hydraulic conductivity
+## soil characteristics: saturated hydraulic conductivity; ref: Li et al., STOTEN,2019
 ## fsilt - % of silt; fclay - % of clay; fsom - % of soil organic matter; BD - bulk density
 def soil_hydraulic_conductivity(fsilt,fclay,fsom,BD):
     x = 7.755+0.0352*fsilt-0.967*(BD**2)-0.000484*(fclay**2)-\
@@ -593,12 +635,12 @@ def soil_hydraulic_conductivity(fsilt,fclay,fsom,BD):
                 0.01398*BD*fsilt-0.1673*BD*fsom
     Ks = 2.2e-7*np.exp(x)
     return Ks
-## soil characteristics: field capacity
-def soil_fc(BD):
+## soil characteristics: field capacity; ref: Li et al., STOTEN,2019
+def soil_field_capacity(BD):
     fc = 0.45-0.06*(BD**2)
     return fc
-## soil characteristics: wilting point
-def soil_wp(fsand,fclay):
+## soil characteristics: wilting point; ref: Li et al., STOTEN,2019
+def soil_wilting_point(fsand,fclay):
     a = np.exp(-4.396-7.15e-2*fclay-4.88e-4*fsand**2-4.285e-5*fsand**2*fclay)
     b = -3.14-2.22e-3*fclay**2-3.483e-5*fsand**2*fclay
     wp = (150/a)**(1.0/b)
@@ -668,13 +710,14 @@ def initial_infil(frac_DM):
     per_DM = frac_DM*100
     ## percent of volume of initial infiltration into the soil
     init_infil = 110*np.exp(-0.357*per_DM)
-    init_infil[init_infil>100] = 100.0
+    # init_infil[init_infil>100] = 100.0
+    init_infil = np.minimum(init_infil,100.0)
     return init_infil/100
 ## EMPIRICAL - soil characteristics: soil pH after manure/fertilizer application
 ## soil pH will increase due to application of urea, peak within 24-48 h, then decrease
 ## urea decomposition consumes H+ ion, which leads to pH increase
 ## [app_timing_app] is an indexing map that remarks the timing of fertilizer application with  a shape of [time,lat,lon]
-def soil_pH_postapp(base_pH,app_timing_map,fert_pH):
+def soil_pH_postapp(base_pH,app_timing_map,fert_pH=8.5):
     pH_postapp = np.zeros(mtrx2)
     for tt in np.arange(base_pH.shape[0]-6):
         pH_postapp[tt+1][app_timing_map[tt]==1] = fert_pH
@@ -702,7 +745,8 @@ def manure_properties(solidmass,watermass):
     vtotal = solidmass/(manure_BD*1e3)
     ## gravimetric water content of manure
     theta_g = watermass/solidmass
-    theta_g[np.isnan(theta_g)] = 0.0
+    # theta_g[np.isnan(theta_g)] = 0.0
+    theta_g = np.nan_to_num(theta_g)
     ## volumetric water content
     theta_v = theta_g*manure_BD/rho_water
     ## WFPS: volumetric water content/porosity
@@ -711,7 +755,8 @@ def manure_properties(solidmass,watermass):
 ## manure DM content
 def manure_DM(solidmass,watermass):
     frac_DM = solidmass/(solidmass+watermass)
-    frac_DM[np.isnan(frac_DM)] = 0.0
+    # frac_DM[np.isnan(frac_DM)] = 0.0
+    frac_DM = np.nan_to_num(frac_DM)
     return frac_DM
 ## manure minimum moisture
 def min_manurewc(temp,rhum):
@@ -782,12 +827,14 @@ N_rates =[[0.29,0.31,0.32,0.44,0.35,0.59,0.74,0.34],
 name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
 den_stock = [200.0, 200.0, 200.0, 120.0, 120.0, 60.0, 100.0, 100.0, 30.0, 200.0]
 ## fraction of urine N and dung N; proportion
+## for poultry: fraction of uric acid N and org N; proportion
 f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
-       [1.0/2, 1.0/2], [1.0/2, 1.0/2], [0.0, 1.0],[1.0/2, 1.0/2]]
+       [1.0/2, 1.0/2], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
 ## N concentration in urine and dung; g N per L urine,  g N per kg SM
-## for poultry, urine N is 0, and c_N_urine is set to 1 for convenience
+## for poultry, "urine N" (1st value) represents the UA concentration of excretion water (moisture)
+## for poultry, "dung N" (2nd value) represents the orgN concentration of excretion
 c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
-       [12.60, 6.40], [12.60, 6.40], [1.00, 29.60], [4.40, 4.85]]
+       [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
 ## fraction of dry matter in solid manure; g DM per kg SM
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
@@ -840,7 +887,7 @@ MMS_indoor_solid_list = ['mmscompost','mmssolid','mmsolidot']
 ##  Cat I.A.2: manure stored in barns (as liquid): aerobic processing, liquid, pit1, pit2
 MMS_indoor_liquid_list = ['mmslagoon']
 ## Cat I.B.1: manure in open/outdoor environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
-MMS_outdoor_solid_list = ['mmsconfin','mmsdrylot','mmspasture','mmspastpad']
+MMS_outdoor_solid_list = ['mmsconfin','mmsdrylot','mmspasture','mmspastpad','mmsdaily']
 ## Cat I.B.2: manure in open/ooutdoor environment (as liquid): aerobic lagoon, liquid
 MMS_outdoor_liquid_list = ['mmsaerproc','mmsliquid','mmsliqoth']
 ## Cat I.B.3: manure in open environment (as liquid): aerobic lagoon, liquid
@@ -854,11 +901,11 @@ MMS_house_storage_liquid_list = ['mmspit1','mmspit2']
 
 ## MMS for land module
 ## Cat III
-MMS_land_spread_list = ['mmsdaily']
+# MMS_land_spread_list = ['mmsdaily']
 
-############################
-## model variables
-############################
+##############################
+## model variables/parameters
+##############################
 ## wind speed at 10m
 wind_data_height = 10
 ## reference height is 2m
@@ -875,6 +922,8 @@ manure_PD = 1460
 manure_porosity = 0.42
 ## manure bulk density
 manure_BD = manure_PD*(1-manure_porosity)
+## adsorption constant for manure; m3/m3
+Kd = 1.0
 ## NO3- diffusivity scaling factor
 f_DNO3 = 1.3e-8/9.8e-10
 ## molar mass of air
