@@ -940,3 +940,100 @@ sigma_v_H2O = 12.7
 
 ## assuming the water holding capacity of manure is 3.0 g water/ g manure
 absorb_factor = 3.0
+
+## fraction of N_avail, N_resist and N_unavail; 50, 45, 5 per cent
+## ref: CLM_FANv1 (Riddick et al., 2016)
+f_avail = 0.5
+f_resist = 0.45
+f_unavail = 0.05
+
+# ###################################
+# ## housing parameters
+# ###################################
+# ## fraction of UAN in poultry excretion N; 60 per cent
+# f_uan = 0.6
+# ## fraction of N in poultry excretion; 5 per cent
+# f_excretn = 0.05
+# ## system pH is assumed to be manure pH varied by animals
+# pH = pH_info[livestock.upper()]
+# ## surface roughness height of slatted floor; default 2mm
+# zo_house = 0.002
+# ## surface roughness of water surface (pit storage, mostly liquid)
+# zo_water = 0.002
+# ## assuming the roughness height of manure storage barn is ~ 0.5m (<ref height of 2m)
+# zo_barn = 0.5 
+
+# ###################################
+# ## MMS parameters
+# ###################################
+# ## adsorption constant for manure; m3/m3
+# Kd_manure = 1.0
+# ## assuming the roughness height of manure pile (open land) is ~ 1.0m (<ref height of 2m)
+# zo_manureland = 1.0
+# ## manure surface thickness is set to be 2 cm
+# z_manuresurf = 0.02
+# ## source layer of manure for NH3 emission; 1cm thickness
+# z_topmanure = 0.01
+# ## dry matter (DM) content of liquid manure is assumed to be 5%
+# f_DM_liquid = 0.05
+# ## assuming the soil interface (source layer) of 4mm
+# # z_soil = 0.004
+# z_soil = 0.02  ## test 2cm
+# ## distance to deeper soil; 2cm 
+# # d_deepsoil = 0.02
+# d_deepsoil = 0.025  ## test 2.5cm
+# ## assuming infiltration of manure water to the soil is 10mm/day (1cm/day; 10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
+# # dailymaxinfil = 0.01
+# dailymaxinfil = 0.003 ## test: 3mm /day
+# ## washoff coefficients: 0.1%/mm water for N species, and 0.05%/mm water for non N species (manure)
+# f_washoff_nonN = 0.0005
+# f_washoff_N = 0.001
+# ## anoxic fraction of manure; average of swine (75%) and cow (50%); ref: Wang et al., Sci.Report.2015
+# f_manure_anoxic = 0.6
+# ## lagoon TAN conc; g/mL
+# lagoon_TAN_conc = 630.0e-6
+
+# ###################################
+# ## LAND parameters
+# ###################################
+# # ## dry matter (DM) content of solid manure 
+# # DM_content = solid_m_DM[livestock]
+# # ## dry matter (DM) content of liquid manure is assumed to be 5%
+# # f_DM_liquid = 0.1
+# # ## maximum water content of manure
+# # f_wcmax = 1 - (DM_content/100)/2
+# # ## assuming the density of manure; 1t kg/m^3 or 1g/cm^3
+# # manure_density = rho_m[livestock]
+# ## thickness of the topsoil layer: 7cm; mid point 3.5cm
+# z_topsoil = 0.07
+# p_topsoil = 0.035
+# ## thickness of the 2nd soil layer (under topsoil); mid point 17.5cm
+# z_2ndsoil = 0.21
+# p_2ndsoil = 0.175
+# ## assuming infiltration of manure water to the soil is 10mm/day (1cm/day; 10 000 g/m^2/day) ref: Vira et al.,2020 GMD (2x d0)
+# # dailymaxinfil = 0.01
+# dailymaxinfil = 0.003 ## test: 3mm /day
+# ## assuming the water holding capacity of manure is 3.0 g water/ g manure
+# absorb_factor = 3.0
+# # dailymaxinfil = 0.0 ## test: shut down infiltration
+# ## infiltration flux within manure (m/s)
+# qpsoil_manure = (dailymaxinfil/1e6)/(24*3600)
+# ## potential irrigation: 50 mm
+# # irrig_water = 50*1e3
+# irrig_water = 0.0
+# ## thichkness of vertical layer 1, 2, 3, 4: 2cm(1), 5cm(2), 7cm(3), 14cm(4)
+# zlayers = [0.02, 0.05, 0.07, 0.14]
+# ## midpoints of each layer
+# pmids = [0.01, 0.045, 0.105, 0.21]
+# ## grazing 
+# ## patch area; 0.25 m2
+# patch_area = 0.25
+# ## grazing density; 2500 m2/head
+# grazing_density = {"BEEF_CATTLE":2500,"DAIRY_CATTLE":2500,"SHEEP":400,"GOAT":400} 
+# ## source layer for NH3 emissions of grazing soils; 4mm (Moring et al., BG 2016)
+# z_source = 0.004
+# ## fraction of effective source area for NH3 emission; annual urine coverage 17 %, dung coverage 4 %  
+# f_urine_patch = 0.17
+# f_dung_pat = 0.04
+# ## fraction of FYM of dung pats
+# frac_FYM = 0.5

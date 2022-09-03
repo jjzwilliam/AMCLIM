@@ -51,8 +51,8 @@ mtrx2 = (time*2,lats,lons)
 Months_name = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
         'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 Months_days = [31,28,31,30,31,30,31,31,30,31,30,31]
-# Months_idx = [0,31,59,90,120,151,181,212,243,273,304,334,365]
-Months_idx = [1,32,60,91,121,152,182,213,244,274,305,335,366]
+Months_idx = [0,31,59,90,120,151,181,212,243,273,304,334,365]
+# Months_idx = [1,32,60,91,121,152,182,213,244,274,305,335,366]
 
 ## specify livestock type and production sytem
 ## livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']

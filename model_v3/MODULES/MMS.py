@@ -61,14 +61,6 @@ d_deepsoil = 0.025  ## test 2.5cm
 dailymaxinfil = 0.003 ## test: 3mm /day
 ## assuming the water holding capacity of manure is 3.0 g water/ g manure
 absorb_factor = 3.0
-# dailymaxinfil = 0.0 ## test: shut down infiltration
-## infiltration flux within manure (m/s)
-qpsoil_manure = (dailymaxinfil/1e6)/(24*3600)
-## assuming soil characteristics: 1) sand (%), 2) clay (%), 3) bulk density (g/cm^3), 4) particle density (g/cm^3)
-soil_sand = 80
-soil_clay = 8
-soil_bd = 1.5
-soil_pd = 2.66
 ## washoff coefficients: 0.1%/mm water for N species, and 0.05%/mm water for non N species (manure)
 f_washoff_nonN = 0.0005
 f_washoff_N = 0.001
@@ -117,70 +109,60 @@ class MMS_module:
         for mms in loss_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_loss = self.f_loss + f_mms 
             except:pass
         for mms in sold_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_sold = self.f_sold + f_mms
             except:pass
         for mms in MMS_fuel_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_fuel = self.f_MMS_fuel + f_mms
             except:pass
         for mms in MMS_preserve_solid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 f_MMS_preserve_solid = f_MMS_preserve_solid + f_mms
             except:pass
         for mms in MMS_preserve_liquid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_preserve_liquid = self.f_MMS_preserve_liquid + f_mms
             except:pass
         for mms in MMS_indoor_solid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_indoor_solid = self.f_MMS_indoor_solid + f_mms
             except:pass
         for mms in MMS_indoor_liquid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_indoor_liquid = self.f_MMS_indoor_liquid + f_mms
             except:pass
         for mms in MMS_outdoor_solid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_open_solid = self.f_MMS_open_solid + f_mms
             except:pass
         for mms in MMS_outdoor_liquid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_open_liquid = self.f_MMS_open_liquid + f_mms
             except:pass
         for mms in MMS_outdoor_lagoon_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_open_lagoon = self.f_MMS_open_lagoon + f_mms
             except:pass
@@ -461,105 +443,89 @@ class MMS_module:
             print("Simulation for poultry.")
 
         for dd in np.arange(start_day_idx,end_day_idx):
+            ## environment
             if dd<Days:
                 self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd)
             if dd>=Days:
                 self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd-Days)
-            
+            ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
-
+            
+            ## simulations at hourly timestep
             for hh in np.arange(24):
-                ## the equations used to represent these pools need to be explained here:
-                ## each pool should be in a unit of, mass/unit area, i.e., g/m^2
-                ## and each MMS corresponds to a specific MMS area, so the explicit equation would be:
-                ##     self.[pool] = self.[poolmass]*(1.0-f_loss-f_sold)*f_MMS_[MMS type]/MMS_area["MMS type"]
-                ## then, note that  
-                ##     MMS_area["MMS type"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_[MMS type]*MMS_area_factor["MMS type"]
-                ##     self.[pool] = self.[poolmass]/(self.housingarea*MMS_area_factor["MMS_type"])
-                ## this is different to the HOUSING module as N excretion has been divided by the housing area before used as input
-
+                
                 ## manure pool
                 self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1]
-
+                
                 ## urea/UA hydrolysis rate; orgN decomposition rate
                 self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta=1.0,delta_t=timestep)
-                ## UA hydrolysis will no longer be constrained by RH (moisture) under liquid conditions
+                ## UA hydrolysis will no longer be constrained by RH (moisture) under liquid conditions/slurry management
                 self.ua_conv_factor[hh+1] = ua_hydrolysis_rate(temp=self.T_sim[hh+1],rhum=100.0,ph=self.pH,
                                     delta_t=timestep)
                 self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_sim[hh+1], 
                                                                                                     delta_t=timestep)                  
+                
                 ## urea/UA pool and orgN pools
                 self.urea_pool[hh+1] = self.urea_pool[hh] + self.urea[hh+1]
                 self.UA_pool[hh+1] = self.UA_pool[hh] + self.UA[hh+1]
                 self.avail_N_pool[hh+1] = self.avail_N_pool[hh] + self.avail_N[hh+1]
                 self.resist_N_pool[hh+1] = self.resist_N_pool[hh] + self.resist_N[hh+1]
                 self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh] + self.unavail_N[hh+1]
-
-                ## TAN production from urea hydrolysis and the N decomposition rate from dung
+                
+                ## TAN production from urea/UA hydrolysis and the N decomposition rate from dung
                 self.TAN_prod[hh+1] = self.urea_hydro_rate[hh+1]*self.urea_pool[hh+1]+\
                                         self.ua_conv_factor[hh+1]*self.UA_pool[hh+1]+\
                                         self.Na_decomp_rate[hh+1]*self.avail_N_pool[hh+1] +\
-                                        self.Nr_decomp_rate[hh+1]*self.resist_N_pool[hh+1]
+                                        self.Nr_decomp_rate[hh+1]*self.resist_N_pool[hh+1] 
                 
                 ## update urea/UA pool and orgN pools
                 self.urea_pool[hh+1] = self.urea_pool[hh+1] * (1-self.urea_hydro_rate[hh+1])
                 self.UA_pool[hh+1] = self.UA_pool[hh+1] * (1-self.ua_conv_factor[hh+1])
                 self.avail_N_pool[hh+1] = self.avail_N_pool[hh+1]*(1 - self.Na_decomp_rate[hh+1]) 
                 self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]* (1 - self.Nr_decomp_rate[hh+1])
-
+                
                 ## water amount range: determined by DM content (5% - 10%)
                 minwater = self.manure_pool[hh+1]/(f_DM_liquid*2) - self.manure_pool[hh+1]
                 maxwater = self.manure_pool[hh+1]/(f_DM_liquid/2) - self.manure_pool[hh+1]
-
                 ## water pool
                 ## Note: the water pool in [MMS indoor liquid] is "inheritated" from housing water pool
                 ## water pool should be larger than the minimum water (assumed a ~10 % DM) amount of the "liquid" MMS
                 stdwater = self.manure[hh+1]/f_DM_liquid - self.manure[hh+1]
                 self.water[hh+1] = np.maximum(stdwater,self.water[hh+1])
                 self.Total_water_pool[hh+1] = self.Total_water_pool[hh] + self.water[hh+1] - self.evap_sim[hh+1]
+                
+                ## open env scheme for determining the water pool, rainfall is included
                 if mms_cat == "MMS_open":
                     self.Total_water_pool[hh+1] = self.Total_water_pool[hh+1] + self.rainfall[hh+1] 
-                # water_idx = self.Total_water_pool[hh+1] - minwater
-                # self.Total_water_pool[hh+1][water_idx<0] = minwater[water_idx<0]      
-                # water_idx = self.Total_water_pool[hh+1] - maxwater
-                # self.Total_water_pool[hh+1][water_idx>0] = maxwater[water_idx>0]
                 self.Total_water_pool[hh+1] = np.maximum(self.Total_water_pool[hh+1],minwater)
                 self.Total_water_pool[hh+1] = np.minimum(self.Total_water_pool[hh+1],maxwater)                             
-
+                
                 ## TAN pool
                 self.TAN_pool[hh+1] = self.TAN_pool[hh] + self.TAN_prod[hh+1] + self.TAN[hh+1]
-
                 ## TAN conc
                 self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/self.Total_water_pool[hh+1]
-                # self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0
                 self.TAN_amount[hh+1] = np.nan_to_num(self.TAN_amount[hh+1],posinf=0.0,neginf=0.0)
                 ## TAN conc in g/m3
                 self.TAN_amount[hh+1] = self.TAN_amount[hh+1] * 1e6
-
                 ## NH3 conc in g/m3
                 KNH3 = NH3_par_coeff(temp=self.T_sim[hh+1],cncH=self.cc_H)
-
+                
                 ## resistance
                 self.R_star[hh+1] = (1/k_aq_NH4(temp=self.T_sim[hh+1]))+(1/(KNH3*k_gas_NH3(temp=self.T_sim[hh+1],
                                                                     u=self.u_sim[hh+1],Z=2,zo=zo_water)))
-
                 ## emission (volatilization process similar to the pit in animal houses; liquid-base)
                 self.modelled_emiss[hh+1] = NH3_volpit(pit_tanconc=self.TAN_amount[hh+1],conc_in=0.0,
                                                 Rpit=self.R_star[hh+1])*timestep*3600
-
                 ## determining the maximum emission; emission cannot exceed TAN pool
-                # emiss_idx = self.TAN_pool[hh+1] - self.modelled_emiss[hh+1]
-                # self.modelled_emiss[hh+1][emiss_idx<0] = self.TAN_pool[hh+1][emiss_idx<0]
                 self.modelled_emiss[hh+1] = np.minimum(self.modelled_emiss[hh+1],self.TAN_pool[hh+1])
-
                 ## final emission flux
                 self.NH3flux[hh+1] = self.modelled_emiss[hh+1]
-
                 ## update TAN pool
                 self.TAN_pool[hh+1] = self.TAN_pool[hh+1] - self.NH3flux[hh+1]
+            
             if dd >= Days:
                 ddidx = dd - Days
             else:
@@ -571,37 +537,38 @@ class MMS_module:
             self.mms_to_landspreading(dayidx=ddidx)
         return
 
-    ## Simulation: Cat A.1 manure stored in barns (as solid) //// under development 31/Aug
+    ## Simulation: Cat A.1 manure stored in barns (as solid) 
     ## manure/animal waste is processed/dried to reduce water content; 
     ## water pool is determined by:
-    ## a) mositure equilibrium (minimum amount of manure moisture content) b) water transferred from housing
+    ## a) water transferred from housing b) referenced water content for solid manure management c) evaporation
     ## NEW) incorporate a [surface compensation point] scheme in the model:
-    ##       gaseouos concentrations (chi): chi_indoor; chi_surface; chi_bulk
-    ##       aqueous concrntrations: [TAN]_bulk (TAN conc in the manure); [TAN]_surf (TAN conc at the surface, in equilibrium with chi_surf)
-    ##       equilibrium between [TAN]_surf and chi_surf: chi_surf = (k_H_D/([H+]+k_NH4+))*[TAN]_surf = KNH3*[TAN]_surf; 
+    ##       gaseouos concentrations (x): x_indoor; x_surface; x_bulk
+    ##       aqueous concrntrations: [TAN]_bulk (TAN conc in the manure); [TAN]_surf (TAN conc at the surface, in equilibrium with x_surf)
+    ##       equilibrium between [TAN]_surf and x_surf: x_surf = (k_H_D/([H+]+k_NH4+))*[TAN]_surf = KNH3*[TAN]_surf; 
     ##                   Note: k_H_D = (161500/(temp+273.15))*np.exp(-10380/(temp+273.15)) 
     ##       fluxes (F): F_atm, surface to indoor; F_tosurf: manure to surface;;; 
-    ##                   F_atm=(chi_surf-chi_indoor)/R_star; 
-    ##                   F_tosurfaq=([TAN]_bulk-[TAN]_surf)/R_manureaq; F_tosurfgas=(chi_bulk-chi_surf)/R_manuregas; 
+    ##                   F_atm=(x_surf-x_indoor)/R_star; 
+    ##                   F_tosurfaq=([TAN]_bulk-[TAN]_surf)/R_manureaq; F_tosurfgas=(x_bulk-x_surf)/R_manuregas; 
     ##                   F_atm = F_tosurf(aq+gas)
     ##    [TAN]_bulk is the prognostic variable and is determined by source and loss based on the mass balance approach
-    ##    solve [TAN]_surf: [TAN]_surf = (chi_indoor/R_ab+[TAN]_bulk*(1/R_manureaq+KNH3/R_manuregas))/
+    ##    solve [TAN]_surf: [TAN]_surf = (x_indoor/R_ab+[TAN]_bulk*(1/R_manureaq+KNH3/R_manuregas))/
     ##                                      (1/R_manureaq+KNH3*(R_manureg+R_ab))
+    ##    indoor concentration is neglected, so x_indoor is set to 0 for global simulations
 
-    ## Simulation: Cat B.1 manure stored in open environment (as solid) //// modified 02/June, 2022
+    ## Simulation: Cat B.1 manure stored in open environment (as solid) 
     ## manure/animal waste is left on open land to reduce water content (evaporation); 
     ## water pool is determined by:
     ## 1) maximum water held by manure (manure pool x absorb factor) 2) water transferred from housing
-    ##      excess water is going to be wash off flux
+    ##      excess water is going to be wash off flux 3) evaporation
     ## NEW) incorporate a [surface compensation point] scheme in the model as Cat B [MMS indoor solid]
     ## NEW) no infiltration is considered in solid phase open-env simulations, no underlying soil pools
     ##      1) paved or concrete surface, 2) solid phase, infiltration is small, so ignored
-    ##       gaseouos concentrations (chi): chi_atm; chi_surface; chi_bulk
+    ##       gaseouos concentrations (x): x_atm; x_surface; x_bulk
     ##       aqueous concrntrations: [TAN]_bulk; [TAN]_surf; 
-    ##       equilibrium between aqueous and gaseous conc: chi = KNH3 * [TAN]
+    ##       equilibrium between aqueous and gaseous conc: x = KNH3 * [TAN]
     ##       fluxes (F_upwards): F_atm, surface to atmosphere; F_tosurf: manure to surface;;; 
-    ##                   F_atm=(chi_surf-chi_atm)/R_ab;  F_runoff = qr*[TAN]_surf
-    ##                   F_tosurfaq=([TAN]_bulk-[TAN]_surf)/R_manureaq; F_tosurfgas = (chi_bulk - chi_surf)/R_manuregas
+    ##                   F_atm=(x_surf-x_atm)/R_ab;  F_runoff = qr*[TAN]_surf
+    ##                   F_tosurfaq=([TAN]_bulk-[TAN]_surf)/R_manureaq; F_tosurfgas = (x_bulk - x_surf)/R_manuregas
     ##                   F_tosurf(aq+gas) = F_atm + F_runoff
     ## Note) NO3- pools in the bulk manure and soil have similar processes as TAN, which do not include 1) adsorption, 2) gaseous diffustion
     ##       NO3- aqueous diffusion is moderated by a scaling factor regarding the different diffusivity of NO3- from NH4+ 
@@ -622,34 +589,39 @@ class MMS_module:
             print("Simulation for poultry.")
 
         for dd in np.arange(start_day_idx,end_day_idx):
+            ## environemnts
             if dd < Days:
                 self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd)
             if dd>=Days:
                 self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd-Days)
+            ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid")
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid")
             
+            ## simulations at hourly timestep
             for hh in np.arange(24):
                 ## manure pool
                 self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1] 
 
-                ## urea hydrolysis rate; orgN decomposition rate
+                ## urea/UA hydrolysis rate; orgN decomposition rate
                 self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta=1.0,delta_t=timestep)
+                ## note the difference between the liquid and solid management; 
+                ## UA hydrolysis rate is constrained by RH under solid management
                 self.ua_conv_factor[hh+1] = ua_hydrolysis_rate(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1],ph=self.pH,
                                     delta_t=timestep)
                 self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_sim[hh+1], 
                                                                                                     delta_t=timestep)
                 
-                ## urea pool and orgN pools
+                ## urea/UA pool and orgN pools
                 self.urea_pool[hh+1] = self.urea_pool[hh] + self.urea[hh+1]
                 self.UA_pool[hh+1] = self.UA_pool[hh] + self.UA[hh+1]
                 self.avail_N_pool[hh+1] = self.avail_N_pool[hh] + self.avail_N[hh+1]
                 self.resist_N_pool[hh+1] = self.resist_N_pool[hh] + self.resist_N[hh+1]
                 self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh] + self.unavail_N[hh+1]
 
-                ## TAN production from urea hydrolysis and the N decomposition rate from dung
+                ## TAN production from urea/UA hydrolysis and the N decomposition rate from dung
                 self.TAN_prod[hh+1] = self.urea_hydro_rate[hh+1]*self.urea_pool[hh+1]+\
                                         self.ua_conv_factor[hh+1]*self.UA_pool[hh+1]+\
                                         self.Na_decomp_rate[hh+1]*self.avail_N_pool[hh+1] +\
@@ -664,31 +636,27 @@ class MMS_module:
                 self.avail_N_pool[hh+1] = self.avail_N_pool[hh+1]*(1 - self.Na_decomp_rate[hh+1]) 
                 self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]* (1 - self.Nr_decomp_rate[hh+1])
 
+                ## indoor env scheme
                 if mms_cat == "MMS_indoor":
                     ## water amount in "solid" manure
                     ## self.manure refers to the DM mass; therefore, total manure mass = DM mass/DM%
                     ## water in the "solid" manure = water% x total manure mass
-                    # self.manure_water[hh+1] = self.water_added[hh+1]/(self.housingarea*MMS_area_factor["mms_indoor_solid"])
+                    ## maximum water that can be held by manure
                     maxwater = self.manure_pool[hh+1] * absorb_factor
+                    ## referenced water content for solid manure
                     stdwater = self.manure_pool[hh+1]/(self.DM_content/100) - self.manure_pool[hh+1]
-                    # stdwater = self.manure_pool[hh+1]/(1-0.6)*0.6
                     ## water pool
                     ## Note the difference between the water pool of [MMS indoor solid] and [MMS indoor liquid]
                     ## water pool of [MMS indoor solid] is directly determined by the amount of manure as we assumed a dry matter content 
                     self.Total_water_pool[hh+1] = self.Total_water_pool[hh] + self.water[hh+1] - self.evap_sim[hh+1]
-                    # water_idx = self.Total_water_pool[hh+1] - maxwater
-                    # self.Total_water_pool[hh+1][water_idx>0] = maxwater[water_idx>0]
-                    # water_idx = self.Total_water_pool[hh+1] - stdwater
-                    # self.Total_water_pool[hh+1][water_idx<0] = stdwater[water_idx<0]
+                    ## water content is controlled to be between the maximum and standard water content
                     self.Total_water_pool[hh+1] = np.maximum(self.Total_water_pool[hh+1],stdwater)
                     self.Total_water_pool[hh+1] = np.minimum(self.Total_water_pool[hh+1],maxwater)  
 
                     ## water content of the manure
                     vtotal,manurewc,manure_WFPS = manure_properties(solidmass=self.manure_pool[hh+1],
                                                             watermass=self.Total_water_pool[hh+1])
-                    # manurewc[manurewc>manure_porosity] = manure_porosity
                     manurewc = np.minimum(manurewc,manure_porosity)
-                    # manure_WFPS[manure_WFPS>1.0] = 1.0
                     manure_WFPS = np.minimum(manure_WFPS,1.0)
 
                     ## manure resistance
@@ -721,8 +689,8 @@ class MMS_module:
                     #     (1-manure_porosity)*Kd))
                     # self.TAN_amount[hh+1] = TAN_concentration(mtan=self.TAN_pool[hh+1],zlayer=z_total,
                     #                                     theta_sat=manure_porosity,theta=manurewc,knh3=KNH3,kd=Kd_manure)
-                    self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1])
-                    # self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0
+                    # self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1])
+                    self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1]*Kd_manure/(manure_PD/1e3))
                     self.TAN_amount[hh+1] = np.nan_to_num(self.TAN_amount[hh+1],posinf=0.0,neginf=0.0)
                     self.TAN_amount[hh+1] = self.TAN_amount[hh+1] * 1e6
                     ## NH3 conc in the bulk manure
@@ -859,10 +827,12 @@ class MMS_module:
                     KNH3 = NH3_par_coeff(temp=self.T_sim[hh+1],cncH=self.cc_H)
                     # self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(z_total*(manurewc+KNH3*(manure_porosity-manurewc)+\
                     #     (1-manure_porosity)*Kd))
-                    self.TAN_amount[hh+1] = TAN_concentration(mtan=self.TAN_pool[hh+1],zlayer=z_total,
-                                                        theta_sat=manure_porosity,theta=manurewc,knh3=KNH3,kd=Kd_manure)
+                    # self.TAN_amount[hh+1] = TAN_concentration(mtan=self.TAN_pool[hh+1],zlayer=z_total,
+                    #                                     theta_sat=manure_porosity,theta=manurewc,knh3=KNH3,kd=Kd_manure)
                     # self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0
+                    self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1]*Kd_manure/(manure_PD/1e3))
                     self.TAN_amount[hh+1] = np.nan_to_num(self.TAN_amount[hh+1],posinf=0.0,neginf=0.0)
+                    self.TAN_amount[hh+1] = self.TAN_amount[hh+1] * 1e6
                     ## NH3 conc in the bulk manure
                     self.NH3_gas_bulk[hh+1] = KNH3 * self.TAN_amount[hh+1]
                     ## NH3 conc is 0 when manure water content equals to porosity
@@ -982,6 +952,14 @@ class MMS_module:
         if dayidx >= Days:
             dayidx = dayidx - Days
         ## inputs from housing (added in the mid-day)
+        ## the equations used to represent these pools need to be explained here:
+        ## each pool should be in a unit of, mass/unit area, i.e., g/m^2
+        ## and each MMS corresponds to a specific MMS area, so the explicit equation would be:
+        ##     self.[pool] = self.[poolmass]*(1.0-f_loss-f_sold)*f_MMS_[MMS type]/MMS_area["MMS type"]
+        ## then, note that  
+        ##     MMS_area["MMS type"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_[MMS type]*MMS_area_factor["MMS type"]
+        ##     self.[pool] = self.[poolmass]/(self.housingarea*MMS_area_factor["MMS_type"])
+        ## this is different to the HOUSING module as N excretion has been divided by the housing area before used as input
         self.manure[12] = self.manure_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
         ## N input in multiple forms
         self.urea[12] = self.urea_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])

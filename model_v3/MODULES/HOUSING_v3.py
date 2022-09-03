@@ -25,6 +25,8 @@ f_unavail = 0.05
 f_uan = 0.6
 ## fraction of N in poultry excretion; 5 per cent
 f_excretn = 0.05
+## adsorption constant for manure; m3/m3
+Kd_manure = 1.0
 ## system pH is assumed to be manure pH varied by animals
 pH = pH_info[livestock.upper()]
 ## surface roughness height of slatted floor; default 2mm
@@ -110,28 +112,24 @@ class HOUSING_MODULE:
         for mms in loss_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_loss = self.f_loss + f_mms   
             except:pass
         for mms in sold_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_sold = self.f_sold + f_mms
             except:pass
         for mms in MMS_house_storage_solid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_housing_litter = self.f_housing_litter + f_mms
             except:pass
         for mms in MMS_house_storage_liquid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
-                # f_mms[np.isnan(f_mms)] = 0.0
                 f_mms = np.nan_to_num(f_mms)
                 self.f_housing_pit = self.f_housing_pit + f_mms
             except:pass
@@ -345,9 +343,6 @@ class HOUSING_MODULE:
                 self.urea_pool = np.zeros(array_shape)
                 self.urea_pool_to_storage = np.zeros(outarray_shape)
             elif housing_type.lower() == 'poultry_house':
-                ## 
-                # self.N_birds_UAN = N_input * 1000/365 * f_uan
-                # self.manure = self.N_birds_UA/f_excretn
                 ## uric acid pool
                 self.UA = np.zeros(array_shape)
                 self.UA_pool = np.zeros(array_shape)
@@ -392,9 +387,6 @@ class HOUSING_MODULE:
             self.T_sim[1:], self.T_gnd[1:], self.u_sim[1:] = barn_env(temp_data,
                         wind_profile(uref=wind_data,height_ref=wind_data_height,height_out=ref_height,zo=zo_house))
             self.RH_sim[1:] = rhum_data
-        # elif house_env.lower() == 'poultry_house':
-        #     # print("HOUSING ENV: poultry_house")
-        #     self.T_sim[1:], self.u_sim[1:], self.RH_sim[1:] = housing_env(temp_data,rhum_data,self.livestock,self.production_system)
         else:
             # print("HOUSING ENV: Other housing systems")
             self.T_sim[1:] = temp_data
@@ -428,8 +420,6 @@ class HOUSING_MODULE:
             #     ## housing resistance; 16700 s/m for poultry_houses
             #     self.R_star[:] = 16700
         
-
-
     ###################################
     ## define model functions
     ###################################
@@ -518,14 +508,10 @@ class HOUSING_MODULE:
                 ## slat water pool
                 self.Total_water_pool_slat[hh+1] = self.Total_water_pool_slat[hh]+self.urine[hh+1]*f_slat +\
                                                     self.manure_initwc_slat[hh+1] - self.evap_slat[hh+1]
-                # water_slat_idx = self.Total_water_pool_slat[hh+1] - self.manure_minwc_slat[hh+1]
-                # self.Total_water_pool_slat[hh+1][water_slat_idx<0] = self.manure_minwc_slat[hh+1][water_slat_idx<0]
                 self.Total_water_pool_slat[hh+1] = np.maximum(self.Total_water_pool_slat[hh+1],self.manure_minwc_slat[hh+1])
                 ## pit water pool
                 self.Total_water_pool_pit[hh+1] = self.Total_water_pool_pit[hh]+self.urine[hh+1]*f_gap*fpitcorrect +\
                                                     self.manure_initwc_pit[hh+1]-self.evap_pit[hh]
-                # water_pit_idx = self.Total_water_pool_pit[hh+1] - self.manure_minwc_pit[hh+1]
-                # self.Total_water_pool_pit[hh+1][water_pit_idx<0] = self.manure_minwc_pit[hh+1][water_pit_idx<0]
                 self.Total_water_pool_pit[hh+1] = np.maximum(self.Total_water_pool_pit[hh+1],self.manure_minwc_pit[hh+1])
 
 
@@ -560,14 +546,10 @@ class HOUSING_MODULE:
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss_slat[hh+1] = NH3_volslat(slat_conc=self.NH3_gas_slat[hh+1],conc_in=0.0,
                                                     Rslat=self.R_slat[hh+1])*timestep*3600
-                # emiss_slat_idx = self.TAN_pool_slat[hh+1] - self.modelled_emiss_slat[hh+1] 
-                # self.modelled_emiss_slat[hh+1][emiss_slat_idx<0] = self.TAN_pool_slat[hh+1][emiss_slat_idx<0]
                 self.modelled_emiss_slat[hh+1] = np.minimum(self.modelled_emiss_slat[hh+1],self.TAN_pool_slat[hh+1])
 
                 self.modelled_emiss_pit[hh+1] = NH3_volpit(pit_tanconc=self.TAN_amount_pit[hh+1],conc_in=0.0,
                                                 Rpit=self.R_pit[hh+1])*timestep*3600
-                # emiss_pit_idx = self.TAN_pool_pit[hh+1] - self.modelled_emiss_pit[hh+1]
-                # self.modelled_emiss_pit[hh+1][emiss_pit_idx<0] = self.TAN_pool_pit[hh+1][emiss_pit_idx<0]
                 self.modelled_emiss_pit[hh+1] = np.minimum(self.modelled_emiss_pit[hh+1],self.TAN_pool_pit[hh+1])
 
                 ## final emission flux from slat and pit; flux are additive
@@ -639,8 +621,6 @@ class HOUSING_MODULE:
                 self.manure_minwc[hh+1] = self.manure_pool[hh+1]*mois_coeff
                 ## water pool 
                 self.Total_water_pool[hh+1] = self.Total_water_pool[hh]+self.urine[hh+1]+self.manure_initwc[hh+1]-self.evap[hh+1]
-                # water_idx = self.Total_water_pool[hh+1] - self.manure_minwc[hh+1] 
-                # self.Total_water_pool[hh+1][water_idx<0] = self.manure_minwc[hh+1][water_idx<=0] 
                 self.Total_water_pool[hh+1] = np.maximum(self.Total_water_pool[hh+1],self.manure_minwc[hh+1])
 
                 ## TAN pool 
@@ -743,7 +723,7 @@ class HOUSING_MODULE:
                 self.TAN_pool[hh+1] = self.TAN_pool[hh] + self.TAN_prod[hh+1]
                 
                 ## TAN concentration; g/cm3
-                self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1]*Kd/(manure_PD/1e3))
+                self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1]+self.manure_pool[hh+1]*Kd_manure/(manure_PD/1e3))
                 # self.TAN_amount[hh+1] = self.TAN_pool[hh+1]/(self.Total_water_pool[hh+1])
                 self.TAN_amount[hh+1][self.Total_water_pool[hh+1]==0] = 0
                 ## TAN concentration in g/m3
@@ -769,8 +749,6 @@ class HOUSING_MODULE:
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss[hh+1] = NH3_volslat(slat_conc=self.NH3_gas[hh+1],conc_in=0.0,
                                                         Rslat=self.R_star[hh+1])*timestep*3600
-                # emiss_idx = self.TAN_pool[hh+1] - self.modelled_emiss[hh+1]
-                # self.modelled_emiss[hh+1][emiss_idx<0] = self.TAN_pool[hh+1][emiss_idx<0]
                 self.modelled_emiss[hh+1] = np.minimum(self.modelled_emiss[hh+1],self.TAN_pool[hh+1])
 
                 ## final emission flux 
