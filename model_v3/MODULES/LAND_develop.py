@@ -100,7 +100,7 @@ class LAND_module:
         print(self.plat1,self.plat2)
         
         ## array shape [lats,lons]
-        field_shape = (psize,lons)
+        field_shape = (psize,CONFIG_lons)
         ## include the time dimension
         array_shape = (25,) + field_shape
         ## output shape
@@ -386,43 +386,53 @@ class LAND_module:
     def sim_env(self,dayidx):
         # print('LAND ENV: open env')
         #### environmental conditions
-        ## soil temperature
-        hhidx = dayidx*24
-        # self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
-        # self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
-        self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[dayidx,self.plat1:self.plat2,:] - 273.15
-        self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[dayidx,self.plat1:self.plat2,:] - 273.15
+        if CONFIG_machine == "STREAM":
+            ## on STREAM, met data are daily average data
+            ## soil temperature; K to degC
+            self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[dayidx,self.plat1:self.plat2,:] - 273.15
+            self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[dayidx,self.plat1:self.plat2,:] - 273.15
+            ## soil moisture; m3/m3
+            self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[dayidx,self.plat1:self.plat2,:]
+            self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[dayidx,self.plat1:self.plat2,:]
+             ## evaporation from bare soil; m to g/m2/s
+            self.evap[1:] = evap_file.evabs[dayidx,self.plat1:self.plat2,:]*(-1e6)/(24*3600)
+            ## rainfall; kg/m2 to g/m2/s
+            self.rainfall[1:] = rain_file.tcrw[dayidx,self.plat1:self.plat2,:]*1e3/(24*3600)
+            ## surface runoff; m to m/s
+            self.surfrunoffrate[1:] = runoff_file.sro[dayidx,self.plat1:self.plat2,:]/(24*3600)
+            ## sub-surface runoff; m to m/s
+            self.subrunoffrate[1:] = subrunoff_file.ssro[dayidx,self.plat1:self.plat2,:]/(24*3600)
+            ## atmospheric resistances; s/m
+            self.R_atm[1:] = ratm_file.RAM1[dayidx,self.plat1:self.plat2,:]+ratm_file.RB1[dayidx,self.plat1:self.plat2,:]
+        
+        else:
+            ## on Archer and Jasmin, met data are hourly data (higher temperal resolution)
+            hhidx = dayidx*24
+            ## soil temperature; K to degC
+            self.soil_temp[0,1:] = groundtemp_filelvl1.stl1[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
+            self.soil_temp[1,1:] = groundtemp_filelvl2.stl2[hhidx:hhidx+24,self.plat1:self.plat2,:] - 273.15
+            ## soil moisture; m3/m3
+            self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[hhidx:hhidx+24,self.plat1:self.plat2,:]
+            self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[hhidx:hhidx+24,self.plat1:self.plat2,:]
+            self.soil_moist = np.maximum(self.soil_moist,0.0)
 
-        # self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[hhidx:hhidx+24,self.plat1:self.plat2,:]
-        # self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[hhidx:hhidx+24,self.plat1:self.plat2,:]
-        self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[dayidx,self.plat1:self.plat2,:]
-        self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[dayidx,self.plat1:self.plat2,:]
-        # self.soil_moist[self.soil_moist<0] = 0.0
-        self.soil_moist = np.maximum(self.soil_moist,0.0)
-
+            ## evaporation from bare soil; m to g/m2/s
+            self.evap[1:] = evap_file.evabs[hhidx:hhidx+24,self.plat1:self.plat2,:]*(-1e6)/(timestep*3600)
+            ## rainfall; kg/m2 to g/m2/s
+            self.rainfall[1:] = rain_file.tcrw[hhidx:hhidx+24,self.plat1:self.plat2,:]*1e3/(timestep*3600)
+            ## surface runoff; m to m/s
+            self.surfrunoffrate[1:] = runoff_file.sro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
+            ## sub-surface runoff; m to m/s
+            self.subrunoffrate[1:] = subrunoff_file.ssro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
+            ## atmospheric resistances; s/m
+            self.R_atm[1:] = ratm_file.RAM1[hhidx:hhidx+24,self.plat1:self.plat2,:]+ratm_file.RB1[hhidx:hhidx+24,self.plat1:self.plat2,:]
+        
         soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
         ## buld density unit: kg/dm3
         soilbd = soilbd_ds.T_BULK_DEN.values[self.plat1:self.plat2,:]
         soilporosity = 1 - (soilbd/(rho_soil/1000))
         self.soil_satmoist[:] = soilporosity
-        # self.soil_satmoist[self.soil_satmoist>1.0] = 0.99
-        # self.soil_moist[self.soil_moist>self.soil_satmoist] = self.soil_satmoist[self.soil_moist>self.soil_satmoist]
         self.soil_satmoist = np.minimum(self.soil_satmoist,0.99)
-
-        ## evaporation from bare soil
-        # self.evap[1:] = evap_file.evabs[hhidx:hhidx+24,self.plat1:self.plat2,:]*(-1e6)
-        self.evap[1:] = evap_file.evabs[dayidx,self.plat1:self.plat2,:]*(-1e6)/24
-        ## rainfall
-        # self.rainfall[1:] = rain_file.tcrw[hhidx:hhidx+24,self.plat1:self.plat2,:]*1e3
-        ## convert into m/s
-        # self.surfrunoffrate[1:] = runoff_file.sro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
-        self.surfrunoffrate[1:] = runoff_file.sro[dayidx,self.plat1:self.plat2,:]/(24*3600)
-        ## convert into m/s
-        # self.subrunoffrate[1:] = subrunoff_file.ssro[hhidx:hhidx+24,self.plat1:self.plat2,:]/(timestep*3600)
-        self.subrunoffrate[1:] = subrunoff_file.ssro[dayidx,self.plat1:self.plat2,:]/(24*3600)
-        ## atmospheric resistances
-        # self.R_atm[1:] = ratm_file.RAM1[hhidx:hhidx+24,self.plat1:self.plat2,:]+ratm_file.RB1[hhidx:hhidx+24,self.plat1:self.plat2,:]
-        self.R_atm[1:] = ratm_file.RAM1[dayidx,self.plat1:self.plat2,:]+ratm_file.RB1[dayidx,self.plat1:self.plat2,:]
            
     
     def met_input_interp(self,template):
@@ -461,12 +471,12 @@ class LAND_module:
                         crop_type=None,N_input=None,plant_calendar=None,harvest_calendar=None,
                         fert_freq=None,soil_pH=None):
         ## lats and lons
-        lats = mtrx2[1]
-        lons = mtrx2[2]
-        N_app = np.zeros(mtrx2)
-        water_app = np.zeros(mtrx2)
+        lats = CONFIG_lats
+        lons = CONFIG_lons
+        N_app = np.zeros(CONFIG_mtrx2)
+        water_app = np.zeros(CONFIG_mtrx2)
         ## mark all application day
-        N_app_mark = np.zeros(mtrx2)
+        N_app_mark = np.zeros(CONFIG_mtrx2)
 
         print(crop_type)
         for lat in np.arange(lats):
@@ -555,6 +565,7 @@ class LAND_module:
         rateN = fertds.Nrate.values*1e3/1e4
         croparea = fertds.croparea.values*1e4
         croparea[totalN!=0] = totalN[totalN!=0]/rateN[totalN!=0]
+        croparea = np.nan_to_num(croparea)
         app_freq = totalN/(rateN*croparea)
         ## the maximum application frequency in a year is 5
         app_freq = np.minimum(app_freq,5)
@@ -562,7 +573,7 @@ class LAND_module:
         ## read planting and harvesting dates
         plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
 
-        soilph = np.zeros(mtrx2)
+        soilph = np.zeros(CONFIG_mtrx2)
         soilph[:] = soilpHds.T_PH_H2O.values
         self.pH = soilph[:,self.plat1:self.plat2,:] 
         self.cc_H = 10**(-self.pH)
@@ -598,17 +609,17 @@ class LAND_module:
         # cropcalds = open_ds(infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
 
         soilpHds = open_ds(infile_path+soil_data_path+soilpHfile)
-        soilph = np.zeros(mtrx2)
+        soilph = np.zeros(CONFIG_mtrx2)
         soilph[:] = soilpHds.T_PH_H2O.values
         self.pH = soilph[:,self.plat1:self.plat2,:] 
         self.cc_H = 10**(-self.pH)
 
-        tan = np.zeros(mtrx[1:])
-        manure = np.zeros(mtrx[1:])
-        water = np.zeros(mtrx[1:])
-        availN = np.zeros(mtrx[1:])
-        resistN = np.zeros(mtrx[1:])
-        unavailN = np.zeros(mtrx[1:])
+        tan = np.zeros(CONFIG_mtrx[1:])
+        manure = np.zeros(CONFIG_mtrx[1:])
+        water = np.zeros(CONFIG_mtrx[1:])
+        availN = np.zeros(CONFIG_mtrx[1:])
+        resistN = np.zeros(CONFIG_mtrx[1:])
+        unavailN = np.zeros(CONFIG_mtrx[1:])
 
         spring_TAN = manureds.spring_TAN.values
         spring_manure = manureds.spring_manure.values
@@ -996,12 +1007,17 @@ class LAND_module:
             self.theta[2,1:] = np.copy(self.soil_moist[1,1:])
 
             for hh in np.arange(0,24):
-                # surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
-                # surfrunoffrate = np.maximum(surfrunoffrate,0.0)
-                # subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
-                # subrunoffrate = np.maximum(subrunoffrate,0.0)
-                surfrunoffrate = self.surfrunoffrate[hh+1]
-                subrunoffrate = self.subrunoffrate[hh+1]
+                if CONFIG_machine == "STREAM":
+                    surfrunoffrate = self.surfrunoffrate[hh+1]
+                    subrunoffrate = self.subrunoffrate[hh+1] 
+                    evap = self.evap[hh+1] 
+                else:
+                    surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                    surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                    subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                    subrunoffrate = np.maximum(subrunoffrate,0.0)
+                    evap = self.evap[hh+1]-self.evap[hh]
+                
                 infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,hh],
                                     theta2=self.theta[0,hh],theta3=self.theta[1,hh],
                                     theta_sat=self.soil_satmoist[0,hh],water_added=self.water[hh+1])
@@ -1249,7 +1265,7 @@ class LAND_module:
                         ## exclude initial inifltration
                         update_sw[self.drainagerate[ll,hh+1]==infilrate1] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate1]*zlayers[0]
                         self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]-\
-                                                                    self.evap[hh+1][[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]]/1e6)/zlayers[0]
+                                                                    evap[[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]]*timestep*3600/1e6)/zlayers[0]
                         # self.theta[ll,hh+1][self.theta[ll,hh+1]<0] = 0.01
                         self.theta[ll,hh+1] = np.maximum(self.theta[ll,hh+1],0.01)
 
@@ -1507,13 +1523,16 @@ class LAND_module:
             # self.theta[2,0] = np.copy(self.soil_moist[1,1])
 
             for hh in np.arange(0,24):
-                ## resistance for upward diffusion in the surface layer
-                # surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
-                # surfrunoffrate = np.maximum(surfrunoffrate,0.0)
-                # subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
-                # subrunoffrate = np.maximum(subrunoffrate,0.0)
-                surfrunoffrate = self.surfrunoffrate[hh+1]
-                subrunoffrate = self.subrunoffrate[hh+1]
+                if CONFIG_machine == "STREAM":
+                    surfrunoffrate = self.surfrunoffrate[hh+1]
+                    subrunoffrate = self.subrunoffrate[hh+1] 
+                    evap = self.evap[hh+1] 
+                else:
+                    surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                    surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                    subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                    subrunoffrate = np.maximum(subrunoffrate,0.0)
+                    evap = self.evap[hh+1]-self.evap[hh]
                 for ll in np.arange(3):
                     ## lldix: index for soil temp, moisture
                     llidx = int(np.floor(ll/2))
@@ -1644,7 +1663,7 @@ class LAND_module:
                         
                             self.slurry_TAN_pool[hh+1] = self.slurry_TAN_pool[hh+1] - self.NH3flux[hh+1] - self.TANwashoff[hh+1] -\
                                                         self.slurry_TANinfil[hh+1] - self.slurry_TANdiffusiondown[hh+1]
-                            self.slurry_water_pool[hh+1] = self.slurry_water_pool[hh+1] - self.evap[hh+1] - slurry_infil
+                            self.slurry_water_pool[hh+1] = self.slurry_water_pool[hh+1] - evap*timestep*3600 - slurry_infil
                             
                             ## when water pool of the slurry is less than the min water threshold
                             ## slurry TAN is set to be added to the surface soil layer
@@ -1950,7 +1969,7 @@ class LAND_module:
         soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
         soilbd = soilbd_ds.T_BULK_DEN.values
         soilpHds = open_ds(infile_path+soil_data_path+soilpHfile)
-        soilph = np.zeros(mtrx2)
+        soilph = np.zeros(CONFIG_mtrx2)
         soilph[:] = soilpHds.T_PH_H2O.values
         Kd = ammonium_adsorption(clay_content=soilclay)[self.plat1:self.plat2,:]
         Kd_manure = 1.0
@@ -1958,7 +1977,7 @@ class LAND_module:
         theta_FC = soil_field_capacity(BD=soilbd)[self.plat1:self.plat2,:]
         theta_wp = soil_wilting_point(fsand=soilsand,fclay=soilclay)[self.plat1:self.plat2,:]
 
-        animal_file_name = animal_file_dict[livestock_name]
+        animal_file_name = CONFIG_animal_file_dict[livestock_name]
         livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
         ## lvl idx 0 is the [Grassland] production system; see config.py
         excretN_info = livestockds['Excreted_N'][0][self.plat1:self.plat2,:]
@@ -2030,8 +2049,16 @@ class LAND_module:
                     self.manure_water[:] = 0.0
 
                 for hh in np.arange(0,24):
-                    surfrunoffrate = self.surfrunoffrate[hh+1]
-                    subrunoffrate = self.subrunoffrate[hh+1]
+                    if CONFIG_machine == "STREAM":
+                        surfrunoffrate = self.surfrunoffrate[hh+1]
+                        subrunoffrate = self.subrunoffrate[hh+1] 
+                        evap = self.evap[hh+1] 
+                    else:
+                        surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                        surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                        subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                        subrunoffrate = np.maximum(subrunoffrate,0.0)
+                        evap = self.evap[hh+1]-self.evap[hh]
                     ## surface washoff rate of N pools/non N pool
                     nonN_washoff_rate = f_washoff_nonN*surfrunoffrate*3600*timestep*1e3
                     N_washoff_rate = f_washoff_N*surfrunoffrate*3600*timestep*1e3
@@ -2053,7 +2080,7 @@ class LAND_module:
                     init_infil = np.maximum(init_infil,0)
                     init_water = (self.urine[hh+1]+self.manure_water[hh+1]) - init_infil
                     frac_init_infil = init_infil/(durine+manure_wc)
-                    self.Total_water_pool_FYM[hh+1] = self.Total_water_pool_FYM[hh] + init_water + self.rainfall[hh+1] - self.evap[hh+1]
+                    self.Total_water_pool_FYM[hh+1] = self.Total_water_pool_FYM[hh] + init_water + (self.rainfall[hh+1]-evap)*timestep*3600
                     mois_coeff = min_manurewc(temp=self.soil_temp[0,hh+1],rhum=50)
                     manure_minwc = self.manure_pool_FYM[hh+1] * mois_coeff
                     self.Total_water_pool_FYM[hh+1] = np.maximum(self.Total_water_pool_FYM[hh+1],manure_minwc)
@@ -2158,7 +2185,7 @@ class LAND_module:
                     init_infil = np.maximum(init_infil,0)
                     init_water = self.manure_water[hh+1] - init_infil
                     frac_init_infil = init_infil/manure_wc
-                    self.Total_water_pool_dung[hh+1] = self.Total_water_pool_dung[hh] + init_water + self.rainfall[hh+1] - self.evap[hh+1]
+                    self.Total_water_pool_dung[hh+1] = self.Total_water_pool_dung[hh] + init_water + (self.rainfall[hh+1]-evap)*timestep*3600
                     manure_minwc = self.manure_pool_dung[hh+1] * mois_coeff
                     self.Total_water_pool_dung[hh+1] = np.maximum(self.Total_water_pool_dung[hh+1],manure_minwc)
                     ## thichness of the manure layer
@@ -2346,7 +2373,7 @@ class LAND_module:
                     self.TAN_pool[llidx,hh+1] = np.maximum(self.TAN_pool[llidx,hh+1],0.0)
                     
                     ## update soil moisture 
-                    update_sw = (self.theta[llidx,hh+1]*z_source - self.drainagerate[llidx,hh+1]*timestep*3600-self.evap[hh+1])/z_source
+                    update_sw = (self.theta[llidx,hh+1]*z_source - self.drainagerate[llidx,hh+1]*timestep*3600-evap)/z_source
                     self.theta[llidx,hh+1] = np.maximum(update_sw,self.soil_moist[0,hh+1])
                 self.daily_output(dd_span,grazing=True)
                 self.daily_init(grazing=True)

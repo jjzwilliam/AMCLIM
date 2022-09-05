@@ -79,15 +79,15 @@ class MMS_module:
         ## livestock and production system info
         self.livestock = livestock_name
         self.lvl_idx = production_system_lvl_idx
-        self.production_system = production_system_dict[self.livestock][self.lvl_idx]
+        self.production_system = CONFIG_production_system_dict[self.livestock][self.lvl_idx]
         ## show current config settings, e.g., MMS type
         print('MMS Module - current MMS is for production system: '+str(self.livestock)+', '+str(self.production_system))
         #####################################################
         ## livestock info and MMS info
         #####################################################
         ## read livestock and the corresponding MMS datasets
-        self.animal_file_name = animal_file_dict[self.livestock]
-        self.MMS_file_name = MMS_file_dict[self.livestock] 
+        self.animal_file_name = CONFIG_animal_file_dict[self.livestock]
+        self.MMS_file_name = CONFIG_MMS_file_dict[self.livestock] 
         self.animal_file = xr.open_dataset(infile_path+animal_data_path+self.animal_file_name)
         self.MMS_file = xr.open_dataset(infile_path+animal_data_path+self.MMS_file_name)
 
@@ -95,16 +95,16 @@ class MMS_module:
         for MMS in self.MMS_file.data_vars:
             self.MMS_type_list.append(str(MMS))
 
-        self.f_loss = np.zeros(mtrx[1:])
-        self.f_sold = np.zeros(mtrx[1:])
-        self.f_MMS_fuel = np.zeros(mtrx[1:])
-        self.f_MMS_preserve_solid = np.zeros(mtrx[1:])
-        self.f_MMS_preserve_liquid = np.zeros(mtrx[1:])
-        self.f_MMS_indoor_solid = np.zeros(mtrx[1:])
-        self.f_MMS_indoor_liquid = np.zeros(mtrx[1:])
-        self.f_MMS_open_solid = np.zeros(mtrx[1:])
-        self.f_MMS_open_liquid = np.zeros(mtrx[1:])
-        self.f_MMS_open_lagoon = np.zeros(mtrx[1:]) 
+        self.f_loss = np.zeros(CONFIG_mtrx[1:])
+        self.f_sold = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_fuel = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_preserve_solid = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_preserve_liquid = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_indoor_solid = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_indoor_liquid = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_open_solid = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_open_liquid = np.zeros(CONFIG_mtrx[1:])
+        self.f_MMS_open_lagoon = np.zeros(CONFIG_mtrx[1:]) 
 
         for mms in loss_list:
             try:
@@ -365,10 +365,16 @@ class MMS_module:
         return
 
     def sim_env(self,mms_type,mms_phase,dayidx):
-        hhidx = dayidx*24
-        temp_data = temp_file.t2m[dayidx] - 273.15
-        rhum_data = rhum_file.Relative_Humidity_2m_06h[dayidx]
-        wind_data = wind_file.Wind_Speed_10m_Mean[dayidx]
+        
+        if CONFIG_machine == "STREAM":
+            temp_data = temp_file.t2m[dayidx] - 273.15
+            rhum_data = rhum_file.Relative_Humidity_2m_06h[dayidx]
+            wind_data = wind_file.Wind_Speed_10m_Mean[dayidx]
+        else:
+            hhidx = dayidx*24
+            temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
+            rhum_data = rhum_file.rh2m[hhidx:hhidx+24]
+            wind_data = wind_file.wind10m[hhidx:hhidx+24]
         if mms_type == 'MMS_indoor':
             self.T_sim[1:],self.T_gnd[1:],self.u_sim[1:] = barn_env(temp_data,
                 wind_profile(uref=wind_data,height_ref=wind_data_height,height_out=ref_height,zo=zo_barn))

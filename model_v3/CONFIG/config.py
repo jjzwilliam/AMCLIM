@@ -3,23 +3,23 @@ import sys
 import os
 from pathlib import Path
 
-## specify machine: STREAM, JASMIN, ARCHER
-machine = 'STREAM'
+## specify CONFIG_machine: STREAM, JASMIN, ARCHER
+CONFIG_machine = 'ARCHER'
 
-inputpathdict = {
+CONFIG_inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
         "JASMIN": '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/',
         "ARCHER": '/work/n02/n02/jjz/working_dir/AMCLIM/input_files/',
 }
 
-outputpathdict = {
+CONFIG_outputpathdict = {
         "STREAM": '/exports/csce/datastore/geos/users/s1576984/test_transfer/output_ncfiles/',
         "JASMIN": '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/outputs/output_ncfiles/',
         "ARCHER": '/work/n02/n02/jjz/working_dir/AMCLIM/outputs/output_ncfiles/',
 }
 
-infile_path = inputpathdict[machine]
-output_path = outputpathdict[machine]
+infile_path = CONFIG_inputpathdict[CONFIG_machine]
+output_path = CONFIG_outputpathdict[CONFIG_machine]
 
 sim_year = 2018
 ## daily simulation or hourly simulation
@@ -27,25 +27,24 @@ nhours = 24
 if (sim_year%4)==0: Days = 366
 else: Days = 365
 Hours = nhours * Days
-time = Days
+CONFIG_time = Days
 timestep = 1
 
 ## resolution; e.g. 0.5 degree
-dlat = 0.5
-dlon = 0.5
+CONFIG_dlat = 0.5
+CONFIG_dlon = 0.5
 
 ## lat/lon dimensions
-lats = int(180.0/dlat)
-lons = int(360.0/dlon)
+CONFIG_lats = int(180.0/CONFIG_dlat)
+CONFIG_lons = int(360.0/CONFIG_dlon)
 
 ## levels: this refers to how many types of practices
 ## currently two: housing and MMS (manure management system)
 levels = 2
 
 ## array dimensions;
-#mtrx = [levels,time,lats,lons]
-mtrx = (time,lats,lons)
-mtrx2 = (time*2,lats,lons)
+CONFIG_mtrx = (CONFIG_time,CONFIG_lats,CONFIG_lons)
+CONFIG_mtrx2 = (CONFIG_time*2,CONFIG_lats,CONFIG_lons)
 
 ## define months info
 Months_name = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
@@ -67,7 +66,7 @@ livestock = 'POULTRY'
 ## SHEEP: grassland-0; mixed-1
 ## POULTRY: broiler-0, layer-1, backyard-2
 lvl_idx = 0
-production_system_dict = {
+CONFIG_production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
         'BEEF_CATTLE':['grassland','mixed',None],
         'DAIRY_CATTLE':['grassland','mixed',None],
@@ -75,10 +74,10 @@ production_system_dict = {
         'SHEEP':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
-production_system = production_system_dict[livestock][lvl_idx]
+production_system = CONFIG_production_system_dict[livestock][lvl_idx]
 ## housing_system: 1. insulated building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
 ## housing_system_list = ['slat/pit house','barn','poultry_house','bck_poultry']
-housing_system_dict = {
+CONFIG_housing_system_dict = {
         'PIG':['insulated','naturally ventilated','naturally ventilated'],
         'BEEF_CATTLE':[None,'naturally ventilated',None],
         'DAIRY_CATTLE':[None,'naturally ventilated',None],
@@ -88,7 +87,7 @@ housing_system_dict = {
         }
 # housing_system = housing_system_dict[livestock][lvl_idx]
 
-animal_file_dict = {
+CONFIG_animal_file_dict = {
         'PIG':'piginfo_faogleam.nc',
         'BEEF_CATTLE':'beefinfo_faogleam.nc',
         'DAIRY_CATTLE':'dairyinfo_faogleam.nc',
@@ -98,7 +97,7 @@ animal_file_dict = {
         }
 # animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
 
-MMS_file_dict = {
+CONFIG_MMS_file_dict = {
         'PIG':'pigmms_faogleam.nc',
         'BEEF_CATTLE':'beefmms_faogleam.nc',
         'DAIRY_CATTLE':'dairymms_faogleam.nc',
@@ -109,12 +108,12 @@ MMS_file_dict = {
 # MMS_file_name ='ind_MMS.nc'                           ## input files should be put in AMCLIM/INPUT/
 # MMS_file_name = MMS_file_dict[livestock]
 
-MMS_type_dict = {
-        'PIG':['ind','med','bck'],
-        'BEEF_CATTLE':['grassland','mixed',None],
-        'DAIRY_CATTLE':['grassland','mixed',None],
-        'OTHER_CATTLE':['grassland','mixed',None],
-        'SHEEP':['grassland','mixed',None],
-        'POULTRY':['broiler','layer','backyard']
+# CONFIG_MMS_type_dict = {
+#         'PIG':['ind','med','bck'],
+#         'BEEF_CATTLE':['grassland','mixed',None],
+#         'DAIRY_CATTLE':['grassland','mixed',None],
+#         'OTHER_CATTLE':['grassland','mixed',None],
+#         'SHEEP':['grassland','mixed',None],
+#         'POULTRY':['broiler','layer','backyard']
         }
 # MMS_type = MMS_type_dict[livestock][lvl_idx]

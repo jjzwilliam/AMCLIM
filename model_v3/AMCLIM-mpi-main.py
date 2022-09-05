@@ -18,6 +18,7 @@ rank = comm.Get_rank()
 
 crops = [sys.argv[1]]
 chem_ferts = ['ammonium','urea']
+#chem_ferts = ['urea']
 startday = 0
 endday = 730
 methods = ['broadcasting-surf','incorporating-disk','deep injection']
@@ -36,7 +37,7 @@ sim = 'base'
 # sens_tests=['+']
 
 band = int(360/size)
-arr = (731,band,720)
+arr = (730,band,720)
 
 
 start = time.time()
@@ -85,17 +86,17 @@ sim_type='base',output_stat=True,quality_check=True)
             NO3diff = None
 
             if rank == 0:
-                NH3flux = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                TANwashoff = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                TANnitrif = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                NH4leaching = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                TANdiff = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                NH3diff = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                Ammuptake = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                Nituptake = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                NO3washoff = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                NO3leaching = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
-                NO3diff = np.transpose(np.zeros((365,360,720), dtype=np.float),(1,0,2)).reshape((360,newshape))
+                NH3flux = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                TANwashoff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                TANnitrif = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                NH4leaching = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                TANdiff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                NH3diff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                Ammuptake = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                Nituptake = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                NO3washoff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                NO3leaching = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                NO3diff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
 
             comm.Gather(sendNH3flux, NH3flux, root=0)
             comm.Gather(sendwashoff, TANwashoff, root=0)

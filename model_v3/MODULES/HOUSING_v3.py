@@ -43,7 +43,7 @@ class HOUSING_MODULE:
     ## Initiating class and assign values to object properties;
     ## array_shape: define dimension (model resolution) of arrays: e.g., (days,lats,lons)
     ## N_input: annual excreted N by livestock divided by farming area; kgN per unit area per year; 
-    ##          shape: same as the np.zeros(array_shape), e.g., np.zeros(mtrx)
+    ##          shape: same as the np.zeros(array_shape), e.g., np.zeros(CONFIG_mtrx)
     ## housing_type: 1. 'slat/pit house' 
     ##               2. 'barn'
     ##               3. 'poultry house'
@@ -54,9 +54,9 @@ class HOUSING_MODULE:
         self.livestock = livestock_name
         self.lvl_idx = production_system_lvl_idx
         ## production system of the livestock
-        self.production_system = production_system_dict[self.livestock][self.lvl_idx]
+        self.production_system = CONFIG_production_system_dict[self.livestock][self.lvl_idx]
         ## housing system/env for the livestock
-        self.house_env = housing_system_dict[self.livestock][self.lvl_idx]
+        self.house_env = CONFIG_housing_system_dict[self.livestock][self.lvl_idx]
         print('HOUSING Module - current livestock is: '+str(self.livestock))
         if self.production_system is None:
             raise ValueError("ERROR - incorrect production system for "+str(self.livestock))
@@ -72,8 +72,8 @@ class HOUSING_MODULE:
         ## livestock info and MMS info
         #####################################################
         ## read livestock and the corresponding MMS datasets
-        self.animal_file_name = animal_file_dict[self.livestock]
-        self.MMS_file_name = MMS_file_dict[self.livestock] 
+        self.animal_file_name = CONFIG_animal_file_dict[self.livestock]
+        self.MMS_file_name = CONFIG_MMS_file_dict[self.livestock] 
         self.animal_file = xr.open_dataset(infile_path+animal_data_path+self.animal_file_name)
         self.MMS_file = xr.open_dataset(infile_path+animal_data_path+self.MMS_file_name)
         ## livestock info: N excretion, heads, body weights
@@ -103,11 +103,11 @@ class HOUSING_MODULE:
         self.excret_N = xr_to_np(self.excret_N)
         print("test total N 2: ",np.nansum(self.excret_N*self.housing_area)/1e9)
         ## MMS info
-        self.f_loss = np.zeros(mtrx[1:])
-        self.f_sold = np.zeros(mtrx[1:])
-        self.f_housing_litter = np.zeros(mtrx[1:])
-        self.f_housing_pit = np.zeros(mtrx[1:])
-        # self.f_dailyspread = np.zeros(mtrx[1:])
+        self.f_loss = np.zeros(CONFIG_mtrx[1:])
+        self.f_sold = np.zeros(CONFIG_mtrx[1:])
+        self.f_housing_litter = np.zeros(CONFIG_mtrx[1:])
+        self.f_housing_pit = np.zeros(CONFIG_mtrx[1:])
+        # self.f_dailyspread = np.zeros(CONFIG_mtrx[1:])
         ## attribute pathways to each cluster
         for mms in loss_list:
             try:
@@ -370,13 +370,15 @@ class HOUSING_MODULE:
 
     ## housing environmental conditions; and diagnostic variables
     def sim_env(self,house_env,housing_type,dayidx):
-        hhidx = dayidx*24
-        # temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
-        # rhum_data = rhum_file.rh2m[hhidx:hhidx+24]
-        # wind_data = wind_file.Wind_Speed_10m_Mean[hhidx:hhidx+24]
-        temp_data = temp_file.t2m[dayidx] - 273.15
-        rhum_data = rhum_file.Relative_Humidity_2m_06h[dayidx]
-        wind_data = wind_file.Wind_Speed_10m_Mean[dayidx]
+        if CONFIG_machine == "STREAM":
+            temp_data = temp_file.t2m[dayidx] - 273.15
+            rhum_data = rhum_file.Relative_Humidity_2m_06h[dayidx]
+            wind_data = wind_file.Wind_Speed_10m_Mean[dayidx]
+        else:
+            hhidx = dayidx*24
+            temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
+            rhum_data = rhum_file.rh2m[hhidx:hhidx+24]
+            wind_data = wind_file.wind10m[hhidx:hhidx+24]
         ## housing environmental conditions
         if house_env.lower() == 'insulated':
             # print("HOUSING ENV: House with slatted floor")

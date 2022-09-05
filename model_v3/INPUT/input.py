@@ -11,33 +11,49 @@ from CONFIG.config import *        ## animal data file names specified in CONFIG
 from MODULES.FUNC import *
 
 ## directing input file directory
-# infile_path = '/home/s1576984/scratch/working_directory/AMCLIM/input_files/'
-# infile_path = '/gws/nopw/j04/macaque/JJz/jjz_virtual_env/working_directory/new_AMCLIM/AMCLIM/input_files/' 
 animal_data_path = 'animal_data/'
-met_data_path = 'met_data/met_data/'
+met_data_path = 'met_data/'
 crop_data_path = 'crop_data/'
 soil_data_path ='soil_data/'
-## Open animal data files and meteorological files
-# animal_file = xr.open_dataset(infile_path+animal_data_path+animal_file_name)
 
 ## open meteorology/parameter/variable files
-## meteorological data in 2018: 1) temperature (2m air; ground), 2) relative humidity, 3) 10m wind speed, 4) evaporation from soil,
-##     5) soil moisture data, 6) percentage of saturation soil moisture 7) sensible heat flux (J/m^2/s)(not used) 8) rainfall (kg/m^2) 
-##     9) aerogynamic and boundary layer resistance (s/m)
-temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-2018d-05.nc')
-groundtemp_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1temp-2018d-05.nc')
-groundtemp_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2temp-2018d-05.nc')
-rhum_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-rhum2m-2018d-05.nc')
-wind_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-wind10m-2018d-05.nc')
-evap_file = xr.open_dataset(infile_path+met_data_path+'ERA5-evapfromsoil-2018d-05.nc')
-# soilmoist_file = xr.open_dataset(infile_path+met_data_path+'SOILMOISTURE-L3S-SSMV-COMBINED-DAILY-2018-360x720.nc')
-soilmoist_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1moist-2018d-05.nc')
-soilmoist_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2moist-2018d-05.nc')
-# soilsm_file = xr.open_dataset(infile_path+met_data_path+'SOILMOISTURE-L3S-SSMS-ACTIVE-DAILY-2018-360x720.nc')
-rain_file = xr.open_dataset(infile_path+met_data_path+'ERA5-totalcolumn_rainwater-2018d-05.nc')
-ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.0018-01-01-00000-05.nc')
-runoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-srfrunoff-2018d-05.nc')
-subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-2018d-05.nc')
+## meteorological data in 2018: 
+##  1) 2m air temperature (K), 
+##  2) relative humidity (%), 
+##  3) 10m wind speed (m/s), 
+##  4) evaporation from soil (m; accumulated), 
+##  5-6) soil temperature data (2 levels, K), 
+##  7-8) soil moisture data (2 levels, m3/m3),
+##  9) rainfall (kg/m^2), 
+##  10) surface runoff (m; accumulated) ,
+##  11) subsurface runoff (m; accumulated), 
+##  12) aerogynamic and boundary layer resistance (s/m)
+if CONFIG_machine == "Stream":
+    temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-'+str(sim_year)+'d-05.nc')
+    rhum_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-rhum2m-'+str(sim_year)+'d-05.nc')
+    wind_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-wind10m-'+str(sim_year)+'d-05.nc')
+    evap_file = xr.open_dataset(infile_path+met_data_path+'ERA5-evapfromsoil-'+str(sim_year)+'d-05.nc')
+    groundtemp_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1temp-'+str(sim_year)+'d-05.nc')
+    groundtemp_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2temp-'+str(sim_year)+'d-05.nc')
+    soilmoist_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1moist-'+str(sim_year)+'d-05.nc')
+    soilmoist_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2moist-'+str(sim_year)+'d-05.nc')
+    rain_file = xr.open_dataset(infile_path+met_data_path+'ERA5-totalcolumn_rainwater-'+str(sim_year)+'d-05.nc')
+    runoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-srfrunoff-'+str(sim_year)+'d-05.nc')
+    subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-'+str(sim_year)+'d-05.nc')
+    ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.'+str(sim_year-2000)+'-01-01-00000-05.nc')
+else:
+    temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-'+str(sim_year)+'h-05.nc')
+    rhum_file = xr.open_dataset(infile_path+met_data_path+'ERA5-rhum2m-'+str(sim_year)+'h-05.nc')
+    wind_file = xr.open_dataset(infile_path+met_data_path+'ERA5-wind10m-'+str(sim_year)+'h-05.nc')
+    evap_file = xr.open_dataset(infile_path+met_data_path+'ERA5-evapfromsoil-'+str(sim_year)+'h-05.nc')
+    groundtemp_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1temp-'+str(sim_year)+'h-05.nc')
+    groundtemp_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2temp-'+str(sim_year)+'h-05.nc')
+    soilmoist_filelvl1 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl1moist-'+str(sim_year)+'h-05.nc')
+    soilmoist_filelvl2 = xr.open_dataset(infile_path+met_data_path+'ERA5-soillvl2moist-'+str(sim_year)+'h-05.nc')
+    rain_file = xr.open_dataset(infile_path+met_data_path+'ERA5-totalcolumn_rainwater-'+str(sim_year)+'h-05.nc')
+    runoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-surfrunoff-'+str(sim_year)+'h-05.nc')
+    subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-'+str(sim_year)+'h-05.nc')
+    ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50-RATM-'+str(sim_year)+'h-05.nc')
 
 #################################
 ## crop and fertilizer data
