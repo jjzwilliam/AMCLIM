@@ -171,10 +171,10 @@ class MMS_module:
         self.f_MMS = self.f_MMS_fuel+self.f_MMS_preserve_solid+self.f_MMS_preserve_liquid+self.f_MMS_indoor_solid+\
                         self.f_MMS_indoor_liquid+self.f_MMS_open_solid+self.f_MMS_open_liquid+self.f_MMS_open_lagoon
 
-        field_shape = (lats,lons)
-        array_shape = (25,lats,lons)
+        field_shape = (CONFIG_lats,CONFIG_lons)
+        array_shape = (25,CONFIG_lats,CONFIG_lons)
         ## output shape
-        outarray_shape = (Days,lats,lons)
+        outarray_shape = (Days,CONFIG_lats,CONFIG_lons)
 
         ## feces input from housing
         self.manure_added = manure_added
@@ -1053,8 +1053,8 @@ class MMS_module:
         self.TAN_pool[-1][self.winter_app_cal==dayidx]  = 0.0
     
     def sim_out(self,mms_cat,phase):
-        nlat = int(180.0/dlat)
-        nlon = int(360.0/dlon)
+        nlat = int(180.0/CONFIG_dlat)
+        nlon = int(360.0/CONFIG_dlon)
         ntime = Days
         lats = 90 - 0.5*np.arange(nlat)
         lons = -180 + 0.5*np.arange(nlon)
@@ -1201,8 +1201,8 @@ class MMS_module:
         return
 
     def output_MMS_pathway(self):
-        nlat = int(180.0/dlat)
-        nlon = int(360.0/dlon)
+        nlat = int(180.0/CONFIG_dlat)
+        nlon = int(360.0/CONFIG_dlon)
         ntime = Days
         lats = 90 - 0.5*np.arange(nlat)
         lons = -180 + 0.5*np.arange(nlon)

@@ -115,5 +115,5 @@ CONFIG_MMS_file_dict = {
 #         'OTHER_CATTLE':['grassland','mixed',None],
 #         'SHEEP':['grassland','mixed',None],
 #         'POULTRY':['broiler','layer','backyard']
-        }
+        # }
 # MMS_type = MMS_type_dict[livestock][lvl_idx]

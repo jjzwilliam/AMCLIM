@@ -169,10 +169,10 @@ class HOUSING_MODULE:
         ## pH and H+ ions concentration
         self.cc_H = np.float(10**(-self.pH))
 
-        field_shape = (lats,lons)
-        array_shape = (25,lats,lons)
+        field_shape = (CONFIG_lats,CONFIG_lons)
+        array_shape = (25,CONFIG_lats,CONFIG_lons)
         ## output shape
-        outarray_shape = (Days,lats,lons)
+        outarray_shape = (Days,CONFIG_lats,CONFIG_lons)
 
         ## environmental fields
         self.T_sim = np.zeros(array_shape)
@@ -959,8 +959,8 @@ class HOUSING_MODULE:
                 self.UA_pool_to_storage[:] = 0.0
 
     def sim_out(self,housing_type,poultry_insitu=False):
-        nlat = int(180.0/dlat)
-        nlon = int(360.0/dlon)
+        nlat = int(180.0/CONFIG_dlat)
+        nlon = int(360.0/CONFIG_dlon)
         ntime = Days
         lats = 90 - 0.5*np.arange(nlat)
         lons = -180 + 0.5*np.arange(nlon)
