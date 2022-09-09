@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ## specify CONFIG_machine: STREAM, JASMIN, ARCHER
-CONFIG_machine = 'ARCHER'
+CONFIG_machine = 'STREAM'
 
 CONFIG_inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',

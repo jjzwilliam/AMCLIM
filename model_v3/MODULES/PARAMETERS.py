@@ -667,6 +667,15 @@ def water_drainage(theta,theta_sat,Ksat,fc,layerthickness,spantime=24):
     ## determine the water drainage
     drainage = np.minimum(ks,drainpotential)
     return drainage
+## crop water uptake: an empirical method; ref: Dardenelli et al., 2004, Field Crops Research
+def crop_water_uptake(theta,theta_WP,Kcrit=0.096):
+    ## svw_water is change of the soil volumetric water content which is uptaken by crops
+    ## convert critical constant Kcrit (per day to per s)
+    svw_uptake = (theta-theta_WP)*Kcrit/(24*3600)
+    ## when soil water content is smaller than the wilting point sw, water uptake is zero
+    ## wilting point is the lower limit for crop water uptake 
+    svw_uptake = np.maximum(svw_uptake,0.0)
+    return svw_uptake
 ## soil characteristics: infiltration rate (m/s) - empirical method 
 ## this is an empirically-derived expression for vertical/percolation/infiltration/subsurface leaching/ of animal slurry
 ## data source: Patle et al., Geo.Eco.Landscale 2019
@@ -718,7 +727,7 @@ def initial_infil(frac_DM):
 ## urea decomposition consumes H+ ion, which leads to pH increase
 ## [app_timing_app] is an indexing map that remarks the timing of fertilizer application with  a shape of [time,lat,lon]
 def soil_pH_postapp(base_pH,app_timing_map,fert_pH=8.5):
-    pH_postapp = np.zeros(mtrx2)
+    pH_postapp = np.zeros(CONFIG_mtrx2)
     for tt in np.arange(base_pH.shape[0]-6):
         pH_postapp[tt+1][app_timing_map[tt]==1] = fert_pH
         pH_postapp[tt+2][app_timing_map[tt]==1] = fert_pH

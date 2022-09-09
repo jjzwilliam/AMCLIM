@@ -28,7 +28,8 @@ soil_data_path ='soil_data/'
 ##  10) surface runoff (m; accumulated) ,
 ##  11) subsurface runoff (m; accumulated), 
 ##  12) aerogynamic and boundary layer resistance (s/m)
-if CONFIG_machine == "Stream":
+if CONFIG_machine == "STREAM":
+    met_data_path = 'met_data/met_data/'
     temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-'+str(sim_year)+'d-05.nc')
     rhum_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-rhum2m-'+str(sim_year)+'d-05.nc')
     wind_file = xr.open_dataset(infile_path+met_data_path+'AgERA5-wind10m-'+str(sim_year)+'d-05.nc')
@@ -40,7 +41,7 @@ if CONFIG_machine == "Stream":
     rain_file = xr.open_dataset(infile_path+met_data_path+'ERA5-totalcolumn_rainwater-'+str(sim_year)+'d-05.nc')
     runoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-srfrunoff-'+str(sim_year)+'d-05.nc')
     subrunoff_file = xr.open_dataset(infile_path+met_data_path+'ERA5-subrunoff-'+str(sim_year)+'d-05.nc')
-    ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.'+str(sim_year-2000)+'-01-01-00000-05.nc')
+    ratm_file = xr.open_dataset(infile_path+met_data_path+'I2000clm50_RAM_output.clm2.h1.00'+str(sim_year-2000)+'-01-01-00000-05.nc')
 else:
     temp_file = xr.open_dataset(infile_path+met_data_path+'ERA5-temp2m-'+str(sim_year)+'h-05.nc')
     rhum_file = xr.open_dataset(infile_path+met_data_path+'ERA5-rhum2m-'+str(sim_year)+'h-05.nc')
@@ -59,11 +60,14 @@ else:
 ## crop and fertilizer data
 #################################
 fertfilename = 'IFA_fert_info_21st_century.nc'
-cropfileformat = '_cropping_info.nc'
+cropfileformat = '_21st_cropping_info.nc'
 crop_filledcalendar = 'ALL_CROPS_netCDF_0.5deg_filled_dir/'
 crop_unfilledcalendar = 'ALL_CROPS_netCDF_0.5deg_unfilled_dir/'
+crop_GGCMI_p3_calendar = "GGCMI_p3/"
 crop_filledcalendarformat = '.crop.calendar.fill.nc'
 crop_unfilledcalendarformat = '.crop.calendar.nc'
+crop_GGCMI_p3_calendarformat = '_GGCMI_p3_crop_calendar.nc'
+croplandtypefile = 'croplands_classification.nc'
 manure_appcalendar ='manure_app_calendar.nc'
 
 ##################################

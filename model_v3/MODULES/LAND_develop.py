@@ -4,6 +4,8 @@ from cmath import phase, tan
 from logging import raiseExceptions
 from os import times
 from re import sub
+from time import time
+from wsgiref.simple_server import demo_app
 
 from pandas import array
 from INPUT.input import *
@@ -63,6 +65,8 @@ f_washoff_N = 0.001
 ## potential irrigation: 50 mm
 irrig_water = 50*1e3
 # irrig_water = 0.0
+## days for seeds to germinate
+day_germinate = 7.0
 
 ## thichkness of vertical layer 1, 2, 3, 4: 2cm(1), 5cm(2), 7cm(3), 14cm(4)
 zlayers = [0.02, 0.05, 0.07, 0.14]
@@ -246,6 +250,8 @@ class LAND_module:
         self.ammNuptake = np.zeros(dlvl)
         ## uptake of NO3- by plants (topsoil, midsoil)
         self.nitNuptake = np.zeros(dlvl)
+        ## water uptake by plants
+        self.wateruptake = np.zeros(dlvl)
         #### upwards fluxes: diffusion
         ## urea diffusion (aq) (topsoil->surface; midsoil->topsoil)
         self.ureadiffusionup = np.zeros(tlvl)
@@ -314,6 +320,9 @@ class LAND_module:
 
         ## adsorption 
         self.Kd = np.zeros(array_shape[1:])
+
+        ## irrigation idx
+        self.irrigation_idx = np.zeros(array_shape[1:])
 
         ## output fields
         self.o_NH3flux = np.zeros(outarray_shape)
@@ -478,42 +487,53 @@ class LAND_module:
         ## mark all application day
         N_app_mark = np.zeros(CONFIG_mtrx2)
 
-        print(crop_type)
-        for lat in np.arange(lats):
-            for lon in np.arange(lons):
-                ## timing of planting and harvesting
-                plt_time = plant_calendar[lat,lon]
-                har_time = harvest_calendar[lat,lon]
-                ## how many times that N is applied on fields in an annual cycle
-                app_freq = fert_freq[lat,lon]
-                ## harvesting goes into the next year
-                if ~np.isnan(app_freq):
-                    if ~np.isnan(plt_time):
-                        if ~np.isnan(har_time):
-                            if har_time<plt_time:
-                                har_time = har_time+Days
-                            if app_freq <=1.0:
-                                N_app[int(plt_time),lat,lon] = N_input[lat,lon]*app_freq
-                                ## mark up the N application
-                                N_app_mark[int(plt_time),lat,lon] = 1 
-                                ## potential irrigation: 50 mm
-                                water_app[int(plt_time),lat,lon] = irrig_water
-                            elif app_freq>1.0:
-                                ## get the integer times of N application
-                                tapp = np.floor(app_freq)
-                                ## application intervals
-                                app_int = int(abs(int(har_time)-int(plt_time))/(tapp+1))
-                                ## index for application
-                                app_idx = np.arange(int(plt_time),int(har_time)-1,app_int)
-                                ## in tapp times, the application rate equals the readed applcation rates
-                                for idx in app_idx[:-1]:
-                                    N_app[int(idx),lat,lon] = N_input[lat,lon]
-                                    N_app_mark[int(idx),lat,lon] = 1
-                                    water_app[int(idx),lat,lon] = irrig_water
-                                ## the residual of N application rates
-                                N_app[int(app_idx[-1]),lat,lon] = (app_freq-tapp)*N_input[lat,lon]
-                                N_app_mark[int(app_idx[-1]),lat,lon] = 1
-                                water_app[int(app_idx[-1]),lat,lon] = irrig_water
+        # print(np.where((np.isnan(harvest_calendar))&(~np.isnan(plant_calendar))))
+
+        for dd in np.arange(CONFIG_mtrx2[0]):
+            # N_app[dd][dd==plant_calendar] = N_input[dd==plant_calendar]
+            N_app[dd][dd==plant_calendar] = N_input[dd==plant_calendar]/2
+            water_app[dd][dd==plant_calendar+1] = irrig_water
+            N_app[dd][dd==np.floor((plant_calendar+harvest_calendar)/2)] = N_input[dd==np.floor((plant_calendar+harvest_calendar)/2)]/2
+
+        N_app_mark[N_app!=0] = 1
+        # water_app[N_app!=0] = irrig_water
+
+        # print(crop_type)
+        # for lat in np.arange(lats):
+        #     for lon in np.arange(lons):
+        #         ## timing of planting and harvesting
+        #         plt_time = plant_calendar[lat,lon]
+        #         har_time = harvest_calendar[lat,lon]
+        #         ## how many times that N is applied on fields in an annual cycle
+        #         app_freq = fert_freq[lat,lon]
+        #         ## harvesting goes into the next year
+        #         if ~np.isnan(app_freq):
+        #             if ~np.isnan(plt_time):
+        #                 if ~np.isnan(har_time):
+                            # if har_time<plt_time:
+                            #     har_time = har_time+Days
+                            # if app_freq <=1.0:
+                            #     N_app[int(plt_time),lat,lon] = N_input[lat,lon]*app_freq
+                            #     ## mark up the N application
+                            #     N_app_mark[int(plt_time),lat,lon] = 1 
+                            #     ## potential irrigation: 50 mm
+                            #     water_app[int(plt_time),lat,lon] = irrig_water
+                            # elif app_freq>1.0:
+                            #     ## get the integer times of N application
+                            #     tapp = np.floor(app_freq)
+                            #     ## application intervals
+                            #     app_int = int(abs(int(har_time)-int(plt_time))/(tapp+1))
+                            #     ## index for application
+                            #     app_idx = np.arange(int(plt_time),int(har_time)-1,app_int)
+                            #     ## in tapp times, the application rate equals the readed applcation rates
+                            #     for idx in app_idx[:-1]:
+                            #         N_app[int(idx),lat,lon] = N_input[lat,lon]
+                            #         N_app_mark[int(idx),lat,lon] = 1
+                            #         water_app[int(idx),lat,lon] = irrig_water
+                            #     ## the residual of N application rates
+                            #     N_app[int(app_idx[-1]),lat,lon] = (app_freq-tapp)*N_input[lat,lon]
+                            #     N_app_mark[int(app_idx[-1]),lat,lon] = 1
+                            #     water_app[int(app_idx[-1]),lat,lon] = irrig_water
         
         ## determine soil pH after urea application
         if soil_pH is not None:
@@ -541,13 +561,18 @@ class LAND_module:
         ## crop calendar dataset
         cropcalds = open_ds(filepath)
         ## read planting and harvesting dates
-        plantdate = cropcalds['plant.start'].values
-        harvestdate = cropcalds['harvest.start'].values
-        plantfill = cropcalds['plant'].values
-        harvestfill = cropcalds['harvest'].values
-        plantdate[(np.isnan(plantdate))&(~np.isnan(plantfill))] = plantfill[(np.isnan(plantdate))&(~np.isnan(plantfill))]
-        harvestdate[(np.isnan(harvestdate))&(~np.isnan(harvestfill))] = harvestfill[(np.isnan(harvestdate))&(~np.isnan(harvestfill))]
-        ## harvesting date goes into next year
+        # plantdate = cropcalds['plant.start'].values
+        # harvestdate = cropcalds['harvest.start'].values
+        # plantfill = cropcalds['plant'].values
+        # harvestfill = cropcalds['harvest'].values
+        # plantdate[(np.isnan(plantdate))&(~np.isnan(plantfill))] = plantfill[(np.isnan(plantdate))&(~np.isnan(plantfill))]
+        # harvestdate[(np.isnan(harvestdate))&(~np.isnan(harvestfill))] = harvestfill[(np.isnan(harvestdate))&(~np.isnan(harvestfill))]
+        # ## harvesting date goes into next year
+        # harvestdate[harvestdate<plantdate] = harvestdate[harvestdate<plantdate]+Days
+
+        ## new GGCMI crop calendar with ir,rf classification
+        plantdate = cropcalds.planting_day.values
+        harvestdate = cropcalds.harvesting_day.values
         harvestdate[harvestdate<plantdate] = harvestdate[harvestdate<plantdate]+Days
         return plantdate,harvestdate
 
@@ -555,20 +580,28 @@ class LAND_module:
         ## read N application rates dataset for crops
         fertds = open_ds(infile_path+crop_data_path+crop+cropfileformat)
         ## crop calendar dataset
-        cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+        # cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+        ## new GGCMI crop calendar
+        cropcalspath = infile_path+crop_data_path+crop_GGCMI_p3_calendar+crop+crop_GGCMI_p3_calendarformat
         # cropcalds = open_ds(infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)
         ## base soil pH dataset
         soilpHds = open_ds(infile_path+soil_data_path+soilpHfile)
 
-        totalN = fertds.TotalN.values*1e3
+        totalN = fertds.TotalN.sel(year=sim_year).values*1e3
+        print("Total N: ",np.nansum(totalN[self.plat1:self.plat2,:]/1e9))
         ## N application rate is interpolated;
-        rateN = fertds.Nrate.values*1e3/1e4
+        rateN = fertds.Nrate.sel(year=sim_year).values*1e3/1e4
         croparea = fertds.croparea.values*1e4
         croparea[totalN!=0] = totalN[totalN!=0]/rateN[totalN!=0]
         croparea = np.nan_to_num(croparea)
+        ## at least, there will be two applications
+        ## 1st: at the start of planting, 2nd: between planting and harvesting
+        # rateN = rateN/2
         app_freq = totalN/(rateN*croparea)
-        ## the maximum application frequency in a year is 5
-        app_freq = np.minimum(app_freq,5)
+        # app_freq = np.nan_to_num(app_freq,posinf=0,neginf=0)
+        # print("max app freq: ",np.nanmax(app_freq))
+        ## the maximum application frequency in a year is 6
+        # app_freq = np.minimum(app_freq,2)
 
         ## read planting and harvesting dates
         plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
@@ -596,6 +629,9 @@ class LAND_module:
         self.urea_added = chem_N_tocrop[:,self.plat1:self.plat2,:] 
         self.ureaN_area = fureaN[self.plat1:self.plat2,:]  * croparea[self.plat1:self.plat2,:] 
         self.water_added = water_to_crop[:,self.plat1:self.plat2,:]
+        print("NO3 N:",np.nansum(np.nansum(self.NO3_added,axis=0)*self.nitN_area)/1e9)
+        print("TAN N:",np.nansum(np.nansum(self.TAN_added,axis=0)*self.ammN_area)/1e9)
+        print("urea N:",np.nansum(np.nansum(self.urea_added,axis=0)*self.ureaN_area)/1e9)
         ## met data interpolation
         self.met_input_interp(totalN[self.plat1:self.plat2,:])
         return
@@ -681,14 +717,36 @@ class LAND_module:
         return 
 
     ## irrigation of the land
-    def irrigation_event(self,dayidx):
-        self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)<0.1] = self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)<0.1]
-        self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)>=0.1] = self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)>=0.1]/5.0
+    def irrigation_event(self,dayidx,plantday,harvestday,irrigation_map,theta_WP,theta_FC):
+        ## justify if the soil water content is lower than the wilting point
+        soil_water_deficit = (self.theta[1,0] + self.theta[2,0])/2 - theta_WP
+        ## only for the periods of growing season
+        soil_water_deficit[dayidx<=plantday] = 1.0
+        soil_water_deficit[dayidx>=harvestday] = 1.0
+        ## only for irrigated croplands (idx=2), excluding rainfed croplands
+        ## Note that irrigated cropland index is 2 (rainfed cropland index is 1)
+        soil_water_deficit[irrigation_map!=2] = 1.0
+        ## update irrigation idx field: soil water is insuficient area plus 1.0
+        self.irrigation_idx[soil_water_deficit<0] = self.irrigation_idx[soil_water_deficit<0] + 1.0
+
+        ## water is added when irrigation idx is 1.0 (soil water content is lower than wilting point)
+        ## water is added til the soil moisture of the top three layer (0-14cm) is equivalent to the field capacity
+        ## m3/m3 change to g/m2
+        self.water_added[dayidx][self.irrigation_idx==1.0] = theta_FC[self.irrigation_idx==1.0]*(zlayers[0]+zlayers[1]+zlayers[2])*1e6
+        # self.water_added[dayidx][self.irrigation_idx!=1] = 0.0
+        self.water_added[dayidx][irrigation_map!=2] = 0.0
+        # self.water_added[dayidx][(irrigation_map!=2)&(self.water_added[dayidx]!=0)] = irrig_water/5.0
         self.water[7] = self.water_added[dayidx]
+        ## reset irrigation idx
+        self.irrigation_idx[:] = 0.0
+       
+        # self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)<0.1] = self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)<0.1]
+        # self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)>=0.1] = self.water_added[dayidx][np.nanmean(self.soil_moist[0,1:],axis=0)>=0.1]/5.0
+        # self.water[7] = self.water_added[dayidx]
         # self.water[7][self.water_added[dayidx]!=0] = self.water_added[dayidx][self.water_added[dayidx]!=0]
         ## get rid of the places that do not need irrigation (rain-fed field)
         # self.water[7][np.nanmean(self.soil_moist[:,1:],axis=(0,1))>0.1] = 0.0
-        
+
  
     ## soil water content of each layer after irrigation
     def post_soil_moist(self,theta1,theta2,theta3,theta_sat,water_added):
@@ -716,7 +774,7 @@ class LAND_module:
         return post_theta1, post_theta2, post_theta3
     
     ## initial infiltration following irrigation events
-    def irr_infil(self,theta1,theta2,theta3,theta_sat,water_added,delta_t=1.0):
+    def irr_infil(self,theta1,theta2,theta3,theta_sat,water_added,delta_t=24.0):
         z_added = water_added/1e6
         infilrate1 = (z_added-zlayers[0]*(theta_sat-theta1))/(3600*delta_t)
         infilrate1 = np.maximum(infilrate1,0.0)
@@ -725,7 +783,18 @@ class LAND_module:
         infilrate3 = (z_added-zlayers[0]*(theta_sat-theta1)-zlayers[1]*(theta_sat-theta2)-\
                         zlayers[2]*(theta_sat-theta3))/(3600*delta_t)
         infilrate3 = np.maximum(infilrate3,0.0)
+        # infilrate1 = infilrate3
+        # infilrate2 = infilrate3
         return infilrate1, infilrate2, infilrate3
+
+    ## crop life cycle stage
+    def crop_lifecycle_stage(self,dayidx,plant_calendar,harvest_calendar,stages=6):
+        if dayidx >= Days:
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)   
+        growing_length = harvest_calendar - plant_calendar
+        stage_idx = np.floor((dayidx - plant_calendar)/(growing_length/stages))+1
+        stage_idx[stage_idx<0] = 0
+        return stage_idx
 
     ## layer 0: surface source layer 2cm
     ## layer 1: topsoil layer 5cm
@@ -759,6 +828,8 @@ class LAND_module:
         self.NO3diffusionup[:,0] = self.NO3diffusionup[:,-1]
         ## soil water content
         self.theta[:,0] = self.theta[:,-1]
+        ## 
+        self.soil_moist[:,0] = self.soil_moist[:,-1]
         if manure is True:
             self.avail_N_pool[0] = self.avail_N_pool[-1]
             self.resist_N_pool[0] = self.resist_N_pool[-1]
@@ -939,23 +1010,36 @@ class LAND_module:
 
         print('current simulation is for: '+str(chem_fert_type))
         print('technique used is: '+str(tech))
+        ## soil clay, sand, silt fraction
         soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
         soilsandds = open_ds(infile_path+soil_data_path+soilsandfile)
         soilsand = soilsandds.T_SAND.values
         soilsiltds = open_ds(infile_path+soil_data_path+soilsiltfile)
         soilsilt = soilsiltds.T_SILT.values
+        ## soil organic carbon
         soilocds = open_ds(infile_path+soil_data_path+soilorgCfile)
         soiloc = soilocds.T_OC.values
+        ## soil bulk density
         soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
         soilbd = soilbd_ds.T_BULK_DEN.values
+        ## adsorption constant
         Kd = ammonium_adsorption(clay_content=soilclay)[self.plat1:self.plat2,:]
+        ## soil hydraulic conductivity
         Ks_sat = soil_hydraulic_conductivity(fsilt=soilsilt,fclay=soilclay,fsom=soiloc,BD=soilbd)[self.plat1:self.plat2,:]
-        theta_FC = soil_field_capacity(BD=soilbd)[self.plat1:self.plat2,:]
+        ## field capacity
+        theta_fc = soil_field_capacity(BD=soilbd)[self.plat1:self.plat2,:]
+        ## wilting point
         theta_wp = soil_wilting_point(fsand=soilsand,fclay=soilclay)[self.plat1:self.plat2,:]
+        ## irrigated croplands index
+        irrigatedcroplandds = open_ds(infile_path+crop_data_path+croplandtypefile)
+        ## Note that irrigated cropland index is 2 (rainfed cropland index is 1)
+        irrigated_croplandidx = irrigatedcroplandds.croplandsidx.values[self.plat1:self.plat2,:]
         ## crop calendar that detenmines the N uptake by crops
         if crop is not None:
-            cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+            # cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
+            ## new GGCMI crop calendar
+            cropcalspath = infile_path+crop_data_path+crop_GGCMI_p3_calendar+crop+crop_GGCMI_p3_calendarformat
             plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
             plantidx = plantidx[self.plat1:self.plat2,:]
             harvestidx = harvestidx[self.plat1:self.plat2,:]
@@ -963,41 +1047,55 @@ class LAND_module:
 
         for dd in np.arange(start_day_idx,end_day_idx):
             if dd < Days:
+                ## read in environmental variables
                 self.sim_env(dd)
-                self.irrigation_event(dd)
+                ## irrigation events
+                self.irrigation_event(dayidx=dd,plantday=plantidx,harvestday=harvestidx,
+                                irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+
+                infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
+                                    theta2=self.theta[0,0],theta3=self.theta[1,0],
+                                    theta_sat=self.soil_satmoist[0,0],water_added=self.water_added[dd])
+
                 if chem_fert_type == 'nitrate':
-                    # print('chemical fertilizer applied: nitrate')
                     self.NO3[5] = self.NO3_added[dd]
                     sim_pH = self.pH[dd]
                     sim_ccH = self.cc_H[dd]
                 elif chem_fert_type == 'ammonium':
                     self.TAN[5] = self.TAN_added[dd]
-                    # print('chemical fertilizer applied: ammonium')
                     sim_pH = self.pH[dd]
                     sim_ccH = self.cc_H[dd]
                 elif chem_fert_type == 'urea':
                     self.urea[5] = self.urea_added[dd]
-                    # print('chemical fertilizer applied: urea')
                     sim_pH = self.soil_pH[dd]
                     sim_ccH = self.soil_ccH[dd]
             else:
                 self.sim_env(dd-Days)
-                self.irrigation_event(dd-Days)
+                self.irrigation_event(dayidx=dd-Days,plantday=plantidx,harvestday=harvestidx,
+                                irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+
+                infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
+                                    theta2=self.theta[0,0],theta3=self.theta[1,0],
+                                    theta_sat=self.soil_satmoist[0,0],
+                                    water_added=np.maximum(self.water_added[dd-Days],self.water_added[dd]))
+
+                ## Note that the np.maximum function is to prevent application on the second year being overwritten
+                ## by day index dd-Days
                 if chem_fert_type == 'nitrate':
                     # print('chemical fertilizer applied: nitrate')
-                    self.NO3[5] = self.NO3_added[dd-Days]
-                    sim_pH = self.pH[dd-Days]
-                    sim_ccH = self.cc_H[dd-Days]
+                    self.NO3[5] = np.maximum(self.NO3_added[dd-Days],self.NO3_added[dd])
+                    sim_pH = np.maximum(self.pH[dd-Days],self.pH[dd])
+                    sim_ccH = np.maximum(self.cc_H[dd-Days],self.cc_H[dd])
                 elif chem_fert_type == 'ammonium':
-                    self.TAN[5] = self.TAN_added[dd-Days]
+                    self.TAN[5] = np.maximum(self.TAN_added[dd-Days],self.TAN_added[dd])
                     # print('chemical fertilizer applied: ammonium')
-                    sim_pH = self.pH[dd-Days]
-                    sim_ccH = self.cc_H[dd]
+                    sim_pH = np.maximum(self.pH[dd-Days],self.pH[dd])
+                    sim_ccH = np.maximum(self.cc_H[dd-Days],self.cc_H[dd])
                 elif chem_fert_type == 'urea':
-                    self.urea[5] = self.urea_added[dd-Days]
+                    self.urea[5] = np.maximum(self.urea_added[dd-Days],self.urea_added[dd])
                     # print('chemical fertilizer applied: urea')
-                    sim_pH = self.soil_pH[dd-Days]
-                    sim_ccH = self.soil_ccH[dd-Days]
+                    sim_pH = np.maximum(self.soil_pH[dd-Days],self.soil_pH[dd])
+                    sim_ccH = np.maximum(self.soil_ccH[dd-Days],self.soil_ccH[dd])
 
             if sim != 'base':
                 self.sensitivity_test(var=stvar,test=st)
@@ -1005,6 +1103,8 @@ class LAND_module:
             self.theta[0,1:] = np.copy(self.soil_moist[0,1:])
             self.theta[1,1:] = np.copy(self.soil_moist[0,1:])
             self.theta[2,1:] = np.copy(self.soil_moist[1,1:])
+
+            # print('dd',dd,self.water_added[dd,0,589])
 
             for hh in np.arange(0,24):
                 if CONFIG_machine == "STREAM":
@@ -1017,20 +1117,51 @@ class LAND_module:
                     subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
                     subrunoffrate = np.maximum(subrunoffrate,0.0)
                     evap = self.evap[hh+1]-self.evap[hh]
-                
-                infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,hh],
-                                    theta2=self.theta[0,hh],theta3=self.theta[1,hh],
-                                    theta_sat=self.soil_satmoist[0,hh],water_added=self.water[hh+1])
-                self.theta[0,hh+1],self.theta[1,hh+1], self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh],
-                                    theta2=self.theta[1,hh],theta3=self.theta[2,hh],
+
+                delta_sw1 = self.soil_moist[0,hh+1] - self.soil_moist[0,hh]
+                delta_sw2 = self.soil_moist[1,hh+1] - self.soil_moist[1,hh]
+
+                self.theta[0,hh+1] = self.theta[0,hh] + delta_sw1
+                self.theta[1,hh+1] = self.theta[1,hh] + delta_sw1
+                self.theta[2,hh+1] = self.theta[2,hh] + delta_sw2
+
+                self.theta[0,hh+1] = np.maximum(self.theta[0,hh+1],0.01)
+                self.theta[1,hh+1] = np.maximum(self.theta[1,hh+1],0.01)
+                self.theta[2,hh+1] = np.maximum(self.theta[2,hh+1],0.01)
+
+                # infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,hh],
+                #                     theta2=self.theta[0,hh],theta3=self.theta[1,hh],
+                #                     theta_sat=self.soil_satmoist[0,hh],water_added=self.water[hh+1])
+                # infilrate1 = 0.0
+                # infilrate2 = 0.0
+                # infilrate3 = 0.0
+                self.theta[0,hh+1],self.theta[1,hh+1], self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                    theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                     theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
 
                 self.drainagerate[0,hh+1] = np.maximum(infilrate1,water_drainage(theta=self.theta[0,hh+1],
-                                            theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_FC,layerthickness=zlayers[0]))
+                                            theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[0]))
                 self.drainagerate[1,hh+1] = np.maximum(infilrate2,water_drainage(theta=self.theta[1,hh+1],
-                                            theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_FC,layerthickness=zlayers[1]))
+                                            theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[1]))
                 self.drainagerate[2,hh+1] = np.maximum(infilrate3,water_drainage(theta=self.theta[2,hh+1],
-                                            theta_sat=self.soil_satmoist[1,hh+1],Ksat=Ks_sat,fc=theta_FC,layerthickness=zlayers[2]))
+                                            theta_sat=self.soil_satmoist[1,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[2]))
+                
+                # print('dd',dd,'hh+1',hh+1,"infil 1: ",infilrate1[0,589])
+                # print('dd',dd,'hh+1',hh+1,"infil 2: ",infilrate2[0,589])
+                # print('dd',dd,'hh+1',hh+1,"infil 3: ",infilrate3[0,589])
+
+                # print('dd',dd,'hh+1',hh+1,"drainage 1: ",self.drainagerate[0,hh+1][0,589])
+                # print('dd',dd,'hh+1',hh+1,"drainage 2: ",self.drainagerate[1,hh+1][0,589])
+                # print('dd',dd,'hh+1',hh+1,"drainage 3: ",self.drainagerate[2,hh+1][0,589])
+
+                # print('dd',dd,'hh+1',hh+1,"sub : ",subrunoffrate[0,589])
+
+                # print('dd',dd,'hh+1',hh+1,"theta 1: ",self.theta[0,hh+1][0,589],"sw1",self.soil_moist[0,hh+1][0,589])
+                # print('dd',dd,'hh+1',hh+1,"theta 2: ",self.theta[1,hh+1][0,589],"sw1",self.soil_moist[0,hh+1][0,589])
+                # print('dd',dd,'hh+1',hh+1,"theta 3: ",self.theta[2,hh+1][0,589],"sw2",self.soil_moist[1,hh+1][0,589])
+                # print("wp ",theta_wp[0,589])
+                # print("irri idx",irrigated_croplandidx[0,589])
+
                 ## resistance for upward diffusion in the surface layer
                 Rdiffsrfaq = diff_resistance(distance=pmids[0],phase='aqueous',
                             theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
@@ -1041,8 +1172,8 @@ class LAND_module:
                     ## lldix: index for soil temp, moisture
                     llidx = int(np.floor(ll/2))
                     
-                    self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
-                    self.theta[ll,hh+1] = np.maximum(theta_wp,self.theta[ll,hh+1])
+                    # self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
+                    # self.theta[ll,hh+1] = np.maximum(theta_wp,self.theta[ll,hh+1])
                     self.drainagerate[ll,hh+1] = np.maximum(self.drainagerate[ll,hh+1],subrunoffrate)
                     # self.drainagerate[ll,hh+1][self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]] = subrunoffrate[self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]]
                     ## resistance for diffusion between surface layer (idx0) and topsoil layer (idx1)
@@ -1062,6 +1193,7 @@ class LAND_module:
                             self.NO3_pool[1,hh] = self.NO3_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
                         else:
                             self.urea_pool[ll,hh] = self.urea_pool[ll,hh]+self.urea[hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"urea, urea pool:",self.urea[hh+1][0,432],self.urea_pool[ll,hh][0,432])
                             self.TAN_pool[ll,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]
                             self.NO3_pool[ll,hh] = self.NO3_pool[ll,hh]+self.NO3[hh+1]
 
@@ -1105,9 +1237,16 @@ class LAND_module:
                             ## urea pool
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]+\
                                                         self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"urea pool",self.urea_pool[ll,hh+1][0,589])
                             ## urea hydrolysis
                             self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
                                                                                                         theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
+                            
+                            # print("dd",dd,"hh+1",hh+1,"soil temp",self.soil_temp[llidx,hh+1][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"soil moisture",self.theta[ll,hh+1][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"hydro rate",urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
+                            #                                                     theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)[0,589])
+                            # print("dd",dd,"hh+1",hh+1,"urea hydro",self.ureahydrolysis[ll,hh+1][0,589])
                             ## subtracting chemical losses
                             self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
                             ## urea concentration
@@ -1176,6 +1315,11 @@ class LAND_module:
                         ########################
                         ## TAN pool
                         self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod
+                        # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
+                        # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
+                        # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
+                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+
                         ## fraction of aqueous NH4
                         fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
                                         temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
@@ -1184,6 +1328,7 @@ class LAND_module:
                                                     pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
                         ## subtracting chemical transformation
                         self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
                         ## TAN and NH3 concentration
                         KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
                         self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
@@ -1225,8 +1370,10 @@ class LAND_module:
                         ## update TAN pool: subtracting all losses
                         self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH3flux[hh+1]-self.TANwashoff[hh+1]-\
                                         self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]
+                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
                         ## get rid of rounding error
                         self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
                         ########################
                         ## NO3- sim
                         ########################
@@ -1264,10 +1411,13 @@ class LAND_module:
                         update_sw = self.theta[ll,hh+1]*zlayers[0] - self.drainagerate[ll,hh+1]*timestep*3600
                         ## exclude initial inifltration
                         update_sw[self.drainagerate[ll,hh+1]==infilrate1] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate1]*zlayers[0]
+                        # self.theta[ll,hh+1] = update_sw/zlayers[0]
                         self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]-\
                                                                     evap[[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]]*timestep*3600/1e6)/zlayers[0]
                         # self.theta[ll,hh+1][self.theta[ll,hh+1]<0] = 0.01
-                        self.theta[ll,hh+1] = np.maximum(self.theta[ll,hh+1],0.01)
+                        # self.theta[ll,hh+1] = np.maximum(self.theta[ll,hh+1],0.01)
+                        self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
+
 
                     elif ll == 1:
                         ########################
@@ -1276,6 +1426,10 @@ class LAND_module:
                         ## TAN pool
                         self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod+\
                                                 self.TANinfil[ll-1,hh+1]+self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
+                        # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
+                        # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
+                        # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
+                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
                         ## fraction of aqueous NH4
                         fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
                                         temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
@@ -1363,10 +1517,18 @@ class LAND_module:
                         ########################
                         ## soil water sim
                         ########################
+                        ## soil water uptaken by crops; soil volumetric water content change, m3/m3
+                        self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
+                        ## water uptake only takes place between plant date plus seedling periods and harvest date
+                        self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
+                        self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
+                        # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
+                        self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
                         ## update soil moisture 
-                        update_sw = self.theta[ll,hh+1]*zlayers[1] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600 
+                        update_sw = self.theta[ll,hh+1]*zlayers[1] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600
                         update_sw[self.drainagerate[ll,hh+1]==infilrate2] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate2]*zlayers[1]
                         self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[1]
+                        # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
 
                     elif ll == 2:
                         ########################
@@ -1428,7 +1590,7 @@ class LAND_module:
                         self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
                             self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
                         ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1][self.TAN_pool[ll,hh+1]<0] = 0.0
+                        self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
                         ########################
                         ## NO3 sim
                         ########################
@@ -1463,6 +1625,12 @@ class LAND_module:
                         ########################
                         ## soil water sim
                         ########################
+                        ## soil water uptaken by crops; soil volumetric water content change, m3/m3
+                        self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
+                        ## water uptake only takes place between plant date plus seedling periods and harvest date
+                        self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
+                        self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
+                        self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
                         ## update soil moisture 
                         update_sw = self.theta[ll,hh+1]*zlayers[2] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600 
                         update_sw[self.drainagerate[ll,hh+1]==infilrate3] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate3]*zlayers[2]
@@ -2415,7 +2583,7 @@ class LAND_module:
 
     def land_sim_reshape(self,sim_result):
         shape = sim_result.shape
-        dim1 = int((shape[0]-1)/2+1)
+        dim1 = int((shape[0]/2))
         output = np.zeros([dim1,shape[1],shape[2]])
         print(dim1,output.shape)
         output = sim_result[:dim1]+sim_result[dim1:]
@@ -2459,11 +2627,17 @@ class LAND_module:
             print('NO3 leaching: '+ str(sum_totalGg(self.o_NO3leaching))+' Gg')
             print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(self.o_NO3diff))+' Gg')
 
+        TANleft = (self.TAN_pool[0,-1]+self.TAN_pool[1,-1]+self.TAN_pool[2,-1])*sim_area
+        urealeft = (self.urea_pool[0,-1]+self.urea_pool[1,-1]+self.urea_pool[2,-1])*sim_area
+
         if quality_check is True:
-            check = chemfert_Ntotal-self.o_NH3flux-self.o_washoff-self.o_nitrif-self.o_NH4leaching-\
-                    self.o_diffaq-self.o_diffgas-self.o_ammNuptake
+            check = np.nansum(chemfert_Ntotal-self.o_NH3flux-self.o_washoff-self.o_nitrif-self.o_NH4leaching-\
+                    self.o_diffaq-self.o_diffgas-self.o_ammNuptake,axis=0)
             result = np.round(sum_totalGg(check)/sum_totalGg(chemfert_Ntotal)*100,decimals=3)
-            print("Integrity check result: "+str(result)+' %')        
+            print("Integrity check result: "+str(result)+' %')
+            # result2 = np.nansum(check,axis=0)/np.nansum(chemfert_Ntotal,axis=0)
+            # print("max diff:",np.where(result2==np.nanmax(result2)),np.nanmax(result2))      
+            # print("min diff:",np.where(result2==np.nanmin(result2)),np.nanmin(result2))     
     
     def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,
                 sim_type='base',senstest_var=False,senstest=False,output_stat=False,quality_check=False):
