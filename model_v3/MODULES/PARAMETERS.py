@@ -360,10 +360,24 @@ def TAN_nitrif(tan_pool,temp,theta,theta_sat,pH,fert_type,frac_nh4):
     return tan_nitrif
 ## calculate plant N uptake rate (to be removed from PARAMETER.py and to be put in LAND.py)
 ## Ammonium and Nitrate N in g/m2; soil C in gC
-def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
-    ## root activity weighting parameters
-    v1,v2,v3,v4 = 1.0,0.5,0.25,0.1
-    ## root structural dry matter components; g/m2
+def plant_N_uptake(mNH4,mNO3,temp,uptake,crop_stageidx,substrateC=0.04,substrateN=0.004):
+
+    ## 290 - 410
+    ## 290, 310, 330, 350, 370, 390, 410
+    ## 1,   2,   3,   4,   5,   6,   (7)
+
+    ## root activity weighting parameters field
+    v1 = np.zeros(mNH4.shape)
+    v2 = np.zeros(mNH4.shape)
+    v3 = np.zeros(mNH4.shape)
+    v4 = np.zeros(mNH4.shape)
+
+    ## root activity weighting parameters lists
+    v1list = [0.1,1.0,1.0,0.5,0.25,0.1] 
+    v2list = [0.1,0.5,1.0,1.0,0.5,0.25]
+    v3list = [0.1,0.25,0.5,1.0,1.0,1.0]
+    v4list = [0.1,0.1,0.25,0.5,1.0,1.0]
+    # ## root structural dry matter components; g/m2
     Wr1,Wr2,Wr3,Wr4 = 20,40,60,80
     ## root activity paramter; gN/(g root day)
     sigmaN20 = 0.05
@@ -377,11 +391,57 @@ def plant_N_uptake(mNH4,mNO3,temp,uptake,substrateC=0.04,substrateN=0.004):
     Neff = mNH4 + func_temp*mNO3
     ## non-linear relationship between N uptake and effective soil mineral concentration
     NC_factor = 1/(1+K_C/substrateC*(1+substrateN/J_N))
+
+    ## iterate crop stage idx from 1 to 6
+    ## 1 is the starting date for planting
+    ## 6 is the 1 stage before harvesting
+    for idx in np.arange(1,len(v1list)+1):
+        if idx<6:
+            con_idx = (np.floor(crop_stageidx)==idx)
+            v1[con_idx] = v1list[idx-1] + \
+                        (crop_stageidx[con_idx]-np.floor(crop_stageidx[con_idx]))*(v1list[idx]-v1list[idx-1])
+            v2[con_idx] = v2list[idx-1] + \
+                        (crop_stageidx[con_idx]-np.floor(crop_stageidx[con_idx]))*(v2list[idx]-v2list[idx-1])
+            v3[con_idx] = v3list[idx-1] + \
+                        (crop_stageidx[con_idx]-np.floor(crop_stageidx[con_idx]))*(v3list[idx]-v3list[idx-1])
+            v4[con_idx] = v4list[idx-1] + \
+                        (crop_stageidx[con_idx]-np.floor(crop_stageidx[con_idx]))*(v4list[idx]-v4list[idx-1])
+        else:
+            con_idx = (np.floor(crop_stageidx)==idx)
+            v1[con_idx] = v1list[idx-1] 
+            v2[con_idx] = v2list[idx-1]
+            v3[con_idx] = v3list[idx-1] 
+            v4[con_idx] = v4list[idx-1] 
+
+    vcoeff = v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4
     ## gN/m2/s
     if uptake == 'nh4':
-        uptake = (sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(mNH4/(Neff+K_Neff))*NC_factor)/(24*3600)
+        uptake = (sigmaN20*func_temp*vcoeff*(mNH4/(Neff+K_Neff))*NC_factor)/(24*3600)
     elif uptake == 'no3':
-        uptake = (sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(func_temp*mNO3/(Neff+K_Neff))*NC_factor)/(24*3600)
+        uptake = (sigmaN20*func_temp*vcoeff*(func_temp*mNO3/(Neff+K_Neff))*NC_factor)/(24*3600)
+    
+
+    # ## root activity weighting parameters
+    # v1,v2,v3,v4 = 1.0,0.5,0.25,0.1
+    # ## root structural dry matter components; g/m2
+    # Wr1,Wr2,Wr3,Wr4 = 20,40,60,80
+    # ## root activity paramter; gN/(g root day)
+    # sigmaN20 = 0.05
+    # ## root activity parameters; [C], [N], gN/m2
+    # K_C, J_N, K_Neff = 0.05, 0.005, 5
+    # ## temperature response
+    # func_temp = 0.25*np.exp(0.0693*temp)
+    # # func_temp[func_temp>1.0] = 1.0
+    # func_temp = np.minimum(func_temp,1.0)
+    # ## soil mineral concentration; 
+    # Neff = mNH4 + func_temp*mNO3
+    # ## non-linear relationship between N uptake and effective soil mineral concentration
+    # NC_factor = 1/(1+K_C/substrateC*(1+substrateN/J_N))
+    # ## gN/m2/s
+    # if uptake == 'nh4':
+    #     uptake = (sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(mNH4/(Neff+K_Neff))*NC_factor)/(24*3600)
+    # elif uptake == 'no3':
+    #     uptake = (sigmaN20*func_temp*(v1*Wr1+v2*Wr2+v3*Wr3+v4*Wr4)*(func_temp*mNO3/(Neff+K_Neff))*NC_factor)/(24*3600)
     return uptake
 
 ## flux1: [NH3 volatalization] or [NH3 upwards diffusion]

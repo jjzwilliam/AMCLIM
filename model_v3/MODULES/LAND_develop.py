@@ -5,6 +5,7 @@ from logging import raiseExceptions
 from os import times
 from re import sub
 from time import time
+from turtle import st
 from wsgiref.simple_server import demo_app
 
 from pandas import array
@@ -717,12 +718,12 @@ class LAND_module:
         return 
 
     ## irrigation of the land
-    def irrigation_event(self,dayidx,plantday,harvestday,irrigation_map,theta_WP,theta_FC):
+    def irrigation_event(self,dayidx,plant_calendar,harvest_calendar,irrigation_map,theta_WP,theta_FC):
         ## justify if the soil water content is lower than the wilting point
         soil_water_deficit = (self.theta[1,0] + self.theta[2,0])/2 - theta_WP
         ## only for the periods of growing season
-        soil_water_deficit[dayidx<=plantday] = 1.0
-        soil_water_deficit[dayidx>=harvestday] = 1.0
+        soil_water_deficit[dayidx<=plant_calendar] = 1.0
+        soil_water_deficit[dayidx>=harvest_calendar] = 1.0
         ## only for irrigated croplands (idx=2), excluding rainfed croplands
         ## Note that irrigated cropland index is 2 (rainfed cropland index is 1)
         soil_water_deficit[irrigation_map!=2] = 1.0
@@ -792,9 +793,11 @@ class LAND_module:
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)   
         growing_length = harvest_calendar - plant_calendar
-        stage_idx = np.floor((dayidx - plant_calendar)/(growing_length/stages))+1
-        stage_idx[stage_idx<0] = 0
-        return stage_idx
+        # stage_idx = np.floor((dayidx - plant_calendar)/(growing_length/stages))+1
+        # stage_idx[stage_idx<0] = 0
+        stage_idx_res = np.round((dayidx - plant_calendar)/(growing_length/stages),decimals=2)+1
+        stage_idx_res[stage_idx_res<0] = 0
+        return stage_idx_res
 
     ## layer 0: surface source layer 2cm
     ## layer 1: topsoil layer 5cm
@@ -1050,8 +1053,10 @@ class LAND_module:
                 ## read in environmental variables
                 self.sim_env(dd)
                 ## irrigation events
-                self.irrigation_event(dayidx=dd,plantday=plantidx,harvestday=harvestidx,
+                self.irrigation_event(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx,
                                 irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+                ## crop growing statge
+                crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx)
 
                 infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
                                     theta2=self.theta[0,0],theta3=self.theta[1,0],
@@ -1071,8 +1076,9 @@ class LAND_module:
                     sim_ccH = self.soil_ccH[dd]
             else:
                 self.sim_env(dd-Days)
-                self.irrigation_event(dayidx=dd-Days,plantday=plantidx,harvestday=harvestidx,
+                self.irrigation_event(dayidx=dd-Days,plant_calendar=plantidx,harvest_calendar=harvestidx,
                                 irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+                crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx)
 
                 infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
                                     theta2=self.theta[0,0],theta3=self.theta[1,0],
@@ -1467,7 +1473,7 @@ class LAND_module:
                                             resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
                         # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
                         TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4')*timestep*3600  ## N uptake
+                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
                         TANuptakeidx[harvestidx<(hh+1)] = 0.0
                         subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
                                 flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
@@ -1501,7 +1507,7 @@ class LAND_module:
                                             resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                         NO3diffupidx = NO3diffupidx * correction_diffaq
                         NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='no3')*timestep*3600  ## N uptake
+                                        temp=self.soil_temp[llidx,hh+1],uptake='no3',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
                         NO3uptakeidx[harvestidx<(hh+1)] = 0.0
                         subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
                                         flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
@@ -1575,7 +1581,7 @@ class LAND_module:
                         # TANdiffaqupidx[self.soil_moist[llidx,hh+1]==0]=0.0
                         TANdiffaqupidx = TANdiffaqupidx * correction_diffaq
                         TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4')*timestep*3600  ## N uptake
+                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
                         TANuptakeidx[harvestidx<(hh+1)] = 0.0
                         subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
                                 flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
@@ -1609,7 +1615,7 @@ class LAND_module:
                                             resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
                         NO3diffupidx = NO3diffupidx * correction_diffaq
                         NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='no3')*timestep*3600  ## N uptake
+                                        temp=self.soil_temp[llidx,hh+1],uptake='no3',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
                         NO3uptakeidx[harvestidx<(hh+1)] = 0.0
                         subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
                                         flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
@@ -1655,9 +1661,20 @@ class LAND_module:
             plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
             plantidx = plantidx[self.plat1:self.plat2,:]
             harvestidx = harvestidx[self.plat1:self.plat2,:]
+        else:
+            ## crop calendar dataset
+            calds = open_ds(infile_path+crop_data_path+manure_appcalendar)
+            # cropcalds = open_ds(infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)        
+            spring_plantdate = calds.spring_plant_mean.values
+            # spring_harvestdate = spring_plantdate + 120? 
+            winter_plantdate = calds.winter_plant_mean.values
+            # winter_harvestdate = winter_plantdate + 120?
+
         sourcelayer = self.source_layer(tech)
 
         for dd in np.arange(start_day_idx,end_day_idx):
+            crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=spring_plantdate,harvest_calendar=spring_harvestdate)
+            crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=winter_plantdate,harvest_calendar=winter_harvestdate)
             if dd < Days:
                 self.sim_env(dd)
                 self.TAN[5] = self.TAN_added[dd]
