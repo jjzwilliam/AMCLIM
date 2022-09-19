@@ -55,8 +55,8 @@ Months_idx = [0,31,59,90,120,151,181,212,243,273,304,334,365]
 
 ## specify livestock type and production sytem
 ## livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
-# livestock = 'BEEF_CATTLE'
-livestock = 'POULTRY'
+livestock = 'BEEF_CATTLE'
+# livestock = 'POULTRY'
 
 ## level index: 
 ## PIG: industrial-0; intermediate-1, backyard-2
@@ -65,7 +65,7 @@ livestock = 'POULTRY'
 ## OTHER CATTLE: grassland-0; mixed-1
 ## SHEEP: grassland-0; mixed-1
 ## POULTRY: broiler-0, layer-1, backyard-2
-lvl_idx = 0
+lvl_idx = 1
 CONFIG_production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
         'BEEF_CATTLE':['grassland','mixed',None],

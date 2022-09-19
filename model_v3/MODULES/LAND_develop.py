@@ -132,6 +132,8 @@ class LAND_module:
             ## input of UA from poultry HOUSING/MMS
             self.UA_added = UA_added
             self.UA = np.zeros(array_shape)
+            self.UA_pool = np.zeros(array_shape)
+            self.UAwashoff = np.zeros(array_shape)
             ## input of available N component from MMS/HOUSING
             self.avail_N_added = avail_N_added
             self.avail_N = np.zeros(array_shape)
@@ -153,6 +155,8 @@ class LAND_module:
             self.unavail_N_pool = np.zeros(array_shape)
             ## washoff flux of unavailable org N 
             self.unavail_N_washoff = np.zeros(array_shape)
+            ## uric acid hydrolysis
+            self.uahydrolysis = np.zeros(tlvl)
             ## decomposition of org N; 
             self.orgN_decomp = np.zeros(tlvl)
             ## water added from MMS/HOUSING
@@ -180,9 +184,9 @@ class LAND_module:
             ## cropland area
             self.croplandarea = np.zeros(array_shape[1:])
             ## pasture/grassland area
-            self.pastarea = np.zeros(array_shape[1:])
+            self.pasturearea = np.zeros(array_shape[1:])
             ## area with manure/slurry application
-            self.croparea = np.zeros(array_shape[1:])
+            self.manureapparea = np.zeros(array_shape[1:])
 
         else:
             ## cropping area for nitrate N fertilizer
@@ -638,6 +642,8 @@ class LAND_module:
         return
 
     def manure_fert_input(self,livestock_name,production_system,mms_cat,phase,crop=None):
+        print("Livestock: ",livestock_name,"Production system: ",production_system)
+        print("MMS category: ",mms_cat,"Phase: ",phase)
         ## read N application rates dataset for crops
         manureds = open_ds(output_path+livestock_name+'.'+production_system+'.'+mms_cat+'.'+phase+\
                                 '.'+str(sim_year)+'.manureapp.nc')
@@ -654,24 +660,31 @@ class LAND_module:
         tan = np.zeros(CONFIG_mtrx[1:])
         manure = np.zeros(CONFIG_mtrx[1:])
         water = np.zeros(CONFIG_mtrx[1:])
+        uan = np.zeros(CONFIG_mtrx[1:])
         availN = np.zeros(CONFIG_mtrx[1:])
         resistN = np.zeros(CONFIG_mtrx[1:])
         unavailN = np.zeros(CONFIG_mtrx[1:])
 
         spring_TAN = manureds.spring_TAN.values
+        spring_UAN = manureds.spring_UAN.values
         spring_manure = manureds.spring_manure.values
         spring_water = manureds.spring_water.values
         spring_avail_N = manureds.spring_availN.values
         spring_resist_N = manureds.spring_resistN.values
         spring_unavail_N = manureds.spring_unavailN.values
-        
+
         winter_TAN = manureds.winter_TAN.values
+        winter_UAN = manureds.winter_UAN.values
         winter_manure = manureds.winter_manure.values
         winter_water = manureds.winter_water.values
         winter_avail_N = manureds.winter_availN.values
         winter_resist_N = manureds.winter_resistN.values
         winter_unavail_N = manureds.winter_unavailN.values
         
+        totalNapplied = spring_TAN + spring_UAN + spring_avail_N + spring_resist_N + spring_unavail_N + \
+                        winter_TAN + winter_UAN + winter_avail_N + winter_resist_N + winter_unavail_N
+        print("manure N applied: ",np.round(np.nansum(totalNapplied[self.plat1:self.plat2,:]/1e9),decimals=3)," GgN")
+
         spring_plantdate = calds.spring_plant_mean.values
         winter_plantdate = calds.winter_plant_mean.values
 
@@ -679,16 +692,20 @@ class LAND_module:
         ## current test used fixed application rate of manure (5mm slurry) to determine the crop area
         ## the aim is testing/debugging
         croparea = (spring_manure+spring_water)/5e3
-        # print(spring_plantdate.shape,tan.shape)
+        self.manureapparea = croparea[self.plat1:self.plat2,:]
+
         for dd in np.arange(Days):
+
             tan[spring_plantdate==dd] = spring_TAN[spring_plantdate==dd]/croparea[spring_plantdate==dd]
+            uan[spring_plantdate==dd] = spring_UAN[spring_plantdate==dd]/croparea[spring_plantdate==dd]
             manure[spring_plantdate==dd] = spring_manure[spring_plantdate==dd]/croparea[spring_plantdate==dd]
-            water [spring_plantdate==dd] = spring_water[spring_plantdate==dd]/croparea[spring_plantdate==dd]
+            water[spring_plantdate==dd] = spring_water[spring_plantdate==dd]/croparea[spring_plantdate==dd]
             availN[spring_plantdate==dd] = spring_avail_N[spring_plantdate==dd]/croparea[spring_plantdate==dd]
             resistN[spring_plantdate==dd] = spring_resist_N[spring_plantdate==dd]/croparea[spring_plantdate==dd]
             unavailN[spring_plantdate==dd] = spring_unavail_N[spring_plantdate==dd]/croparea[spring_plantdate==dd]
 
             self.TAN_added[dd] = tan[self.plat1:self.plat2,:]
+            self.UA_added[dd] = uan[self.plat1:self.plat2,:]
             self.manure_added[dd] = manure[self.plat1:self.plat2,:]
             self.water_added[dd] = water[self.plat1:self.plat2,:]
             self.avail_N_added[dd] = availN[self.plat1:self.plat2,:]
@@ -701,20 +718,19 @@ class LAND_module:
             availN[:] = 0.0
             resistN[:]  = 0.0
             unavailN[:]  = 0.0
-
+        
             tan[winter_plantdate==dd] = winter_TAN[winter_plantdate==dd]/croparea[winter_plantdate==dd]
+            uan[winter_plantdate==dd] = winter_UAN[winter_plantdate==dd]/croparea[winter_plantdate==dd]
             manure[winter_plantdate==dd] = winter_manure[winter_plantdate==dd]/croparea[winter_plantdate==dd]
-            water [winter_plantdate==dd] = winter_water[winter_plantdate==dd]/croparea[winter_plantdate==dd]
+            water[winter_plantdate==dd] = winter_water[winter_plantdate==dd]/croparea[winter_plantdate==dd]
             availN[winter_plantdate==dd] = winter_avail_N[winter_plantdate==dd]/croparea[winter_plantdate==dd]
             resistN[winter_plantdate==dd] = winter_resist_N[winter_plantdate==dd]/croparea[winter_plantdate==dd]
             unavailN[winter_plantdate==dd] = winter_unavail_N[winter_plantdate==dd]/croparea[winter_plantdate==dd]
-            
-            self.TAN_added[dd] = tan[self.plat1:self.plat2,:]
-            self.manure_added[dd] = manure[self.plat1:self.plat2,:]
-            self.water_added[dd] = water[self.plat1:self.plat2,:]
-            self.avail_N_added[dd] = availN[self.plat1:self.plat2,:]
-            self.resist_N_added[dd] = resistN[self.plat1:self.plat2,:]
-            self.unavail_N_added[dd] = unavailN[self.plat1:self.plat2,:]
+
+
+        test_Ntotal = np.nansum(self.TAN_added+self.UA_added+self.avail_N_added+\
+                        self.resist_N_added+self.unavail_N_added,axis=0)*croparea[self.plat1:self.plat2,:]
+        print("test N total: ",np.round(np.nansum(test_Ntotal)/1e9,decimals=3), " Gg N")
         return 
 
     ## irrigation of the land
@@ -727,8 +743,8 @@ class LAND_module:
         ## only for irrigated croplands (idx=2), excluding rainfed croplands
         ## Note that irrigated cropland index is 2 (rainfed cropland index is 1)
         soil_water_deficit[irrigation_map!=2] = 1.0
-        ## update irrigation idx field: soil water is insuficient area plus 1.0
-        self.irrigation_idx[soil_water_deficit<0] = self.irrigation_idx[soil_water_deficit<0] + 1.0
+        ## update irrigation idx field: if soil water is insufficient, area plus 1.0
+        self.irrigation_idx[soil_water_deficit<=0] = self.irrigation_idx[soil_water_deficit<=0] + 1.0
 
         ## water is added when irrigation idx is 1.0 (soil water content is lower than wilting point)
         ## water is added til the soil moisture of the top three layer (0-14cm) is equivalent to the field capacity
@@ -750,28 +766,42 @@ class LAND_module:
 
  
     ## soil water content of each layer after irrigation
-    def post_soil_moist(self,theta1,theta2,theta3,theta_sat,water_added):
+    ## techs: 1. irrigated - irrigation water, also including surface application of slurry
+    ##        2. disk - slurry being incorporated 
+    ##        3. injection - slurry being injected
+    def post_soil_moist(self,theta1,theta2,theta3,theta_sat,water_added,tech='irrigated'):
         z_added = water_added/1e6
         delta_z1 = (theta_sat-theta1)*zlayers[0]
         delta_z2 = (theta_sat-theta2)*zlayers[1]
-        # delta_z3 = (theta_sat-theta3)*zlayers[2]
-
-        post_theta1 = (theta1*zlayers[0]+z_added)/zlayers[0]
-        # post_theta1[post_theta1>theta_sat] = theta_sat[post_theta1>theta_sat]
-        post_theta1 = np.minimum(post_theta1,theta_sat)
-        water_left = z_added - delta_z1
-        # water_left[water_left<0] = 0.0
-        water_left = np.maximum(water_left,0.0)
-        post_theta2 = (theta2*zlayers[1]+water_left)/zlayers[1]
-        # post_theta2[post_theta2>theta_sat] = theta_sat[post_theta2>theta_sat]
-        post_theta2 = np.minimum(post_theta2,theta_sat)
-        water_left = water_left - delta_z2
-        # water_left[water_left<0] = 0.0
-        water_left = np.maximum(water_left,0.0)
-        post_theta3 = (theta3*zlayers[2]+water_left)/zlayers[2]
-        # post_theta3[post_theta3>theta_sat] = theta_sat[post_theta3>theta_sat]
-        post_theta3 = np.minimum(post_theta3,theta_sat)
-
+        
+        ## water is added from the surface, i.e., irrigation, surface application of slurry 
+        if tech == "irrigated":
+            post_theta1 = (theta1*zlayers[0]+z_added)/zlayers[0]
+            post_theta1 = np.minimum(post_theta1,theta_sat)
+            water_left = z_added - delta_z1
+            water_left = np.maximum(water_left,0.0)
+            post_theta2 = (theta2*zlayers[1]+water_left)/zlayers[1]
+            post_theta2 = np.minimum(post_theta2,theta_sat)
+            water_left = water_left - delta_z2
+            water_left = np.maximum(water_left,0.0)
+            post_theta3 = (theta3*zlayers[2]+water_left)/zlayers[2]
+            post_theta3 = np.minimum(post_theta3,theta_sat)
+        ## water is considered to be well mixed at the top two layers by incoporation
+        elif tech == 'disk':
+            post_theta1 = (theta1*zlayers[0]+theta2*zlayers[1]+z_added)/(zlayers[0]+zlayers[1])
+            post_theta1 = np.minimum(post_theta1,theta_sat)
+            post_theta2 = post_theta1
+            water_left = z_added - delta_z1 - delta_z2
+            water_left = np.maximum(water_left,0.0)
+            post_theta3 = (theta3*zlayers[2]+water_left)/zlayers[2]
+            post_theta3 = np.minimum(post_theta3,theta_sat)
+        ## water is directly injected to the third soil layer
+        ## the soil moisture of the top two layers remains unchanged
+        elif tech == 'injection':
+            post_theta1 = theta1
+            post_theta2 = theta2
+            post_theta3 = (theta3*zlayers[2]+z_added)/zlayers[2]
+            post_theta3 = np.minimum(post_theta3,theta_sat)
         return post_theta1, post_theta2, post_theta3
     
     ## initial infiltration following irrigation events
@@ -790,13 +820,24 @@ class LAND_module:
 
     ## crop life cycle stage
     def crop_lifecycle_stage(self,dayidx,plant_calendar,harvest_calendar,stages=6):
-        if dayidx >= Days:
-            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)   
+        # print("dd",dayidx)
+        ## growing length: from planting to harvesting
         growing_length = harvest_calendar - plant_calendar
+        ## stage index component 1
+        stage_idx_res1 = np.round((dayidx - plant_calendar)/(growing_length/stages),decimals=2)+1
+        stage_idx_res1[stage_idx_res1<0] = 0
+        stage_idx_res1[dayidx>harvest_calendar] = 0
+        ## reset day idx for 2nd year and later
+        if dayidx >= Days:
+            # dayidx = int(dayidx - (np.floor(dayidx/Days)-1)*Days)   
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         # stage_idx = np.floor((dayidx - plant_calendar)/(growing_length/stages))+1
         # stage_idx[stage_idx<0] = 0
-        stage_idx_res = np.round((dayidx - plant_calendar)/(growing_length/stages),decimals=2)+1
-        stage_idx_res[stage_idx_res<0] = 0
+        stage_idx_res2 = np.round((dayidx - plant_calendar)/(growing_length/stages),decimals=2)+1
+        stage_idx_res2[stage_idx_res2<0] = 0
+        stage_idx_res2[dayidx>harvest_calendar] = 0
+        stage_idx_res = np.maximum(stage_idx_res1,stage_idx_res2)
+        # print("idx1",stage_idx_res1[0,432],"idx2",stage_idx_res2[0,432],"idx",stage_idx_res[0,432])
         return stage_idx_res
 
     ## layer 0: surface source layer 2cm
@@ -834,6 +875,7 @@ class LAND_module:
         ## 
         self.soil_moist[:,0] = self.soil_moist[:,-1]
         if manure is True:
+            self.UA_pool[0] = self.UA_pool[-1]
             self.avail_N_pool[0] = self.avail_N_pool[-1]
             self.resist_N_pool[0] = self.resist_N_pool[-1]
             self.unavail_N_pool[0] = self.unavail_N_pool[-1]
@@ -852,7 +894,7 @@ class LAND_module:
         return
 
     ##
-    def daily_output(self,dayidx,grazing=False):
+    def daily_output(self,dayidx,grazing=False,fert="chem"):
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
 
@@ -887,6 +929,9 @@ class LAND_module:
         else:
             self.o_NH3flux[dayidx] = np.nansum(self.NH3flux[1:],axis=0)
             self.o_washoff[dayidx] = np.nansum(self.TANwashoff[1:]+self.ureawashoff[1:],axis=0)
+            if fert == "manure":
+                self.o_washoff[dayidx] = np.nansum(self.TANwashoff[1:]+self.UAwashoff[1:]+self.avail_N_washoff[1:]+\
+                                                self.resist_N_washoff[1:]+self.unavail_N_washoff[1:],axis=0)
             self.o_nitrif[dayidx] = np.nansum(self.NH4nitrif[:,1:],axis=(0,1))
             self.o_NH4leaching[dayidx] = np.nansum(self.TANinfil[-1,1:]+self.ureainfil[-1,1:],axis=0)
             self.o_diffaq[dayidx] = np.nansum(self.TANdiffusiondown[-1,1:]+self.ureadiffusiondown[-1,1:],axis=0)
@@ -1007,12 +1052,10 @@ class LAND_module:
 
         return
     
-    ## main sim function of chemical fertilizer application
+    ## main sim function of fertilizer application
     ## st: sensitivity test; stvar: sensitivity test value
-    def land_sim(self,start_day_idx,end_day_idx,chem_fert_type,tech,crop=None,sim='base',stvar=False,st=False):
-
-        print('current simulation is for: '+str(chem_fert_type))
-        print('technique used is: '+str(tech))
+    def land_sim(self,start_day_idx,end_day_idx,chem_fert_type,tech,manure_fert=False,manure_type=None,
+                    crop=None,sim='base',stvar=False,st=False):
         ## soil clay, sand, silt fraction
         soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
@@ -1046,1098 +1089,1167 @@ class LAND_module:
             plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
             plantidx = plantidx[self.plat1:self.plat2,:]
             harvestidx = harvestidx[self.plat1:self.plat2,:]
-        sourcelayer = self.source_layer(tech)
+            # print("latest harvesting date",np.nanmax(harvestidx))
+            # print(np.where(harvestidx==np.nanmax(harvestidx)))
+            # print(plantidx[np.where(harvestidx==np.nanmax(harvestidx))])
 
-        for dd in np.arange(start_day_idx,end_day_idx):
-            if dd < Days:
-                ## read in environmental variables
-                self.sim_env(dd)
-                ## irrigation events
-                self.irrigation_event(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx,
-                                irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
-                ## crop growing statge
-                crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx)
-
-                infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
-                                    theta2=self.theta[0,0],theta3=self.theta[1,0],
-                                    theta_sat=self.soil_satmoist[0,0],water_added=self.water_added[dd])
-
-                if chem_fert_type == 'nitrate':
-                    self.NO3[5] = self.NO3_added[dd]
-                    sim_pH = self.pH[dd]
-                    sim_ccH = self.cc_H[dd]
-                elif chem_fert_type == 'ammonium':
-                    self.TAN[5] = self.TAN_added[dd]
-                    sim_pH = self.pH[dd]
-                    sim_ccH = self.cc_H[dd]
-                elif chem_fert_type == 'urea':
-                    self.urea[5] = self.urea_added[dd]
-                    sim_pH = self.soil_pH[dd]
-                    sim_ccH = self.soil_ccH[dd]
-            else:
-                self.sim_env(dd-Days)
-                self.irrigation_event(dayidx=dd-Days,plant_calendar=plantidx,harvest_calendar=harvestidx,
-                                irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
-                crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx)
-
-                infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
-                                    theta2=self.theta[0,0],theta3=self.theta[1,0],
-                                    theta_sat=self.soil_satmoist[0,0],
-                                    water_added=np.maximum(self.water_added[dd-Days],self.water_added[dd]))
-
-                ## Note that the np.maximum function is to prevent application on the second year being overwritten
-                ## by day index dd-Days
-                if chem_fert_type == 'nitrate':
-                    # print('chemical fertilizer applied: nitrate')
-                    self.NO3[5] = np.maximum(self.NO3_added[dd-Days],self.NO3_added[dd])
-                    sim_pH = np.maximum(self.pH[dd-Days],self.pH[dd])
-                    sim_ccH = np.maximum(self.cc_H[dd-Days],self.cc_H[dd])
-                elif chem_fert_type == 'ammonium':
-                    self.TAN[5] = np.maximum(self.TAN_added[dd-Days],self.TAN_added[dd])
-                    # print('chemical fertilizer applied: ammonium')
-                    sim_pH = np.maximum(self.pH[dd-Days],self.pH[dd])
-                    sim_ccH = np.maximum(self.cc_H[dd-Days],self.cc_H[dd])
-                elif chem_fert_type == 'urea':
-                    self.urea[5] = np.maximum(self.urea_added[dd-Days],self.urea_added[dd])
-                    # print('chemical fertilizer applied: urea')
-                    sim_pH = np.maximum(self.soil_pH[dd-Days],self.soil_pH[dd])
-                    sim_ccH = np.maximum(self.soil_ccH[dd-Days],self.soil_ccH[dd])
-
-            if sim != 'base':
-                self.sensitivity_test(var=stvar,test=st)
-
-            self.theta[0,1:] = np.copy(self.soil_moist[0,1:])
-            self.theta[1,1:] = np.copy(self.soil_moist[0,1:])
-            self.theta[2,1:] = np.copy(self.soil_moist[1,1:])
-
-            # print('dd',dd,self.water_added[dd,0,589])
-
-            for hh in np.arange(0,24):
-                if CONFIG_machine == "STREAM":
-                    surfrunoffrate = self.surfrunoffrate[hh+1]
-                    subrunoffrate = self.subrunoffrate[hh+1] 
-                    evap = self.evap[hh+1] 
-                else:
-                    surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
-                    surfrunoffrate = np.maximum(surfrunoffrate,0.0)
-                    subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
-                    subrunoffrate = np.maximum(subrunoffrate,0.0)
-                    evap = self.evap[hh+1]-self.evap[hh]
-
-                delta_sw1 = self.soil_moist[0,hh+1] - self.soil_moist[0,hh]
-                delta_sw2 = self.soil_moist[1,hh+1] - self.soil_moist[1,hh]
-
-                self.theta[0,hh+1] = self.theta[0,hh] + delta_sw1
-                self.theta[1,hh+1] = self.theta[1,hh] + delta_sw1
-                self.theta[2,hh+1] = self.theta[2,hh] + delta_sw2
-
-                self.theta[0,hh+1] = np.maximum(self.theta[0,hh+1],0.01)
-                self.theta[1,hh+1] = np.maximum(self.theta[1,hh+1],0.01)
-                self.theta[2,hh+1] = np.maximum(self.theta[2,hh+1],0.01)
-
-                # infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,hh],
-                #                     theta2=self.theta[0,hh],theta3=self.theta[1,hh],
-                #                     theta_sat=self.soil_satmoist[0,hh],water_added=self.water[hh+1])
-                # infilrate1 = 0.0
-                # infilrate2 = 0.0
-                # infilrate3 = 0.0
-                self.theta[0,hh+1],self.theta[1,hh+1], self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
-                                    theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
-                                    theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
-
-                self.drainagerate[0,hh+1] = np.maximum(infilrate1,water_drainage(theta=self.theta[0,hh+1],
-                                            theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[0]))
-                self.drainagerate[1,hh+1] = np.maximum(infilrate2,water_drainage(theta=self.theta[1,hh+1],
-                                            theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[1]))
-                self.drainagerate[2,hh+1] = np.maximum(infilrate3,water_drainage(theta=self.theta[2,hh+1],
-                                            theta_sat=self.soil_satmoist[1,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[2]))
-                
-                # print('dd',dd,'hh+1',hh+1,"infil 1: ",infilrate1[0,589])
-                # print('dd',dd,'hh+1',hh+1,"infil 2: ",infilrate2[0,589])
-                # print('dd',dd,'hh+1',hh+1,"infil 3: ",infilrate3[0,589])
-
-                # print('dd',dd,'hh+1',hh+1,"drainage 1: ",self.drainagerate[0,hh+1][0,589])
-                # print('dd',dd,'hh+1',hh+1,"drainage 2: ",self.drainagerate[1,hh+1][0,589])
-                # print('dd',dd,'hh+1',hh+1,"drainage 3: ",self.drainagerate[2,hh+1][0,589])
-
-                # print('dd',dd,'hh+1',hh+1,"sub : ",subrunoffrate[0,589])
-
-                # print('dd',dd,'hh+1',hh+1,"theta 1: ",self.theta[0,hh+1][0,589],"sw1",self.soil_moist[0,hh+1][0,589])
-                # print('dd',dd,'hh+1',hh+1,"theta 2: ",self.theta[1,hh+1][0,589],"sw1",self.soil_moist[0,hh+1][0,589])
-                # print('dd',dd,'hh+1',hh+1,"theta 3: ",self.theta[2,hh+1][0,589],"sw2",self.soil_moist[1,hh+1][0,589])
-                # print("wp ",theta_wp[0,589])
-                # print("irri idx",irrigated_croplandidx[0,589])
-
-                ## resistance for upward diffusion in the surface layer
-                Rdiffsrfaq = diff_resistance(distance=pmids[0],phase='aqueous',
-                            theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
-                Rdiffsrfgas = diff_resistance(distance=pmids[0],phase='gaseous',
-                            theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
-                
-                for ll in np.arange(3):
-                    ## lldix: index for soil temp, moisture
-                    llidx = int(np.floor(ll/2))
-                    
-                    # self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
-                    # self.theta[ll,hh+1] = np.maximum(theta_wp,self.theta[ll,hh+1])
-                    self.drainagerate[ll,hh+1] = np.maximum(self.drainagerate[ll,hh+1],subrunoffrate)
-                    # self.drainagerate[ll,hh+1][self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]] = subrunoffrate[self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]]
-                    ## resistance for diffusion between surface layer (idx0) and topsoil layer (idx1)
-                    self.Rdiffaq[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='aqueous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],temp=self.soil_temp[llidx,hh+1])
-                    self.Rdiffgas[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='gaseous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],temp=self.soil_temp[llidx,hh+1])
-
-                    ## input includes N from fertilizer application
-                    if ll == sourcelayer:
-                        if sourcelayer == 1:
-                            self.urea_pool[0,hh+1] = self.urea_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.urea[hh+1]
-                            self.urea_pool[1,hh] = self.urea_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.urea[hh+1]
-                            self.TAN_pool[0,hh+1] = self.TAN_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
-                            self.TAN_pool[1,hh] = self.TAN_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
-                            self.NO3_pool[0,hh+1] = self.NO3_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
-                            self.NO3_pool[1,hh] = self.NO3_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
-                        else:
-                            self.urea_pool[ll,hh] = self.urea_pool[ll,hh]+self.urea[hh+1]
-                            # print("dd",dd,"hh+1",hh+1,"urea, urea pool:",self.urea[hh+1][0,432],self.urea_pool[ll,hh][0,432])
-                            self.TAN_pool[ll,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]
-                            self.NO3_pool[ll,hh] = self.NO3_pool[ll,hh]+self.NO3[hh+1]
-
-                    ## urea scheme
-                    if chem_fert_type == 'urea':
-                        if ll == 0:
-                            ## urea pool
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]
-                            ## urea hydrolysis
-                            self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                        theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
-                            ## subtracting chemical losses
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
-                            ## urea concentration
-                            self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                                        theta=self.theta[ll,hh+1])
-                            ## urea concentration at the compensation point
-                            ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,
-                                                            qrunoff=surfrunoffrate)
-                            ## determine the potential of each flux
-                            ureawashoffidx = surf_runoff(N_surfcnc=ureasurfamount,
-                                                         qrunoff=surfrunoffrate)*timestep*3600
-                            ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
-                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600
-                            ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
-                                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600
-                            correction_ureadiffdown = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
-                            ureadiffdownidx = ureadiffdownidx*correction_ureadiffdown
-                            ureadiffupidx = False
-                            srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.urea_pool[ll,hh+1],
-                                        flux1=ureawashoffidx,flux2=ureainfilidx,flux3=ureadiffdownidx,flux4=ureadiffupidx)
-                            self.ureawashoff[hh+1] = srfrunoffidx
-                            self.ureainfil[ll,hh+1] = subsrfleachingidx
-                            self.ureadiffusiondown[ll,hh+1] = diffaqdownidx  
-                            ## update urea pool
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureawashoff[hh+1]-\
-                                                    self.ureainfil[ll,hh+1]-self.ureadiffusiondown[ll,hh+1]
-                            ## get rid of rounding error
-                            self.urea_pool[ll,hh+1] = np.maximum(self.urea_pool[ll,hh+1],0.0)
-                        elif ll == 1:
-                            ## urea pool
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]+\
-                                                        self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
-                            # print("dd",dd,"hh+1",hh+1,"urea pool",self.urea_pool[ll,hh+1][0,589])
-                            ## urea hydrolysis
-                            self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                        theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
-                            
-                            # print("dd",dd,"hh+1",hh+1,"soil temp",self.soil_temp[llidx,hh+1][0,589])
-                            # print("dd",dd,"hh+1",hh+1,"soil moisture",self.theta[ll,hh+1][0,589])
-                            # print("dd",dd,"hh+1",hh+1,"hydro rate",urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                            #                                                     theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)[0,589])
-                            # print("dd",dd,"hh+1",hh+1,"urea hydro",self.ureahydrolysis[ll,hh+1][0,589])
-                            ## subtracting chemical losses
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
-                            ## urea concentration
-                            self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
-                            ## determine the potential of each flux
-                            ureawashoffidx = False
-                            ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
-                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600
-                            ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
-                                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600
-                            correction_ureadiff = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
-                            ureadiffdownidx = ureadiffdownidx*correction_ureadiff
-                            ureadiffupidx = N_diffusion(cnc1=self.urea_amount[ll,hh],cnc2=self.urea_amount[ll-1,hh+1],
-                                                            resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600
-                            ureadiffupidx = ureadiffupidx*correction_ureadiff
-                            srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.urea_pool[ll,hh+1],
-                                        flux1=ureawashoffidx,flux2=ureainfilidx,flux3=ureadiffdownidx,flux4=ureadiffupidx)
-                            self.ureainfil[ll,hh+1] = subsrfleachingidx
-                            self.ureadiffusiondown[ll,hh+1] = diffaqdownidx  
-                            self.ureadiffusionup[ll-1,hh+1] = diffaqupidx
-                            ## update urea pool
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureadiffusionup[ll-1,hh+1]-\
-                                                        self.ureainfil[ll,hh+1]-self.ureadiffusiondown[ll,hh+1]
-                            ## get rid of rounding error
-                            self.urea_pool[ll,hh+1] = np.maximum(self.urea_pool[ll,hh+1],0.0)
-                        elif ll == 2:
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
-                            ## urea hydrolysis
-                            self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                        theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
-                            ## subtracting chemical losses
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
-                            ## urea concentration
-                            self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
-                            ## determine the potential of each flux
-                            ureawashoffidx = False
-                            ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
-                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600
-                            ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=0.0,
-                                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600
-                            correction_ureadiff = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
-                            ureadiffdownidx = ureadiffdownidx*correction_ureadiff
-                            ureadiffupidx = N_diffusion(cnc1=self.urea_amount[ll,hh],cnc2=self.urea_amount[ll-1,hh+1],
-                                                            resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600
-                            ureadiffupidx = ureadiffupidx*correction_ureadiff
-                            srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.urea_pool[ll,hh+1],
-                                        flux1=ureawashoffidx,flux2=ureainfilidx,flux3=ureadiffdownidx,flux4=ureadiffupidx)       
-                            self.ureainfil[ll,hh+1] = subsrfleachingidx
-                            self.ureadiffusiondown[ll,hh+1] = diffaqdownidx              
-                            self.ureadiffusionup[ll-1,hh+1] = diffaqupidx
-                            ## update urea pool
-                            self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureadiffusionup[ll-1,hh+1]-\
-                                                        self.ureainfil[ll,hh+1]-self.ureadiffusiondown[ll,hh+1]
-                            ## get rid of rounding error
-                            self.urea_pool[ll,hh+1] = np.maximum(self.urea_pool[ll,hh+1],0.0)
-                    ## TAN production
-                    try:
-                        TANprod = self.ureahydrolysis[ll,hh+1]+self.orgN_decomp[hh+1]
-                    except:
-                        pass
-                        TANprod = self.ureahydrolysis[ll,hh+1]
-
-                    if ll == 0:
-                        ########################
-                        ## TAN sim
-                        ########################
-                        ## TAN pool
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod
-                        # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
-                        # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
-                        # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
-                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
-
-                        ## fraction of aqueous NH4
-                        fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                        temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
-                        self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
-                                                    theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                                    pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
-                        ## subtracting chemical transformation
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
-                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
-                        ## TAN and NH3 concentration
-                        KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
-                        self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
-                                                    knh3=KNH3,kd=Kd)
-                        self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
-                                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
-                        ## TAN concentration at the compensation surface
-                        TANsurfamount = surf_TAN_cnc(tan_cnc=self.TAN_amount[ll,hh+1],rliq=Rdiffsrfaq,rgas=Rdiffsrfgas,
-                                            knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=surfrunoffrate)
-                        NH3surfamount = TANsurfamount*KNH3
-                        ## determining the potential of each flux
-                        emissidx = NH3_vol(nh3_surfcnc=NH3surfamount,ratm=self.R_atm[hh+1])*timestep*3600  ## NH3 volatlization
-                        TANwashoffidx = surf_runoff(N_surfcnc=TANsurfamount,
-                                                    # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600 
-                                                    qrunoff=surfrunoffrate)*timestep*3600  ## TAN washoff
-                        TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
-                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
-                        TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
-                        # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
-                        correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
-                        TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
-                        NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
-                                            resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
-                        # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        correction_NH3diffgasdown = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
-                                                                    (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
-                        NH3diffgasdownidx = NH3diffgasdownidx*correction_NH3diffgasdown
-                        TANuptakeidx = False  ## N uptake
-                        nh3volidx,srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffgasdownidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
-                                flux1=emissidx,flux2=TANwashoffidx,flux3=TANinfilidx,flux4=TANdiffaqdownidx,
-                                flux5=NH3diffgasdownidx,flux6=TANuptakeidx)
-                        self.NH3flux[hh+1] = nh3volidx
-                        self.TANwashoff[hh+1] = srfrunoffidx
-                        self.TANinfil[ll,hh+1] = subsrfleachingidx
-                        self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
-                        ## update TAN pool: subtracting all losses
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH3flux[hh+1]-self.TANwashoff[hh+1]-\
-                                        self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]
-                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
-                        ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
-                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
-                        ########################
-                        ## NO3- sim
-                        ########################
-                        ## NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]
-
-                        ## NO3 concentration
-                        self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
-                        ## NO3 concentration at the compensation surface
-                        NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq/f_DNO3,
-                                                qrunoff=surfrunoffrate)
-                        ## determining the potential of each flux
-                        NO3washoffidx = surf_runoff(N_surfcnc=NO3surfamount,
-                                                    qrunoff=surfrunoffrate)*timestep*3600  ## NO3 washoff
-                        NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
-                                                       qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
-                        NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffaqdownidx = NO3diffaqdownidx*correction_diffaq
-                        NO3diffupidx = False
-                        srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
-                                        flux1=NO3washoffidx,flux2=NO3infilidx,flux3=NO3diffaqdownidx,flux4=NO3diffupidx)
-                        self.NO3washoff[hh+1] = srfrunoffidx
-                        self.NO3infil[ll,hh+1] = subsrfleachingidx
-                        self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
-                        ## update NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3washoff[hh+1]-\
-                                                    self.NO3infil[ll,hh+1]-self.NO3diffusiondown[ll,hh+1]
-                        ## get rid of rounding error
-                        self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
-                        ########################
-                        ## soil water sim
-                        ########################
-                        ## update soil moisture 
-                        update_sw = self.theta[ll,hh+1]*zlayers[0] - self.drainagerate[ll,hh+1]*timestep*3600
-                        ## exclude initial inifltration
-                        update_sw[self.drainagerate[ll,hh+1]==infilrate1] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate1]*zlayers[0]
-                        # self.theta[ll,hh+1] = update_sw/zlayers[0]
-                        self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]-\
-                                                                    evap[[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]]*timestep*3600/1e6)/zlayers[0]
-                        # self.theta[ll,hh+1][self.theta[ll,hh+1]<0] = 0.01
-                        # self.theta[ll,hh+1] = np.maximum(self.theta[ll,hh+1],0.01)
-                        self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
-
-
-                    elif ll == 1:
-                        ########################
-                        ## TAN sim
-                        ########################
-                        ## TAN pool
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod+\
-                                                self.TANinfil[ll-1,hh+1]+self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
-                        # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
-                        # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
-                        # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
-                        # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
-                        ## fraction of aqueous NH4
-                        fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                        temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
-                        self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
-                                                    theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                                    pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
-                        ## subtracting chemical transformation
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
-                        ## TAN and NH3 concentration
-                        KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
-                        self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
-                                                    knh3=KNH3,kd=Kd)
-                        self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
-                                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
-                        ## determining the potential of each flux
-                        TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
-                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
-                        TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
-                        # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
-                        correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
-                        TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
-                        NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
-                                            resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
-                        # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        correction_diffgas = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
-                                                                    (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
-                        NH3diffgasdownidx = NH3diffgasdownidx*correction_diffgas
-                        NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
-                                            resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
-                        # NH3diffgasupidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-
-                        TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
-                        # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
-                        TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
-                        TANuptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
-                                flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
-                                flux5=NH3diffgasupidx,flux6=TANuptakeidx)
-                        self.TANinfil[ll,hh+1] = subsrfleachingidx
-                        self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
-                        self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
-                        self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
-                        self.ammNuptake[ll-1,hh+1] = uptakeidx
-                        ## update TAN pool: subtracting all losses
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
-                            self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
-                        ########################
-                        ## NO3- sim
-                        ########################
-                        ## NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]+\
-                                                    self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
-                        ## NO3 concentration
-                        self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
-                        ## determining the potential of each flux
-                        NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
-                                                       qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
-                        NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffaqdownidx = NO3diffaqdownidx * correction_diffaq
-                        NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffupidx = NO3diffupidx * correction_diffaq
-                        NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='no3',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
-                        NO3uptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
-                                        flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
-                        self.NO3infil[ll,hh+1] = subsrfleachingidx
-                        self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
-                        self.nitNuptake[ll-1,hh+1] = uptakeidx
-                        ## update NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
-                                                    self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
-                        ########################
-                        ## soil water sim
-                        ########################
-                        ## soil water uptaken by crops; soil volumetric water content change, m3/m3
-                        self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
-                        ## water uptake only takes place between plant date plus seedling periods and harvest date
-                        self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
-                        self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
-                        # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
-                        self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
-                        ## update soil moisture 
-                        update_sw = self.theta[ll,hh+1]*zlayers[1] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600
-                        update_sw[self.drainagerate[ll,hh+1]==infilrate2] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate2]*zlayers[1]
-                        self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[1]
-                        # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
-
-                    elif ll == 2:
-                        ########################
-                        ## TAN sim
-                        ########################
-                        ## TAN pool
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+TANprod+self.TANinfil[ll-1,hh+1]+\
-                                                    self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
-                        ## fraction of aqueous NH4
-                        fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                        temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
-                        self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
-                                                    theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                                    pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
-                        ## subtracting chemical transformation
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
-                        ## TAN and NH3 concentration
-                        KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
-                        self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
-                                                    knh3=KNH3,kd=Kd)
-                        self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
-                                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
-                        ## determining the potential of each flux
-                        TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
-                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
-                        TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=0,
-                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
-                        # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
-                        correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
-                        TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
-                        NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=0,
-                                            resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
-                        # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        correction_diffgas = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
-                                                                    (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
-                        NH3diffgasdownidx = NH3diffgasdownidx*correction_diffgas
-                        NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
-                                            resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
-                        # NH3diffgasupidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        NH3diffgasupidx = NH3diffgasupidx * correction_diffgas
-                        TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
-                        # TANdiffaqupidx[self.soil_moist[llidx,hh+1]==0]=0.0
-                        TANdiffaqupidx = TANdiffaqupidx * correction_diffaq
-                        TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
-                        TANuptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
-                                flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
-                                flux5=NH3diffgasupidx,flux6=TANuptakeidx)
-                        self.TANinfil[ll,hh+1] = subsrfleachingidx
-                        self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
-                        self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
-                        self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
-                        self.ammNuptake[ll-1,hh+1] = uptakeidx
-                        ## update TAN pool: subtracting all losses
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
-                            self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
-                        ########################
-                        ## NO3 sim
-                        ########################
-                        ## NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+\
-                                                    self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
-                        ## NO3 concentration
-                        self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
-                        ## determining the potential of each flux
-                        NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
-                                                       qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
-                        NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=0,
-                                            resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffaqdownidx = NO3diffaqdownidx * correction_diffaq
-                        NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffupidx = NO3diffupidx * correction_diffaq
-                        NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='no3',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
-                        NO3uptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
-                                        flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
-                        self.NO3infil[ll,hh+1] = subsrfleachingidx
-                        self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
-                        self.nitNuptake[ll-1,hh+1] = uptakeidx
-                        ## update NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
-                                                    self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
-                        ########################
-                        ## soil water sim
-                        ########################
-                        ## soil water uptaken by crops; soil volumetric water content change, m3/m3
-                        self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
-                        ## water uptake only takes place between plant date plus seedling periods and harvest date
-                        self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
-                        self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
-                        self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
-                        ## update soil moisture 
-                        update_sw = self.theta[ll,hh+1]*zlayers[2] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600 
-                        update_sw[self.drainagerate[ll,hh+1]==infilrate3] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate3]*zlayers[2]
-                        self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[2]
-
-            self.daily_output(dd)
-            self.daily_init()            
-        return
-
-    ## main sim function of manure fertilizer application
-    ## manure_type: "slurry", "solid manure"
-    def land_manure_sim(self,start_day_idx,end_day_idx,manure_type,tech,crop=None,sim='base',stvar=False,st=False):
-        print('current simulation is for: '+str(manure_type))
-        print('technique used is: '+str(tech))
-        soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
-        soilclay = soilclayds.T_CLAY.values
-        Kd = ammonium_adsorption(clay_content=soilclay)[self.plat1:self.plat2,:]
-        span_t = 12/timestep
-        ## crop calendar that detenmines the N uptake by crops
-        if crop is not None:
-            cropcalspath = infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat
-            plantidx, harvestidx = self.crop_calendar(filepath = cropcalspath)
-            plantidx = plantidx[self.plat1:self.plat2,:]
-            harvestidx = harvestidx[self.plat1:self.plat2,:]
         else:
             ## crop calendar dataset
             calds = open_ds(infile_path+crop_data_path+manure_appcalendar)
             # cropcalds = open_ds(infile_path+crop_data_path+crop_filledcalendar+crop+crop_filledcalendarformat)        
-            spring_plantdate = calds.spring_plant_mean.values
-            # spring_harvestdate = spring_plantdate + 120? 
-            winter_plantdate = calds.winter_plant_mean.values
-            # winter_harvestdate = winter_plantdate + 120?
-
+            spring_plantdate = calds.spring_plant_mean.values[self.plat1:self.plat2,:]
+            ## test
+            spring_harvestdate = spring_plantdate + 120
+            winter_plantdate = calds.winter_plant_mean.values[self.plat1:self.plat2,:]
+            ## test
+            winter_harvestdate = winter_plantdate + 120
         sourcelayer = self.source_layer(tech)
+        
+        ###################################
+        ## chemical fertilizer application
+        ###################################
+        if manure_fert is False:
+            print('current simulation is for: '+str(chem_fert_type))
+            print('technique used is: '+str(tech))
+            for dd in np.arange(start_day_idx,end_day_idx):
+                if dd < Days:
+                    ## read in environmental variables
+                    self.sim_env(dd)
+                    ## irrigation events
+                    self.irrigation_event(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx,
+                                    irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+                    ## crop growing stage
+                    crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx)
 
-        for dd in np.arange(start_day_idx,end_day_idx):
-            crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=spring_plantdate,harvest_calendar=spring_harvestdate)
-            crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=winter_plantdate,harvest_calendar=winter_harvestdate)
-            if dd < Days:
-                self.sim_env(dd)
-                self.TAN[5] = self.TAN_added[dd]
-                self.avail_N[5] = self.avail_N_added[dd]
-                self.resist_N[5] = self.resist_N_added[dd]
-                self.unavail_N[5] = self.unavail_N_added[dd]
-                self.water[5] = self.water_added[dd]
-                self.manure[5] = self.manure_added[dd]
-                sim_pH = self.pH[dd]
-                sim_ccH = self.cc_H[dd]
+                    infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
+                                        theta2=self.theta[0,0],theta3=self.theta[1,0],
+                                        theta_sat=self.soil_satmoist[0,0],water_added=self.water_added[dd])
 
-            else:
-                self.sim_env(dd-Days)
-                self.TAN[5] = self.TAN_added[dd-Days]
-                self.avail_N[5] = self.avail_N_added[dd-Days]
-                self.resist_N[5] = self.resist_N_added[dd-Days]
-                self.unavail_N[5] = self.unavail_N_added[dd-Days]
-                self.water[5] = self.water_added[dd-Days]
-                self.manure[5] = self.manure_added[dd-Days]
-                sim_pH = self.pH[dd-Days]
-                sim_ccH = self.cc_H[dd-Days]
-
-            if sim != 'base':
-                self.sensitivity_test(var=stvar,test=st)
-            
-            self.theta[0] = np.copy(self.soil_moist[0])
-            self.theta[1] = np.copy(self.soil_moist[0])
-            self.theta[2] = np.copy(self.soil_moist[1])
-            # self.theta[0,0] = np.copy(self.soil_moist[0,1])
-            # self.theta[1,0] = np.copy(self.soil_moist[0,1])
-            # self.theta[2,0] = np.copy(self.soil_moist[1,1])
-
-            for hh in np.arange(0,24):
-                if CONFIG_machine == "STREAM":
-                    surfrunoffrate = self.surfrunoffrate[hh+1]
-                    subrunoffrate = self.subrunoffrate[hh+1] 
-                    evap = self.evap[hh+1] 
+                    if chem_fert_type == 'nitrate':
+                        self.NO3[5] = self.NO3_added[dd]
+                        sim_pH = self.pH[dd]
+                        sim_ccH = self.cc_H[dd]
+                    elif chem_fert_type == 'ammonium':
+                        self.TAN[5] = self.TAN_added[dd]
+                        sim_pH = self.pH[dd]
+                        sim_ccH = self.cc_H[dd]
+                    elif chem_fert_type == 'urea':
+                        self.urea[5] = self.urea_added[dd]
+                        sim_pH = self.soil_pH[dd]
+                        sim_ccH = self.soil_ccH[dd]
                 else:
-                    surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
-                    surfrunoffrate = np.maximum(surfrunoffrate,0.0)
-                    subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
-                    subrunoffrate = np.maximum(subrunoffrate,0.0)
-                    evap = self.evap[hh+1]-self.evap[hh]
-                for ll in np.arange(3):
-                    ## lldix: index for soil temp, moisture
-                    llidx = int(np.floor(ll/2))
-                    ## input includes N from fertilizer application
-                    if ll == sourcelayer:
-                        
-                        self.avail_N_pool[hh+1] = self.avail_N_pool[hh]+self.avail_N[hh+1]
-                        self.resist_N_pool[hh+1] = self.resist_N_pool[hh]+self.resist_N[hh+1]
-                        self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh]+self.unavail_N[hh+1]
-                        Na_decomp_rate, Nr_decomp_rate = N_pools_decomp_rate(temp=self.soil_temp[llidx,hh+1],delta_t=timestep)
-                        ## org N decomposition contributes to TAN pool at a specific soil layer
-                        self.orgN_decomp[ll,hh+1] = self.avail_N_pool[hh+1]*Na_decomp_rate + \
-                                                    self.resist_N_pool[hh+1]*Nr_decomp_rate
-                        if ll == 0:
-                            N_washoff_rate = f_washoff_N*surfrunoffrate*3600*timestep*1e3
-                            self.avail_N_washoff[hh+1] = N_washoff_rate*self.avail_N_pool[hh+1]
-                            self.resist_N_washoff[hh+1] = N_washoff_rate*self.resist_N_pool[hh+1]
-                            self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
-                        self.avail_N_pool[hh+1] = self.avail_N_pool[hh+1]-(self.avail_N_pool[hh+1]*Na_decomp_rate)-\
-                                                    self.avail_N_washoff[hh+1]
-                        self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]-(self.resist_N_pool[hh+1]*Nr_decomp_rate)-\
-                                                    self.resist_N_washoff[hh+1]
-                        self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh+1] - self.unavail_N_washoff[hh+1]
-                                        
-                        ## water and TAN inital distribution after slurry application
-                        if ll == 0:
-                            ## washoff rates for orgN and non-N species (manure)
-                            nonN_washoff_rate = f_washoff_nonN*surfrunoffrate*3600*timestep*1e3
+                    self.sim_env(dd-Days)
+                    self.irrigation_event(dayidx=dd-Days,plant_calendar=plantidx,harvest_calendar=harvestidx,
+                                    irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+                    crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=plantidx,harvest_calendar=harvestidx)
 
-                            ## slurry TAN pool and water pool
-                            self.slurry_TAN_pool[hh+1] = self.slurry_TAN_pool[hh]+self.TAN[hh+1]
-                            self.slurry_water_pool[hh+1] = self.slurry_water_pool[hh]+self.water[hh+1]
-                            ## manure pool; slurry DM content on the day of application
-                            self.manure_pool[hh+1] = self.manure_pool[hh]+self.manure[hh+1]
-                            frac_DM = manure_DM(solidmass=self.manure[hh+1],watermass=self.water[hh+1])
-                            frac_DM[self.manure[hh+1]==0] = 0.0
-                            ## initial "instant" infiltration
-                            init_infil = initial_infil(frac_DM)
-                            init_infil[frac_DM==0.0] = 0.0
-                            init_waterinfil = init_infil * self.water[hh+1]
-                            zsat = (init_waterinfil/(self.soil_satmoist[llidx,hh] - self.soil_moist[llidx,hh]))/1e6
-                            self.theta[0,hh+1] = (self.theta[0,hh]*zlayers[0] + init_waterinfil/1e6)/zlayers[0]
-                            # self.theta[0,hh+1] = (self.theta[0,hh]*zlayers[0] + init_waterinfil/1e6)/zlayers[0]
-                            self.theta[0,hh+1][zsat>zlayers[0]] = self.soil_satmoist[0,hh+1][zsat>zlayers[0]]
-                            self.theta[1,hh+1] = (self.theta[1,hh]*zlayers[1] + (zsat - zlayers[0]))/zlayers[1]
-                            self.theta[1,hh+1][zsat<zlayers[0]] = self.soil_moist[0,hh+1][zsat<zlayers[0]]
-                            
-                            ## initial inifiltration of TAN from the slurry to the topsoil
-                            TAN_infil = self.slurry_TAN_pool[hh+1] * init_infil
-                            ## infiltrated TAN to the first soil layer
-                            TAN_infil_z0 = TAN_infil*((self.theta[0,hh+1] - self.soil_moist[llidx,hh])*zlayers[0]*1e6/init_waterinfil)
-                            TAN_infil_z0[init_infil==0.0] = 0.0
-                            self.TAN_pool[0,hh] = self.TAN_pool[0,hh] + TAN_infil_z0
-                            self.TAN_pool[1,hh]= self.TAN_pool[1,hh] + (TAN_infil - TAN_infil_z0)
-                            self.slurry_TAN_pool[hh+1] = self.slurry_TAN_pool[hh+1] - TAN_infil
-                            self.slurry_water_pool[hh+1] = self.slurry_water_pool[hh+1] - init_waterinfil
-                            self.manure_washoff[hh+1] = nonN_washoff_rate*self.manure_pool[hh+1]
-                            self.manure_pool[hh+1] = self.manure_pool[hh+1] - self.manure_washoff[hh+1]
-                            
-                        if ll == 1:
-                            self.theta[0,hh+1] = (self.theta[0,hh+1]*(zlayers[0]+zlayers[1]) + self.water[hh+1]/1e6)/(zlayers[0]+zlayers[1])
-                            self.theta[0,hh+1][self.theta[0,hh+1]>self.soil_satmoist[llidx,hh+1]] = self.soil_satmoist[llidx,hh+1][self.theta[0,hh+1] >self.soil_satmoist[llidx,hh+1]]
-                            self.theta[1,hh+1] = (self.theta[1,hh+1]*(zlayers[0]+zlayers[1]) + self.water[hh+1]/1e6)/(zlayers[0]+zlayers[1])
-                            self.theta[1,hh+1][self.theta[1,hh+1]>self.soil_satmoist[llidx,hh+1]] = self.soil_satmoist[llidx,hh+1][self.theta[1,hh+1] >self.soil_satmoist[llidx,hh+1]]
-                            self.TAN_pool[0,hh+1] = self.TAN_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
-                            self.TAN_pool[1,hh] = self.TAN_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
-                            self.NO3_pool[0,hh+1] = self.NO3_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
-                            self.NO3_pool[1,hh] = self.NO3_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
-                            
-                        if ll == 2:
-                            self.theta[2,hh+1]  = (self.theta[2,hh+1]*zlayers[2] + self.water[hh+1]/1e6)/zlayers[2]
-                            self.theta[2,hh+1][self.theta[2,hh+1]>self.soil_satmoist[llidx,hh+1]] = self.soil_satmoist[llidx,hh+1][self.theta[2,hh+1]>self.soil_satmoist[llidx,hh+1]]
-                            self.TAN_pool[2,hh] = self.TAN_pool[2,hh]+self.TAN[hh+1]
-                            self.NO3_pool[2,hh] = self.NO3_pool[2,hh]+self.NO3[hh+1]
-                        
-                    # TANadd = self.ureahydrolysis[ll,hh+1] + self.orgN_decomp[ll,hh+1]
-                    TANadd = self.ureahydrolysis[ll,hh+1]  
+                    infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
+                                        theta2=self.theta[0,0],theta3=self.theta[1,0],
+                                        theta_sat=self.soil_satmoist[0,0],
+                                        water_added=np.maximum(self.water_added[dd-Days],self.water_added[dd]))
+
+                    ## Note that the np.maximum function is to prevent application on the second year being overwritten
+                    ## by day index dd-Days
+                    if chem_fert_type == 'nitrate':
+                        # print('chemical fertilizer applied: nitrate')
+                        self.NO3[5] = np.maximum(self.NO3_added[dd-Days],self.NO3_added[dd])
+                        sim_pH = np.maximum(self.pH[dd-Days],self.pH[dd])
+                        sim_ccH = np.maximum(self.cc_H[dd-Days],self.cc_H[dd])
+                    elif chem_fert_type == 'ammonium':
+                        self.TAN[5] = np.maximum(self.TAN_added[dd-Days],self.TAN_added[dd])
+                        # print('chemical fertilizer applied: ammonium')
+                        sim_pH = np.maximum(self.pH[dd-Days],self.pH[dd])
+                        sim_ccH = np.maximum(self.cc_H[dd-Days],self.cc_H[dd])
+                    elif chem_fert_type == 'urea':
+                        self.urea[5] = np.maximum(self.urea_added[dd-Days],self.urea_added[dd])
+                        # print('chemical fertilizer applied: urea')
+                        sim_pH = np.maximum(self.soil_pH[dd-Days],self.soil_pH[dd])
+                        sim_ccH = np.maximum(self.soil_ccH[dd-Days],self.soil_ccH[dd])
+
+                if sim != 'base':
+                    self.sensitivity_test(var=stvar,test=st)
+
+                self.theta[0,1:] = np.copy(self.soil_moist[0,1:])
+                self.theta[1,1:] = np.copy(self.soil_moist[0,1:])
+                self.theta[2,1:] = np.copy(self.soil_moist[1,1:])
+
+                # print('dd',dd,self.water_added[dd,0,589])
+
+                for hh in np.arange(0,24):
+                    if CONFIG_machine == "STREAM":
+                        surfrunoffrate = self.surfrunoffrate[hh+1]
+                        subrunoffrate = self.subrunoffrate[hh+1] 
+                        evap = self.evap[hh+1] 
+                    else:
+                        surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                        surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                        subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                        subrunoffrate = np.maximum(subrunoffrate,0.0)
+                        evap = self.evap[hh+1]-self.evap[hh]
+
+                    delta_sw1 = self.soil_moist[0,hh+1] - self.soil_moist[0,hh]
+                    delta_sw2 = self.soil_moist[1,hh+1] - self.soil_moist[1,hh]
+
+                    self.theta[0,hh+1] = self.theta[0,hh] + delta_sw1
+                    self.theta[1,hh+1] = self.theta[1,hh] + delta_sw1
+                    self.theta[2,hh+1] = self.theta[2,hh] + delta_sw2
+
+                    self.theta[0,hh+1] = np.maximum(self.theta[0,hh+1],0.01)
+                    self.theta[1,hh+1] = np.maximum(self.theta[1,hh+1],0.01)
+                    self.theta[2,hh+1] = np.maximum(self.theta[2,hh+1],0.01)
+
+                    # infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,hh],
+                    #                     theta2=self.theta[0,hh],theta3=self.theta[1,hh],
+                    #                     theta_sat=self.soil_satmoist[0,hh],water_added=self.water[hh+1])
+                    # infilrate1 = 0.0
+                    # infilrate2 = 0.0
+                    # infilrate3 = 0.0
+                    self.theta[0,hh+1],self.theta[1,hh+1], self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                        theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
+                                        theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
+
+                    self.drainagerate[0,hh+1] = np.maximum(infilrate1,water_drainage(theta=self.theta[0,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[0]))
+                    self.drainagerate[1,hh+1] = np.maximum(infilrate2,water_drainage(theta=self.theta[1,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[1]))
+                    self.drainagerate[2,hh+1] = np.maximum(infilrate3,water_drainage(theta=self.theta[2,hh+1],
+                                                theta_sat=self.soil_satmoist[1,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[2]))
                     
-                    if ll == 0:
-                        if ll != sourcelayer:
-                            # self.theta[0] = self.soil_moist[llidx,hh+1]
-                            self.drainagerate[ll,hh+1] = subrunoffrate
-                            # subrunoffrate1 = subrunoffrate
-                            
-                        ## resistance for upward diffusion in the surface layer
-                        Rdiffsrfaq = diff_resistance(distance=pmids[0],phase='aqueous',
-                            theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[llidx,hh+1])
-                        Rdiffsrfgas = diff_resistance(distance=pmids[0],phase='gaseous',
-                            theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[llidx,hh+1])
-                        self.Rdiffaq[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='aqueous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[llidx,hh+1])
-                        self.Rdiffgas[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='gaseous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[llidx,hh+1])
+                    # print('dd',dd,'hh+1',hh+1,"infil 1: ",infilrate1[0,589])
+                    # print('dd',dd,'hh+1',hh+1,"infil 2: ",infilrate2[0,589])
+                    # print('dd',dd,'hh+1',hh+1,"infil 3: ",infilrate3[0,589])
+
+                    # print('dd',dd,'hh+1',hh+1,"drainage 1: ",self.drainagerate[0,hh+1][0,589])
+                    # print('dd',dd,'hh+1',hh+1,"drainage 2: ",self.drainagerate[1,hh+1][0,589])
+                    # print('dd',dd,'hh+1',hh+1,"drainage 3: ",self.drainagerate[2,hh+1][0,589])
+
+                    # print('dd',dd,'hh+1',hh+1,"sub : ",subrunoffrate[0,589])
+
+                    # print('dd',dd,'hh+1',hh+1,"theta 1: ",self.theta[0,hh+1][0,589],"sw1",self.soil_moist[0,hh+1][0,589])
+                    # print('dd',dd,'hh+1',hh+1,"theta 2: ",self.theta[1,hh+1][0,589],"sw1",self.soil_moist[0,hh+1][0,589])
+                    # print('dd',dd,'hh+1',hh+1,"theta 3: ",self.theta[2,hh+1][0,589],"sw2",self.soil_moist[1,hh+1][0,589])
+                    # print("wp ",theta_wp[0,589])
+                    # print("irri idx",irrigated_croplandidx[0,589])
+
+                    ## resistance for upward diffusion in the surface layer
+                    Rdiffsrfaq = diff_resistance(distance=pmids[0],phase='aqueous',
+                                theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
+                    Rdiffsrfgas = diff_resistance(distance=pmids[0],phase='gaseous',
+                                theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
+                    
+                    for ll in np.arange(3):
+                        ## lldix: index for soil temp, moisture
+                        llidx = int(np.floor(ll/2))
                         
-                        if sourcelayer == 0:
-                            ## slurry pool at the surface
-                            frac_DM = manure_DM(solidmass=self.manure_pool[hh+1],watermass=self.slurry_water_pool[hh+1])
-                            slurry_infilrate = infil_rate_slurry(frac_DM)
-                            slurry_infil = slurry_infilrate*3600*timestep
-                            minwater = self.manure_pool[hh+1] * absorb_factor
-                            infil_idx = (self.slurry_water_pool[hh+1] - slurry_infil) - minwater
-                            slurry_infil[infil_idx<0] = self.slurry_water_pool[hh+1][infil_idx<0] - minwater[infil_idx<0]
-                            slurry_infilrate = slurry_infil/(3600*timestep)
-                            
-                            zslurry = self.slurry_water_pool[hh+1]/1e6
-                            
-                            KNH3 = NH3_par_coeff(temp=self.soil_temp[0,hh+1],cncH=self.slurry_ccH)
-    #                         self.slurry_TAN_pool[hh+1] = self.slurry_TAN_pool[hh]+self.slurry_TANdiffusionup[hh] 
-                            self.slurry_TAN_amount[hh+1] = self.slurry_TAN_pool[hh+1]/self.slurry_water_pool[hh+1]*1e6
-                            self.slurry_TAN_amount[hh+1][self.slurry_water_pool[hh+1]==0] = 0.0
-                            self.slurry_NH3_gas[hh+1] = KNH3*self.slurry_TAN_amount[hh+1]
-                            
-                            emissidx = NH3_vol(nh3_surfcnc=self.slurry_NH3_gas[hh+1],ratm=self.R_atm[hh+1])*timestep*3600
-                            TANwashoffidx = surf_runoff(N_surfcnc=self.slurry_TAN_amount[hh+1],
-                                                    qrunoff=surfrunoffrate)*timestep*3600  ## TAN washoff
-                            TANinfilidx = subsurf_leaching(N_cnc=self.slurry_TAN_amount[hh+1],
-                                                            qsubrunoff=slurry_infilrate)*timestep*3600  ## TAN infiltration/leaching
-                            TANdiffaqdownidx = N_diffusion(cnc1=self.slurry_TAN_amount[hh+1],cnc2=self.TAN_amount[0,hh],
-                                                resist=Rdiffsrfaq)*timestep*3600  ## TAN aqueous downwards diffusion
-                            
-                            nh3volidx,srfrunoffidx,subsrfleachingidx,diffaqdownidx = N_pathways(mN=self.slurry_TAN_pool[hh+1],
-                                        flux1=emissidx,flux2=TANwashoffidx,flux3=TANinfilidx,flux4=TANdiffaqdownidx)
-                            
+                        # self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
+                        # self.theta[ll,hh+1] = np.maximum(theta_wp,self.theta[ll,hh+1])
+                        self.drainagerate[ll,hh+1] = np.maximum(self.drainagerate[ll,hh+1],subrunoffrate)
+                        # self.drainagerate[ll,hh+1][self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]] = subrunoffrate[self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]]
+                        ## resistance for diffusion between surface layer (idx0) and topsoil layer (idx1)
+                        self.Rdiffaq[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='aqueous',
+                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],temp=self.soil_temp[llidx,hh+1])
+                        self.Rdiffgas[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='gaseous',
+                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],temp=self.soil_temp[llidx,hh+1])
+
+                        ## input includes N from fertilizer application
+                        if ll == sourcelayer:
+                            if sourcelayer == 1:
+                                self.urea_pool[0,hh+1] = self.urea_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.urea[hh+1]
+                                self.urea_pool[1,hh] = self.urea_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.urea[hh+1]
+                                self.TAN_pool[0,hh+1] = self.TAN_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
+                                self.TAN_pool[1,hh] = self.TAN_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
+                                self.NO3_pool[0,hh+1] = self.NO3_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
+                                self.NO3_pool[1,hh] = self.NO3_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.NO3[hh+1]
+                            else:
+                                self.urea_pool[ll,hh] = self.urea_pool[ll,hh]+self.urea[hh+1]
+                                # print("dd",dd,"hh+1",hh+1,"urea, urea pool:",self.urea[hh+1][0,432],self.urea_pool[ll,hh][0,432])
+                                self.TAN_pool[ll,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]
+                                self.NO3_pool[ll,hh] = self.NO3_pool[ll,hh]+self.NO3[hh+1]
+
+                        ## urea scheme
+                        if chem_fert_type == 'urea':
+                            if ll == 0:
+                                ## urea pool
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]
+                                ## urea hydrolysis
+                                self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
+                                                                                                            theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
+                                ## subtracting chemical losses
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
+                                ## urea concentration
+                                self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                                            theta=self.theta[ll,hh+1])
+                                ## urea concentration at the compensation point
+                                ureasurfamount = surf_Ncnc(N_cnc=self.urea_amount[ll,hh+1],rliq=Rdiffsrfaq,
+                                                                qrunoff=surfrunoffrate)
+                                ## determine the potential of each flux
+                                ureawashoffidx = surf_runoff(N_surfcnc=ureasurfamount,
+                                                            qrunoff=surfrunoffrate)*timestep*3600
+                                ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600
+                                ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
+                                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600
+                                correction_ureadiffdown = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                                ureadiffdownidx = ureadiffdownidx*correction_ureadiffdown
+                                ureadiffupidx = False
+                                srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.urea_pool[ll,hh+1],
+                                            flux1=ureawashoffidx,flux2=ureainfilidx,flux3=ureadiffdownidx,flux4=ureadiffupidx)
+                                self.ureawashoff[hh+1] = srfrunoffidx
+                                self.ureainfil[ll,hh+1] = subsrfleachingidx
+                                self.ureadiffusiondown[ll,hh+1] = diffaqdownidx  
+                                ## update urea pool
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureawashoff[hh+1]-\
+                                                        self.ureainfil[ll,hh+1]-self.ureadiffusiondown[ll,hh+1]
+                                ## get rid of rounding error
+                                self.urea_pool[ll,hh+1] = np.maximum(self.urea_pool[ll,hh+1],0.0)
+                            elif ll == 1:
+                                ## urea pool
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]+\
+                                                            self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
+                                # print("dd",dd,"hh+1",hh+1,"urea pool",self.urea_pool[ll,hh+1][0,589])
+                                ## urea hydrolysis
+                                self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
+                                                                                                            theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
+                                
+                                # print("dd",dd,"hh+1",hh+1,"soil temp",self.soil_temp[llidx,hh+1][0,589])
+                                # print("dd",dd,"hh+1",hh+1,"soil moisture",self.theta[ll,hh+1][0,589])
+                                # print("dd",dd,"hh+1",hh+1,"hydro rate",urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
+                                #                                                     theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)[0,589])
+                                # print("dd",dd,"hh+1",hh+1,"urea hydro",self.ureahydrolysis[ll,hh+1][0,589])
+                                ## subtracting chemical losses
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
+                                ## urea concentration
+                                self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                                ## determine the potential of each flux
+                                ureawashoffidx = False
+                                ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600
+                                ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=self.urea_amount[ll+1,hh],
+                                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600
+                                correction_ureadiff = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                                ureadiffdownidx = ureadiffdownidx*correction_ureadiff
+                                ureadiffupidx = N_diffusion(cnc1=self.urea_amount[ll,hh],cnc2=self.urea_amount[ll-1,hh+1],
+                                                                resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600
+                                ureadiffupidx = ureadiffupidx*correction_ureadiff
+                                srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.urea_pool[ll,hh+1],
+                                            flux1=ureawashoffidx,flux2=ureainfilidx,flux3=ureadiffdownidx,flux4=ureadiffupidx)
+                                self.ureainfil[ll,hh+1] = subsrfleachingidx
+                                self.ureadiffusiondown[ll,hh+1] = diffaqdownidx  
+                                self.ureadiffusionup[ll-1,hh+1] = diffaqupidx
+                                ## update urea pool
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureadiffusionup[ll-1,hh+1]-\
+                                                            self.ureainfil[ll,hh+1]-self.ureadiffusiondown[ll,hh+1]
+                                ## get rid of rounding error
+                                self.urea_pool[ll,hh+1] = np.maximum(self.urea_pool[ll,hh+1],0.0)
+                            elif ll == 2:
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
+                                ## urea hydrolysis
+                                self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
+                                                                                                            theta=self.theta[ll,hh+1],delta_t=timestep,k_h=0.03)
+                                ## subtracting chemical losses
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
+                                ## urea concentration
+                                self.urea_amount[ll,hh+1] = N_concentration(mN=self.urea_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                                ## determine the potential of each flux
+                                ureawashoffidx = False
+                                ureainfilidx = subsurf_leaching(N_cnc=self.urea_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600
+                                ureadiffdownidx = N_diffusion(cnc1=self.urea_amount[ll,hh+1],cnc2=0.0,
+                                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600
+                                correction_ureadiff = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                                ureadiffdownidx = ureadiffdownidx*correction_ureadiff
+                                ureadiffupidx = N_diffusion(cnc1=self.urea_amount[ll,hh],cnc2=self.urea_amount[ll-1,hh+1],
+                                                                resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600
+                                ureadiffupidx = ureadiffupidx*correction_ureadiff
+                                srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.urea_pool[ll,hh+1],
+                                            flux1=ureawashoffidx,flux2=ureainfilidx,flux3=ureadiffdownidx,flux4=ureadiffupidx)       
+                                self.ureainfil[ll,hh+1] = subsrfleachingidx
+                                self.ureadiffusiondown[ll,hh+1] = diffaqdownidx              
+                                self.ureadiffusionup[ll-1,hh+1] = diffaqupidx
+                                ## update urea pool
+                                self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureadiffusionup[ll-1,hh+1]-\
+                                                            self.ureainfil[ll,hh+1]-self.ureadiffusiondown[ll,hh+1]
+                                ## get rid of rounding error
+                                self.urea_pool[ll,hh+1] = np.maximum(self.urea_pool[ll,hh+1],0.0)
+                        ## TAN production
+                        try:
+                            TANprod = self.ureahydrolysis[ll,hh+1]+self.orgN_decomp[ll,hh+1]+self.uahydrolysis[ll,hh+1]
+                        except:
+                            pass
+                            TANprod = self.ureahydrolysis[ll,hh+1]
+
+                        if ll == 0:
+                            ########################
+                            ## TAN sim
+                            ########################
+                            ## TAN pool
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod
+                            # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+
+                            ## fraction of aqueous NH4
+                            fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                            temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
+                            self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
+                                                        theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                                        pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
+                            ## subtracting chemical transformation
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ## TAN and NH3 concentration
+                            KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
+                            self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                        theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
+                                                        knh3=KNH3,kd=Kd)
+                            self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
+                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
+                            ## TAN concentration at the compensation surface
+                            TANsurfamount = surf_TAN_cnc(tan_cnc=self.TAN_amount[ll,hh+1],rliq=Rdiffsrfaq,rgas=Rdiffsrfgas,
+                                                knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=surfrunoffrate)
+                            NH3surfamount = TANsurfamount*KNH3
+                            ## determining the potential of each flux
+                            emissidx = NH3_vol(nh3_surfcnc=NH3surfamount,ratm=self.R_atm[hh+1])*timestep*3600  ## NH3 volatlization
+                            TANwashoffidx = surf_runoff(N_surfcnc=TANsurfamount,
+                                                        # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600 
+                                                        qrunoff=surfrunoffrate)*timestep*3600  ## TAN washoff
+                            TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
+                            TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                            TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
+                            NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
+                                                resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                            # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            correction_NH3diffgasdown = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
+                                                                        (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
+                            NH3diffgasdownidx = NH3diffgasdownidx*correction_NH3diffgasdown
+                            TANuptakeidx = False  ## N uptake
+                            nh3volidx,srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffgasdownidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
+                                    flux1=emissidx,flux2=TANwashoffidx,flux3=TANinfilidx,flux4=TANdiffaqdownidx,
+                                    flux5=NH3diffgasdownidx,flux6=TANuptakeidx)
                             self.NH3flux[hh+1] = nh3volidx
                             self.TANwashoff[hh+1] = srfrunoffidx
-                            self.slurry_TANinfil[hh+1] = subsrfleachingidx
-                            self.slurry_TANdiffusiondown[hh+1] = diffaqdownidx
-                        
-                            self.slurry_TAN_pool[hh+1] = self.slurry_TAN_pool[hh+1] - self.NH3flux[hh+1] - self.TANwashoff[hh+1] -\
-                                                        self.slurry_TANinfil[hh+1] - self.slurry_TANdiffusiondown[hh+1]
-                            self.slurry_water_pool[hh+1] = self.slurry_water_pool[hh+1] - evap*timestep*3600 - slurry_infil
-                            
-                            ## when water pool of the slurry is less than the min water threshold
-                            ## slurry TAN is set to be added to the surface soil layer
-                            ## slurry water, manure is reset to zero.
-                            water_idx = self.slurry_water_pool[hh+1] - minwater
-                            self.slurry_TANinfil[hh+1][water_idx<1.0] = self.slurry_TANinfil[hh+1][water_idx<1.0] + \
-                                                                            self.slurry_TAN_pool[hh+1][water_idx<1.0]
-                            self.slurry_TAN_pool[hh+1][water_idx<1.0] = 0.0
-                            self.slurry_water_pool[hh+1][water_idx<1.0] = 0.0
-                            self.manure_pool[hh+1][water_idx<1.0] = 0.0
-                            
-                            ## soil water content is nudged by reanalysis data for soil moisture
-                            theta1_recovery = (self.theta[0,hh+1] - self.soil_moist[0,hh+1])/span_t
-                            ## subsurface percolation flux includes correction for infiltration  
-                            ## and nudged soil moisture to conserve water mass
-                            # subrunoffrate1 = subrunoffrate + slurry_infilrate + theta1_recovery/(3600*timestep)
-                            self.drainagerate[0,hh+1] = subrunoffrate + slurry_infilrate
+                            self.TANinfil[ll,hh+1] = subsrfleachingidx
+                            self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
+                            ## update TAN pool: subtracting all losses
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH3flux[hh+1]-self.TANwashoff[hh+1]-\
+                                            self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ## get rid of rounding error
+                            self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ########################
+                            ## NO3- sim
+                            ########################
+                            ## NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]
 
-                        theta1_recovery = (self.theta[0,hh+1] - self.soil_moist[0,hh+1])/span_t
-                        self.theta[0,hh+1] = self.theta[0,hh+1] - theta1_recovery                       
-                        ## TAN pool
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+\
-                                                    self.slurry_TANinfil[hh+1]+self.slurry_TANdiffusiondown[hh+1]+\
-                                                        self.orgN_decomp[ll,hh+1]
-                        ## fraction of aqueous NH4
-                        fNH4 = frac_NH4(theta=self.theta[0,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                        temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
-                        self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
-                                                    theta=self.theta[0,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                                    pH=sim_pH,fert_type='manure',frac_nh4=fNH4)*timestep*3600
-                        ## subtracting chemical transformation
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
-                        ## TAN and NH3 concentration
-                        KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
-                        self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[0,hh+1],
-                                                    knh3=KNH3,kd=Kd)
-                        self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
-                                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[0,hh+1])
-                        ## TAN concentration at the compensation surface
-                        TANsurfamount = surf_TAN_cnc(tan_cnc=self.TAN_amount[ll,hh+1],rliq=Rdiffsrfaq,rgas=Rdiffsrfgas,
-                                            knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=surfrunoffrate)
-                                            # knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=self.surfrunoffrate[hh+1])
-                        NH3surfamount = TANsurfamount*KNH3
-                        ## determining the potential of each flux
-                        emissidx = NH3_vol(nh3_surfcnc=NH3surfamount,ratm=self.R_atm[hh+1])*timestep*3600  ## NH3 volatlization
-                        ## NH3 from soil layer is zero when slurry TAN pool is not empty
-                        emissidx[self.slurry_TAN_pool[hh]!=0] = 0.0
-                        TANwashoffidx = surf_runoff(N_surfcnc=TANsurfamount,
-                                                    qrunoff=surfrunoffrate)*timestep*3600  ## TAN washoff
-                        ## surface washoff from the soil layer is zero when slurry TAN pool is not empty
-                        TANwashoffidx[self.slurry_TAN_pool[hh]!=0] = 0.0
-                        TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
-                                                        qsubrunoff=self.drainagerate[0,hh+1])*timestep*3600  ## TAN infiltration/leaching
-                        TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
-                        TANdiffaqdownidx[self.theta[0,hh+1]==0]=0.0
-                        NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
-                                            resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
-                        NH3diffgasdownidx[self.theta[0,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        TANuptakeidx = False  ## N uptake
-                        nh3volidx,srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffgasdownidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
-                                flux1=emissidx,flux2=TANwashoffidx,flux3=TANinfilidx,flux4=TANdiffaqdownidx,
-                                flux5=NH3diffgasdownidx,flux6=TANuptakeidx)
-                        ## when slurry TAN pool is depleted to zero, NH3 is released from the top soil layer
-                        self.NH3flux[hh+1][self.slurry_TAN_pool[hh+1]==0] = nh3volidx[self.slurry_TAN_pool[hh+1]==0]
-                        self.TANwashoff[hh+1][self.slurry_TAN_pool[hh+1]==0] = srfrunoffidx[self.slurry_TAN_pool[hh+1]==0]
-                        self.TANinfil[ll,hh+1] = subsrfleachingidx
-                        self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
-                        ## update TAN pool: subtracting all losses
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-\
-                            self.NH3diffusiondown[ll,hh+1]
-                        self.TAN_pool[ll,hh+1][self.slurry_TAN_pool[hh]==0] = self.TAN_pool[ll,hh+1][self.slurry_TAN_pool[hh]==0]-\
-                                                self.NH3flux[hh+1][self.slurry_TAN_pool[hh]==0]-self.TANwashoff[hh+1][self.slurry_TAN_pool[hh]==0]
-                        ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1][self.TAN_pool[ll,hh+1]<0] = 0.0
-                    elif ll == 1:
-                        # if ll != sourcelayer:
-                        #     self.theta[1] = self.soil_moist[0,hh+1]
-                            
-                        theta2_recovery = (self.theta[1,hh+1] - self.soil_moist[llidx,hh+1])/span_t
-                        # subrunoffrate2 = subrunoffrate1 + theta2_recovery/(3600*timestep)
-                        self.drainagerate[ll,hh+1] = subrunoffrate
-                        self.theta[1,hh+1] = self.theta[1,hh+1] - theta2_recovery
-                        # print(dd,"midsoil",self.theta[1,hh+1,12,377],"sm",self.soil_moist[llidx,hh+1,12,377])    
-                        self.Rdiffaq[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='aqueous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[1,hh+1],temp=self.soil_temp[llidx,hh+1])
-                        self.Rdiffgas[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='gaseous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[1,hh+1],temp=self.soil_temp[llidx,hh+1])
+                            ## NO3 concentration
+                            self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                            ## NO3 concentration at the compensation surface
+                            NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq/f_DNO3,
+                                                    qrunoff=surfrunoffrate)
+                            ## determining the potential of each flux
+                            NO3washoffidx = surf_runoff(N_surfcnc=NO3surfamount,
+                                                        qrunoff=surfrunoffrate)*timestep*3600  ## NO3 washoff
+                            NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
+                            NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffaqdownidx = NO3diffaqdownidx*correction_diffaq
+                            NO3diffupidx = False
+                            srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
+                                            flux1=NO3washoffidx,flux2=NO3infilidx,flux3=NO3diffaqdownidx,flux4=NO3diffupidx)
+                            self.NO3washoff[hh+1] = srfrunoffidx
+                            self.NO3infil[ll,hh+1] = subsrfleachingidx
+                            self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
+                            ## update NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3washoff[hh+1]-\
+                                                        self.NO3infil[ll,hh+1]-self.NO3diffusiondown[ll,hh+1]
+                            ## get rid of rounding error
+                            self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
+                            ########################
+                            ## soil water sim
+                            ########################
+                            ## update soil moisture 
+                            update_sw = self.theta[ll,hh+1]*zlayers[0] - self.drainagerate[ll,hh+1]*timestep*3600
+                            ## exclude initial inifltration
+                            update_sw[self.drainagerate[ll,hh+1]==infilrate1] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate1]*zlayers[0]
+                            # self.theta[ll,hh+1] = update_sw/zlayers[0]
+                            self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]-\
+                                                                        evap[[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]]*timestep*3600/1e6)/zlayers[0]
+                            # self.theta[ll,hh+1][self.theta[ll,hh+1]<0] = 0.01
+                            # self.theta[ll,hh+1] = np.maximum(self.theta[ll,hh+1],0.01)
+                            self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
+
+
+                        elif ll == 1:
+                            ########################
+                            ## TAN sim
+                            ########################
+                            ## TAN pool
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod+\
+                                                    self.TANinfil[ll-1,hh+1]+self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ## fraction of aqueous NH4
+                            fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                            temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
+                            self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
+                                                        theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                                        pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
+                            ## subtracting chemical transformation
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                            ## TAN and NH3 concentration
+                            KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
+                            self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                        theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
+                                                        knh3=KNH3,kd=Kd)
+                            self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
+                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
+                            TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                            TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
+                            NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
+                                                resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                            # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            correction_diffgas = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
+                                                                        (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
+                            NH3diffgasdownidx = NH3diffgasdownidx*correction_diffgas
+                            NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
+                                                resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
+                            # NH3diffgasupidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+
+                            TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='nh4',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
+                            TANuptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
+                                    flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
+                                    flux5=NH3diffgasupidx,flux6=TANuptakeidx)
+                            self.TANinfil[ll,hh+1] = subsrfleachingidx
+                            self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
+                            self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
+                            self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
+                            self.ammNuptake[ll-1,hh+1] = uptakeidx
+                            ## update TAN pool: subtracting all losses
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
+                                self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                            ########################
+                            ## NO3- sim
+                            ########################
+                            ## NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]+\
+                                                        self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
+                            ## NO3 concentration
+                            self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
+                            NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffaqdownidx = NO3diffaqdownidx * correction_diffaq
+                            NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffupidx = NO3diffupidx * correction_diffaq
+                            NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='no3',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
+                            NO3uptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
+                                            flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
+                            self.NO3infil[ll,hh+1] = subsrfleachingidx
+                            self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
+                            self.nitNuptake[ll-1,hh+1] = uptakeidx
+                            ## update NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
+                                                        self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
+                            ########################
+                            ## soil water sim
+                            ########################
+                            ## soil water uptaken by crops; soil volumetric water content change, m3/m3
+                            self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
+                            ## water uptake only takes place between plant date plus seedling periods and harvest date
+                            self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
+                            self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
+                            # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
+                            self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
+                            ## update soil moisture 
+                            update_sw = self.theta[ll,hh+1]*zlayers[1] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600
+                            update_sw[self.drainagerate[ll,hh+1]==infilrate2] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate2]*zlayers[1]
+                            self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[1]
+                            # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
+
+                        elif ll == 2:
+                            ########################
+                            ## TAN sim
+                            ########################
+                            ## TAN pool
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+TANprod+self.TANinfil[ll-1,hh+1]+\
+                                                        self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
+                            ## fraction of aqueous NH4
+                            fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                            temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
+                            self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
+                                                        theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                                        pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
+                            ## subtracting chemical transformation
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                            ## TAN and NH3 concentration
+                            KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
+                            self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                        theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
+                                                        knh3=KNH3,kd=Kd)
+                            self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
+                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
+                            TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=0,
+                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                            TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
+                            NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=0,
+                                                resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                            # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            correction_diffgas = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
+                                                                        (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
+                            NH3diffgasdownidx = NH3diffgasdownidx*correction_diffgas
+                            NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
+                                                resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
+                            # NH3diffgasupidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            NH3diffgasupidx = NH3diffgasupidx * correction_diffgas
+                            TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
+                            # TANdiffaqupidx[self.soil_moist[llidx,hh+1]==0]=0.0
+                            TANdiffaqupidx = TANdiffaqupidx * correction_diffaq
+                            TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='nh4',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
+                            TANuptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
+                                    flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
+                                    flux5=NH3diffgasupidx,flux6=TANuptakeidx)
+                            self.TANinfil[ll,hh+1] = subsrfleachingidx
+                            self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
+                            self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
+                            self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
+                            self.ammNuptake[ll-1,hh+1] = uptakeidx
+                            ## update TAN pool: subtracting all losses
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
+                                self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                            ########################
+                            ## NO3 sim
+                            ########################
+                            ## NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+\
+                                                        self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
+                            ## NO3 concentration
+                            self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
+                            NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=0,
+                                                resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffaqdownidx = NO3diffaqdownidx * correction_diffaq
+                            NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffupidx = NO3diffupidx * correction_diffaq
+                            NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='no3',crop_stageidx=crop_stage)*timestep*3600  ## N uptake
+                            NO3uptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
+                                            flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
+                            self.NO3infil[ll,hh+1] = subsrfleachingidx
+                            self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
+                            self.nitNuptake[ll-1,hh+1] = uptakeidx
+                            ## update NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
+                                                        self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
+                            ########################
+                            ## soil water sim
+                            ########################
+                            ## soil water uptaken by crops; soil volumetric water content change, m3/m3
+                            self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
+                            ## water uptake only takes place between plant date plus seedling periods and harvest date
+                            self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
+                            self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
+                            self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
+                            ## update soil moisture 
+                            update_sw = self.theta[ll,hh+1]*zlayers[2] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600 
+                            update_sw[self.drainagerate[ll,hh+1]==infilrate3] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate3]*zlayers[2]
+                            self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[2]
+                self.daily_output(dd)
+                self.daily_init()  
+
+        ###################################
+        ## manure fertilizer application
+        ###################################
+        if manure_fert is True:
+            print('current simulation is for: manure application-'+str(manure_type))
+            print('technique used is: '+str(tech))
+            
+            for dd in np.arange(start_day_idx,end_day_idx):
+                if crop is None:
+                    # print("Manure application on croplands.")
+                    spring_crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=spring_plantdate,harvest_calendar=spring_harvestdate)
+                    winter_crop_stage = self.crop_lifecycle_stage(dayidx=dd,plant_calendar=winter_plantdate,harvest_calendar=winter_harvestdate)
+                    # print("dd",dd,spring_crop_stage[0,597],winter_crop_stage[0,597])
+                elif crop == "grass":
+                    # print("Manure application on pastures/grassland.")
+                    crop_stage = np.zeros(theta_fc.shape)
+                    crop_stage[:] = 2.0
+                
+                if dd < Days:
+                    self.sim_env(dd)
+
+                    ## irrigation events
+                    self.irrigation_event(dayidx=dd,plant_calendar=spring_plantdate,harvest_calendar=winter_harvestdate,
+                                    irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+
+                    infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
+                                        theta2=self.theta[0,0],theta3=self.theta[1,0],
+                                        theta_sat=self.soil_satmoist[0,0],water_added=self.water_added[dd])
+
+                    self.TAN[5] = self.TAN_added[dd]
+                    self.UA[5] = self.UA_added[dd]
+                    self.avail_N[5] = self.avail_N_added[dd]
+                    self.resist_N[5] = self.resist_N_added[dd]
+                    self.unavail_N[5] = self.unavail_N_added[dd]
+                    self.water[5] = self.water_added[dd]
+                    self.manure[5] = self.manure_added[dd]
+                    sim_pH = self.pH[dd]
+                    sim_ccH = self.cc_H[dd]
+
+                else:
+                    self.sim_env(dd-Days)
+                    ## irrigation events
+                    self.irrigation_event(dayidx=dd-Days,plant_calendar=spring_plantdate,harvest_calendar=winter_harvestdate,
+                                    irrigation_map=irrigated_croplandidx,theta_WP=theta_wp,theta_FC=theta_fc)
+
+                    infilrate1, infilrate2, infilrate3 = self.irr_infil(theta1=self.theta[0,0],
+                                        theta2=self.theta[0,0],theta3=self.theta[1,0],
+                                        theta_sat=self.soil_satmoist[0,0],water_added=self.water_added[dd])
+
+                    self.TAN[5] = self.TAN_added[dd-Days]
+                    self.UA[5] = self.UA_added[dd-Days]
+                    self.avail_N[5] = self.avail_N_added[dd-Days]
+                    self.resist_N[5] = self.resist_N_added[dd-Days]
+                    self.unavail_N[5] = self.unavail_N_added[dd-Days]
+                    self.water[5] = self.water_added[dd-Days]
+                    self.manure[5] = self.manure_added[dd-Days]
+                    sim_pH = self.pH[dd-Days]
+                    sim_ccH = self.cc_H[dd-Days]
+
+                if sim != 'base':
+                    self.sensitivity_test(var=stvar,test=st)
+                
+                self.theta[0] = np.copy(self.soil_moist[0])
+                self.theta[1] = np.copy(self.soil_moist[0])
+                self.theta[2] = np.copy(self.soil_moist[1])
+
+                for hh in np.arange(0,24):
+                    if CONFIG_machine == "STREAM":
+                        surfrunoffrate = self.surfrunoffrate[hh+1]
+                        subrunoffrate = self.subrunoffrate[hh+1] 
+                        evap = self.evap[hh+1] 
+                    else:
+                        surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                        surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                        subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                        subrunoffrate = np.maximum(subrunoffrate,0.0)
+                        evap = self.evap[hh+1]-self.evap[hh]
+
+                    delta_sw1 = self.soil_moist[0,hh+1] - self.soil_moist[0,hh]
+                    delta_sw2 = self.soil_moist[1,hh+1] - self.soil_moist[1,hh]
+
+                    # print("dd",dd,"hh+1",hh+1,"theta n1",self.theta[2,hh+1][0,597])
+
+                    self.theta[0,hh+1] = self.theta[0,hh] + delta_sw1
+                    self.theta[1,hh+1] = self.theta[1,hh] + delta_sw1
+                    self.theta[2,hh+1] = self.theta[2,hh] + delta_sw2
+
+                    # print("dd",dd,"hh+1",hh+1,"theta n2",self.theta[2,hh+1][0,597])
+
+                    self.theta[0,hh+1] = np.maximum(self.theta[0,hh+1],0.01)
+                    self.theta[1,hh+1] = np.maximum(self.theta[1,hh+1],0.01)
+                    self.theta[2,hh+1] = np.maximum(self.theta[2,hh+1],0.01)
+
+                    # print("dd",dd,"hh+1",hh+1,"theta n3",self.theta[2,hh+1][0,597])
+
+                    self.theta[0,hh+1],self.theta[1,hh+1], self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                        theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
+                                        theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
                     
-                        ## TAN pool
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+self.orgN_decomp[ll,hh+1]+\
-                                                self.TANinfil[ll-1,hh+1]+self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
-                        ## fraction of aqueous NH4
-                        fNH4 = frac_NH4(theta=self.theta[1,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                        temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
-                        self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
-                                                    theta=self.theta[1,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                                    pH=sim_pH,fert_type='manure',frac_nh4=fNH4)*timestep*3600
-                        ## subtracting chemical transformation
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
-                        ## TAN and NH3 concentration
-                        KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
-                        self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[1,hh+1],
-                                                    knh3=KNH3,kd=Kd)
-                        self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
-                                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[1,hh+1])
-                        ## determining the potential of each flux
-                        TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
-                                                            qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
-                        TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
-                        TANdiffaqdownidx[self.theta[1,hh+1]==0]=0.0
-                        NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
-                                            resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
-                        NH3diffgasdownidx[self.theta[1,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
-                                            resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
-                        NH3diffgasupidx[self.theta[1,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
-                        TANdiffaqdownidx[self.theta[1,hh+1]==0]=0.0
-                        TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4')*timestep*3600  ## N uptake
-                        # TANuptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
-                                flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
-                                flux5=NH3diffgasupidx,flux6=TANuptakeidx)
-                        self.TANinfil[ll,hh+1] = subsrfleachingidx
-                        self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
-                        self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
-                        self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
-                        self.ammNuptake[ll-1,hh+1] = uptakeidx
-                        ## update TAN pool: subtracting all losses
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
-                            self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1][self.TAN_pool[ll,hh+1]<0] = 0.0
-                        
-                        
-                    elif ll == 2:
-                        theta3_recovery = (self.theta[2,hh+1] - self.soil_moist[llidx,hh+1])/span_t
-                        # subrunoffrate3 = subrunoffrate2 + theta3_recovery/(3600*timestep)
-                        self.drainagerate[ll,hh+1] = subrunoffrate
-                        self.theta[2,hh+1] = self.theta[2,hh+1] - theta3_recovery 
+                    # print("dd",dd,"hh+1",hh+1,"theta n4",self.theta[2,hh+1][0,597])
+
+                    self.drainagerate[0,hh+1] = water_drainage(theta=self.theta[0,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[0])
+                    self.drainagerate[1,hh+1] = water_drainage(theta=self.theta[1,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[1])
+                    self.drainagerate[2,hh+1] = water_drainage(theta=self.theta[2,hh+1],
+                                                theta_sat=self.soil_satmoist[1,hh+1],Ksat=Ks_sat,fc=theta_fc,layerthickness=zlayers[2])
+
+                    ## resistance for upward diffusion in the surface layer
+                    Rdiffsrfaq = diff_resistance(distance=pmids[0],phase='aqueous',
+                                theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
+                    Rdiffsrfgas = diff_resistance(distance=pmids[0],phase='gaseous',
+                                theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[0,hh+1],temp=self.soil_temp[0,hh+1])
+
+                    for ll in np.arange(3):
+                        ## lldix: index for soil temp, moisture
+                        llidx = int(np.floor(ll/2))
+                        self.drainagerate[ll,hh+1] = np.maximum(self.drainagerate[ll,hh+1],subrunoffrate)
+                        # self.drainagerate[ll,hh+1][self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]] = subrunoffrate[self.theta[ll,hh+1]==self.soil_moist[llidx,hh+1]]
+                        ## resistance for diffusion between surface layer (idx0) and topsoil layer (idx1)
                         self.Rdiffaq[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='aqueous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[2,hh+1],temp=self.soil_temp[llidx,hh+1])
+                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],temp=self.soil_temp[llidx,hh+1])
                         self.Rdiffgas[ll,hh+1] = diff_resistance(distance=pmids[ll+1]-pmids[ll],phase='gaseous',
-                            theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[2,hh+1],temp=self.soil_temp[llidx,hh+1])
-                        ## TAN pool
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.orgN_decomp[ll,hh+1]+self.TANinfil[ll-1,hh+1]+\
-                                                    self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
-                        ## fraction of aqueous NH4
-                        fNH4 = frac_NH4(theta=self.theta[2,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                        temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
-                        self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
-                                                    theta=self.theta[2,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
-                                                    pH=sim_pH,fert_type='manure',frac_nh4=fNH4)*timestep*3600
-                        ## subtracting chemical transformation
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
-                        ## TAN and NH3 concentration
-                        KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
-                        self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
-                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[2,hh+1],
-                                                    knh3=KNH3,kd=Kd)
-                        self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
-                                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[2,hh+1])
-                        ## determining the potential of each flux
-                        TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],temp=self.soil_temp[llidx,hh+1])
+                        
+                        if ll == sourcelayer:
+                            self.UA_pool[hh+1] = self.UA_pool[hh] + self.UA[hh+1]
+                            self.avail_N_pool[hh+1] = self.avail_N_pool[hh]+self.avail_N[hh+1]
+                            self.resist_N_pool[hh+1] = self.resist_N_pool[hh]+self.resist_N[hh+1]
+                            self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh]+self.unavail_N[hh+1]
+                            ## UA hydrolysis rate and org N decomposition rates
+                            ua_conv_factor = ua_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],rhum=50.0,ph=sim_pH,
+                                    delta_t=timestep)
+                            Na_decomp_rate, Nr_decomp_rate = N_pools_decomp_rate(temp=self.soil_temp[llidx,hh+1],delta_t=timestep)
+                            ## UA hydrolysis and org N decomposition contributes to TAN pool at a specific soil layer
+                            self.uahydrolysis[ll,hh+1] = self.UA_pool[hh+1]*ua_conv_factor
+                            self.orgN_decomp[ll,hh+1] = self.avail_N_pool[hh+1]*Na_decomp_rate + \
+                                                        self.resist_N_pool[hh+1]*Nr_decomp_rate
+                            if ll == 0:
+                                N_washoff_rate = f_washoff_N*surfrunoffrate*3600*timestep*1e3
+                                self.UAwashoff[hh+1] = N_washoff_rate*self.UA_pool[hh+1]
+                                self.avail_N_washoff[hh+1] = N_washoff_rate*self.avail_N_pool[hh+1]
+                                self.resist_N_washoff[hh+1] = N_washoff_rate*self.resist_N_pool[hh+1]
+                                self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
+                            self.UA_pool[hh+1] = self.UA_pool[hh+1]-self.uahydrolysis[ll,hh+1]-self.UAwashoff[hh+1]
+                            self.avail_N_pool[hh+1] = self.avail_N_pool[hh+1]-(self.avail_N_pool[hh+1]*Na_decomp_rate)-\
+                                                        self.avail_N_washoff[hh+1]
+                            self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]-(self.resist_N_pool[hh+1]*Nr_decomp_rate)-\
+                                                        self.resist_N_washoff[hh+1]
+                            self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh+1] - self.unavail_N_washoff[hh+1]
+
+                            if sourcelayer == 1:
+                                self.TAN_pool[0,hh+1] = self.TAN_pool[0,hh+1] + (zlayers[0]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
+                                self.TAN_pool[1,hh] = self.TAN_pool[1,hh] + (zlayers[1]/(zlayers[0]+zlayers[1]))*self.TAN[hh+1]
+                                self.theta[0,hh+1],self.theta[1,hh+1],self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                                theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1],tech="disk")
+                                # print("dd",dd,"hh+1",hh+1,"water added",self.water[hh+1][0,597])
+                                # print("dd",dd,"hh+1",hh+1,"theta n5",self.theta[2,hh+1][0,597])
+                            else:
+                                self.TAN_pool[ll,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]
+                                if sourcelayer == 0:
+                                    self.theta[0,hh+1],self.theta[1,hh+1],self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                                theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
+                                    # print("dd",dd,"hh+1",hh+1,"theta n6",self.theta[2,hh+1][0,597])
+                                elif sourcelayer == 2:
+                                    self.theta[0,hh+1],self.theta[1,hh+1],self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                                theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
+                                                theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1],tech="injection")
+                                    # print("dd",dd,"hh+1",hh+1,"theta n7",self.theta[2,hh+1][0,597])
+                         ## TAN production
+                        
+                        TANprod = self.ureahydrolysis[ll,hh+1]+self.orgN_decomp[ll,hh+1]+self.uahydrolysis[ll,hh+1]
+                        
+
+                        if ll == 0:
+                            ########################
+                            ## TAN sim
+                            ########################
+                            ## TAN pool
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod
+                            # print("dd",dd,"hh+1",hh+1,"TAN diff up",self.TANdiffusionup[ll,hh][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"NH3 diffup",self.NH3diffusionup[ll,hh][0,589])
+                            # print("dd",dd,"hh+1",hh+1,"TAN prod",TANprod[0,589])
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+
+                            ## fraction of aqueous NH4
+                            fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                            temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
+                            self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
+                                                        theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                                        pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
+                            ## subtracting chemical transformation
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ## TAN and NH3 concentration
+                            KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
+                            self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                        theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
+                                                        knh3=KNH3,kd=Kd)
+                            self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
+                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
+                            ## TAN concentration at the compensation surface
+                            TANsurfamount = surf_TAN_cnc(tan_cnc=self.TAN_amount[ll,hh+1],rliq=Rdiffsrfaq,rgas=Rdiffsrfgas,
+                                                knh3=KNH3,ratm=self.R_atm[hh+1],qrunoff=surfrunoffrate)
+                            NH3surfamount = TANsurfamount*KNH3
+                            ## determining the potential of each flux
+                            emissidx = NH3_vol(nh3_surfcnc=NH3surfamount,ratm=self.R_atm[hh+1])*timestep*3600  ## NH3 volatlization
+                            TANwashoffidx = surf_runoff(N_surfcnc=TANsurfamount,
+                                                        # qrunoff=(self.surfrunoffrate[hh+1]))*timestep*3600 
+                                                        qrunoff=surfrunoffrate)*timestep*3600  ## TAN washoff
+                            TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
                                                             qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
-                        TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=0,
-                                            resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
-                        TANdiffaqdownidx[self.theta[2,hh+1]==0]=0.0
-                        NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=0,
-                                            resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
-                        NH3diffgasdownidx[self.theta[2,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
-                                            resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
-                        NH3diffgasupidx[self.theta[2,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
-                        TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
-                        TANdiffaqupidx[self.theta[2,hh+1]==0]=0.0
-                        TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='nh4')*timestep*3600  ## N uptake
-                        # TANuptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
-                                flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
-                                flux5=NH3diffgasupidx,flux6=TANuptakeidx)
-                        self.TANinfil[ll,hh+1] = subsrfleachingidx
-                        self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
-                        self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
-                        self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
-                        self.ammNuptake[ll-1,hh+1] = uptakeidx
-                        ## update TAN pool: subtracting all losses
-                        self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
-                            self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.TAN_pool[ll,hh+1][self.TAN_pool[ll,hh+1]<0] = 0.0
+                            TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                            TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
+                            NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
+                                                resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                            # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            correction_NH3diffgasdown = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
+                                                                        (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
+                            NH3diffgasdownidx = NH3diffgasdownidx*correction_NH3diffgasdown
+                            TANuptakeidx = False  ## N uptake
+                            nh3volidx,srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffgasdownidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
+                                    flux1=emissidx,flux2=TANwashoffidx,flux3=TANinfilidx,flux4=TANdiffaqdownidx,
+                                    flux5=NH3diffgasdownidx,flux6=TANuptakeidx)
+                            self.NH3flux[hh+1] = nh3volidx
+                            self.TANwashoff[hh+1] = srfrunoffidx
+                            self.TANinfil[ll,hh+1] = subsrfleachingidx
+                            self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
+                            ## update TAN pool: subtracting all losses
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH3flux[hh+1]-self.TANwashoff[hh+1]-\
+                                            self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ## get rid of rounding error
+                            self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool",self.TAN_pool[ll,hh+1][0,589])
+                            ########################
+                            ## NO3- sim
+                            ########################
+                            ## NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]
 
-                    ## NO3 scheme
-                    if ll == 0:
-                        ## NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]
+                            ## NO3 concentration
+                            self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                            ## NO3 concentration at the compensation surface
+                            NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq/f_DNO3,
+                                                    qrunoff=surfrunoffrate)
+                            ## determining the potential of each flux
+                            NO3washoffidx = surf_runoff(N_surfcnc=NO3surfamount,
+                                                        qrunoff=surfrunoffrate)*timestep*3600  ## NO3 washoff
+                            NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
+                            NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffaqdownidx = NO3diffaqdownidx*correction_diffaq
+                            NO3diffupidx = False
+                            srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
+                                            flux1=NO3washoffidx,flux2=NO3infilidx,flux3=NO3diffaqdownidx,flux4=NO3diffupidx)
+                            self.NO3washoff[hh+1] = srfrunoffidx
+                            self.NO3infil[ll,hh+1] = subsrfleachingidx
+                            self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
+                            ## update NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3washoff[hh+1]-\
+                                                        self.NO3infil[ll,hh+1]-self.NO3diffusiondown[ll,hh+1]
+                            ## get rid of rounding error
+                            self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
+                            ########################
+                            ## soil water sim
+                            ########################
+                            ## update soil moisture 
+                            update_sw = self.theta[ll,hh+1]*zlayers[0] - self.drainagerate[ll,hh+1]*timestep*3600
+                            ## exclude initial inifltration
+                            update_sw[self.drainagerate[ll,hh+1]==infilrate1] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate1]*zlayers[0]
+                            # self.theta[ll,hh+1] = update_sw/zlayers[0]
+                            self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]-\
+                                                                        evap[[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]]]*timestep*3600/1e6)/zlayers[0]
+                            # self.theta[ll,hh+1][self.theta[ll,hh+1]<0] = 0.01
+                            # self.theta[ll,hh+1] = np.maximum(self.theta[ll,hh+1],0.01)
+                            self.theta[ll,hh+1] = np.maximum(self.soil_moist[llidx,hh+1],self.theta[ll,hh+1])
 
-                        ## NO3 concentration
-                        self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[0,hh+1])
-                        ## NO3 concentration at the compensation surface
-                        NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq/f_DNO3,
-                                                qrunoff=surfrunoffrate)
-                        # NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[ll,hh+1],rliq=Rdiffsrfaq,qrunoff=self.surfrunoffrate[hh+1])
-                        ## determining the potential of each flux
-                        NO3washoffidx = surf_runoff(N_surfcnc=NO3surfamount,
-                                                    qrunoff=surfrunoffrate)*timestep*3600  ## NO3 washoff
-                        NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
-                                                        # qsubrunoff=(self.subrunoffrate[hh+1]))*timestep*3600
-                                                    qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
-                        NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffupidx = False
-                        srfrunoffidx,subsrfleachingidx,diffaqdownidx,diffaqupidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
-                                        flux1=NO3washoffidx,flux2=NO3infilidx,flux3=NO3diffaqdownidx,flux4=NO3diffupidx)
-                        self.NO3washoff[hh+1] = srfrunoffidx
-                        self.NO3infil[ll,hh+1] = subsrfleachingidx
-                        self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
-                        ## update NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3washoff[hh+1]-\
-                                                    self.NO3infil[ll,hh+1]-self.NO3diffusiondown[ll,hh+1]
-                        ## get rid of rounding error
-                        self.NO3_pool[ll,hh+1][self.NO3_pool[ll,hh+1]<0.0] = 0.0
-                    elif ll == 1:
-                        ## NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]+\
-                                                    self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
-                        ## NO3 concentration
-                        self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[1,hh+1])
-                        ## determining the potential of each flux
-                        NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
-                                                    qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
-                        NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
-                                            resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='no3')*timestep*3600  ## N uptake
-                        # NO3uptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
-                                        flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
-                        self.NO3infil[ll,hh+1] = subsrfleachingidx
-                        self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
-                        self.nitNuptake[ll-1,hh+1] = uptakeidx
-                        ## update NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
-                                                    self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.NO3_pool[ll,hh+1][self.NO3_pool[ll,hh+1]<0.0] = 0.0
-                    elif ll == 2:
-                        ## NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+\
-                                                    self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
-                        ## NO3 concentration
-                        self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[2,hh+1])
-                        ## determining the potential of each flux
-                        NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
-                                                    qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
-                        NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=0,
-                                            resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
-                                            resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
-                        NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
-                                        temp=self.soil_temp[llidx,hh+1],uptake='no3')*timestep*3600  ## N uptake
-                        # NO3uptakeidx[harvestidx<(hh+1)] = 0.0
-                        subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
-                                        flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
-                        self.NO3infil[ll,hh+1] = subsrfleachingidx
-                        self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
-                        self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
-                        self.nitNuptake[ll-1,hh+1] = uptakeidx
-                        ## update NO3 pool
-                        self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
-                                                    self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
-                        ## get rid of rounding error
-                        self.NO3_pool[ll,hh+1][self.NO3_pool[ll,hh+1]<0.0] = 0.0
-            self.daily_output(dd)
-            self.daily_init(manure=True)            
+
+                        elif ll == 1:
+                            ########################
+                            ## TAN sim
+                            ########################
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 1",self.TAN_pool[ll,hh+1][0,597])
+                            ## TAN pool
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod+\
+                                                    self.TANinfil[ll-1,hh+1]+self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
+                            
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 2 (hh)",self.TAN_pool[ll,hh][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff aq up",self.TANdiffusionup[ll,hh][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff gas up",self.NH3diffusionup[ll,hh][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"org N decomp",self.orgN_decomp[ll,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"TAN infil", self.TANinfil[ll-1,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff aq down", self.TANdiffusiondown[ll-1,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff gas up", self.NH3diffusiondown[ll-1,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 2",self.TAN_pool[ll,hh+1][0,597])
+
+                            ## fraction of aqueous NH4
+                            fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                            temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
+                            self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
+                                                        theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                                        pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
+                            ## subtracting chemical transformation
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 3",self.TAN_pool[ll,hh+1][0,597])
+                            ## TAN and NH3 concentration
+                            KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
+                            self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                        theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
+                                                        knh3=KNH3,kd=Kd)
+                            self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
+                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
+                            TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=self.TAN_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                            TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
+                            NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=self.NH3_gas[ll+1,hh],
+                                                resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                            # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            correction_diffgas = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
+                                                                        (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
+                            NH3diffgasdownidx = NH3diffgasdownidx*correction_diffgas
+                            NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
+                                                resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
+                            # NH3diffgasupidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+
+                            TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='nh4',
+                                            crop_stageidx=np.maximum(spring_crop_stage,winter_crop_stage))*timestep*3600  ## N uptake
+                            # print("dd",dd,"hh+1",hh+1,"uptake idx 2",TANuptakeidx[0,597])
+                            # TANuptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
+                                    flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
+                                    flux5=NH3diffgasupidx,flux6=TANuptakeidx)
+                            self.TANinfil[ll,hh+1] = subsrfleachingidx
+                            self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
+                            self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
+                            self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
+                            self.ammNuptake[ll-1,hh+1] = uptakeidx
+                            # print("dd",dd,"hh+1",hh+1,"uptake 1",self.ammNuptake[ll-1,hh+1][0,597])
+                            ## update TAN pool: subtracting all losses
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
+                                self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 4",self.TAN_pool[ll,hh+1][0,597])
+                            ## get rid of rounding error
+                            self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 5",self.TAN_pool[ll,hh+1][0,597])
+                            ########################
+                            ## NO3- sim
+                            ########################
+                            ## NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+self.NO3diffusionup[ll,hh]+\
+                                                        self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
+                            ## NO3 concentration
+                            self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
+                            NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=self.NO3_amount[ll+1,hh],
+                                                resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffaqdownidx = NO3diffaqdownidx * correction_diffaq
+                            NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffupidx = NO3diffupidx * correction_diffaq
+                            NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='no3',
+                                            crop_stageidx=np.maximum(spring_crop_stage,winter_crop_stage))*timestep*3600  ## N uptake
+                            # NO3uptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
+                                            flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
+                            self.NO3infil[ll,hh+1] = subsrfleachingidx
+                            self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
+                            self.nitNuptake[ll-1,hh+1] = uptakeidx
+                            ## update NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
+                                                        self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
+                            ########################
+                            ## soil water sim
+                            ########################
+                            ## soil water uptaken by crops; soil volumetric water content change, m3/m3
+                            self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
+                            ## water uptake only takes place between plant date plus seedling periods and harvest date
+                            # self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
+                            # self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
+                            self.wateruptake[ll-1,hh+1][np.maximum(spring_crop_stage,winter_crop_stage)==0] = 0.0
+                            # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
+                            self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
+                            ## update soil moisture 
+                            update_sw = self.theta[ll,hh+1]*zlayers[1] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600
+                            update_sw[self.drainagerate[ll,hh+1]==infilrate2] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate2]*zlayers[1]
+                            self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[1]
+                            # print("dd",dd,"hh+1",hh+1,"theta 2: ",self.theta[ll,hh+1][0,589])
+
+                        elif ll == 2:
+                            ########################
+                            ## TAN sim
+                            ########################
+                            ## TAN pool
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+TANprod+self.TANinfil[ll-1,hh+1]+\
+                                                        self.TANdiffusiondown[ll-1,hh+1]+self.NH3diffusiondown[ll-1,hh+1]
+                            
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 2 (hh)",self.TAN_pool[ll,hh][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff aq up",self.TANdiffusionup[ll,hh][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff gas up",self.NH3diffusionup[ll,hh][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"org N decomp",self.orgN_decomp[ll,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"TAN infil", self.TANinfil[ll-1,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff aq down", self.TANdiffusiondown[ll-1,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"diff gas up", self.NH3diffusiondown[ll-1,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 2",self.TAN_pool[ll,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"theta",self.theta[ll,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"sm",self.soil_moist[llidx,hh+1][0,597])
+                            ## fraction of aqueous NH4
+                            fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                            temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
+                            # print("dd",dd,"hh+1",hh+1,"theta",self.theta[ll,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"theta_sat",self.soil_satmoist[llidx,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"temp",self.soil_temp[llidx,hh+1][0,597])
+                            # print("dd",dd,"hh+1",hh+1,"ccH",sim_ccH[0,597])
+                            # print("dd",dd,"hh+1",hh+1,"kd",Kd[0,597])
+                            self.NH4nitrif[ll,hh+1] = TAN_nitrif(tan_pool=self.TAN_pool[ll,hh+1],temp=self.soil_temp[llidx,hh+1],
+                                                        theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
+                                                        pH=sim_pH,fert_type='mineral',frac_nh4=fNH4)*timestep*3600
+                            ## subtracting chemical transformation
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.NH4nitrif[ll,hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"TAN pool 3",self.TAN_pool[ll,hh+1][0,597])
+                            ## TAN and NH3 concentration
+                            KNH3 = NH3_par_coeff(temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH)
+                            self.TAN_amount[ll,hh+1] = TAN_concentration(mtan=self.TAN_pool[ll,hh+1],zlayer=zlayers[ll],
+                                                        theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1],
+                                                        knh3=KNH3,kd=Kd)
+                            self.NH3_gas[ll,hh+1] = NH3_concentration(tan_cnc=self.TAN_amount[ll,hh+1],knh3=KNH3,
+                                                    theta_sat=self.soil_satmoist[llidx,hh+1],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            TANinfilidx = subsurf_leaching(N_cnc=self.TAN_amount[ll,hh+1],
+                                                                qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## TAN infiltration/leaching
+                            TANdiffaqdownidx = N_diffusion(cnc1=self.TAN_amount[ll,hh+1],cnc2=0,
+                                                resist=self.Rdiffaq[ll,hh+1])*timestep*3600  ## TAN aqueous downwards diffusion
+                            # TANdiffaqdownidx[self.theta[llidx,hh+1]==0]=0.0
+                            correction_diffaq = np.nan_to_num(self.theta[llidx,hh+1]/self.theta[llidx,hh+1],posinf=0.0,neginf=0.0)
+                            TANdiffaqdownidx = TANdiffaqdownidx * correction_diffaq
+                            NH3diffgasdownidx = N_diffusion(cnc1=self.NH3_gas[ll,hh+1],cnc2=0,
+                                                resist=self.Rdiffgas[ll,hh+1])*timestep*3600  ## NH3 gaseous downwards diffusion
+                            # NH3diffgasdownidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            correction_diffgas = np.nan_to_num((self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1])/\
+                                                                        (self.soil_satmoist[llidx,hh+1]-self.theta[llidx,hh+1]),posinf=0.0,neginf=0.0)
+                            NH3diffgasdownidx = NH3diffgasdownidx*correction_diffgas
+                            NH3diffgasupidx = N_diffusion(cnc1=self.NH3_gas[ll,hh],cnc2=self.NH3_gas[ll-1,hh+1],
+                                                resist=self.Rdiffgas[ll-1,hh+1])*timestep*3600  ## NH3 gaseous upwards diffusion
+                            # NH3diffgasupidx[self.theta[llidx,hh+1]==self.soil_satmoist[llidx,hh+1]]=0.0
+                            NH3diffgasupidx = NH3diffgasupidx * correction_diffgas
+                            TANdiffaqupidx = N_diffusion(cnc1=self.TAN_amount[ll,hh],cnc2=self.TAN_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1])*timestep*3600  ## TAN aqueous diffusion
+                            # TANdiffaqupidx[self.soil_moist[llidx,hh+1]==0]=0.0
+                            TANdiffaqupidx = TANdiffaqupidx * correction_diffaq
+                            TANuptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='nh4',
+                                            crop_stageidx=np.maximum(spring_crop_stage,winter_crop_stage))*timestep*3600  ## N uptake
+                            # print("dd",dd,"hh+1",hh+1,"crop stage",spring_crop_stage[0,597],winter_crop_stage[0,597])
+                            # print("dd",dd,"hh+1",hh+1,"fnh4",fNH4[0,597])
+                            # print("dd",dd,"hh+1",hh+1,"uptake idx 2",TANuptakeidx[0,597])
+                            # TANuptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffgasdownidx,diffaqupidx,diffgasupidx,uptakeidx = TAN_pathways(mN=self.TAN_pool[ll,hh+1],
+                                    flux1=TANinfilidx,flux2=TANdiffaqdownidx,flux3=NH3diffgasdownidx,flux4=TANdiffaqupidx,
+                                    flux5=NH3diffgasupidx,flux6=TANuptakeidx)
+                            self.TANinfil[ll,hh+1] = subsrfleachingidx
+                            self.TANdiffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NH3diffusiondown[ll,hh+1] = diffgasdownidx
+                            self.TANdiffusionup[ll-1,hh+1] = diffaqupidx
+                            self.NH3diffusionup[ll-1,hh+1] = diffgasupidx
+                            self.ammNuptake[ll-1,hh+1] = uptakeidx
+                            # print("dd",dd,"hh+1",hh+1,"uptake 2",self.ammNuptake[ll-1,hh+1][0,597])
+                            ## update TAN pool: subtracting all losses
+                            self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh+1]-self.TANdiffusionup[ll-1,hh+1]-self.NH3diffusionup[ll-1,hh+1]-\
+                                self.TANinfil[ll,hh+1]-self.TANdiffusiondown[ll,hh+1]-self.NH3diffusiondown[ll,hh+1]-self.ammNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.TAN_pool[ll,hh+1] = np.maximum(self.TAN_pool[ll,hh+1],0.0)
+                            ########################
+                            ## NO3 sim
+                            ########################
+                            ## NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh]+self.NH4nitrif[ll,hh+1]+\
+                                                        self.NO3diffusiondown[ll-1,hh+1]+self.NO3infil[ll-1,hh+1]
+                            ## NO3 concentration
+                            self.NO3_amount[ll,hh+1] = N_concentration(mN=self.NO3_pool[ll,hh+1],zlayer=zlayers[ll],theta=self.theta[ll,hh+1])
+                            ## determining the potential of each flux
+                            NO3infilidx = subsurf_leaching(N_cnc=self.NO3_amount[ll,hh+1],
+                                                        qsubrunoff=self.drainagerate[ll,hh+1])*timestep*3600  ## NO3 leaching
+                            NO3diffaqdownidx = N_diffusion(cnc1=self.NO3_amount[ll,hh+1],cnc2=0,
+                                                resist=self.Rdiffaq[ll,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffaqdownidx = NO3diffaqdownidx * correction_diffaq
+                            NO3diffupidx = N_diffusion(cnc1=self.NO3_amount[ll,hh],cnc2=self.NO3_amount[ll-1,hh+1],
+                                                resist=self.Rdiffaq[ll-1,hh+1]/f_DNO3)*timestep*3600  ## NO3 aqueous diffusion
+                            NO3diffupidx = NO3diffupidx * correction_diffaq
+                            NO3uptakeidx = plant_N_uptake(mNH4=self.TAN_pool[ll,hh+1]*fNH4,mNO3=self.NO3_pool[ll,hh],
+                                            temp=self.soil_temp[llidx,hh+1],uptake='no3',
+                                            crop_stageidx=np.maximum(spring_crop_stage,winter_crop_stage))*timestep*3600  ## N uptake
+                            # NO3uptakeidx[harvestidx<(hh+1)] = 0.0
+                            subsrfleachingidx,diffaqdownidx,diffaqupidx,uptakeidx = N_pathways(mN=self.NO3_pool[ll,hh+1],
+                                            flux1=NO3infilidx,flux2=NO3diffaqdownidx,flux3=NO3diffupidx,flux4=NO3uptakeidx)
+                            self.NO3infil[ll,hh+1] = subsrfleachingidx
+                            self.NO3diffusiondown[ll,hh+1] = diffaqdownidx
+                            self.NO3diffusionup[ll-1,hh+1] = diffaqupidx
+                            self.nitNuptake[ll-1,hh+1] = uptakeidx
+                            ## update NO3 pool
+                            self.NO3_pool[ll,hh+1] = self.NO3_pool[ll,hh+1]-self.NO3infil[ll,hh+1]-self.NO3diffusionup[ll-1,hh+1]-\
+                                                        self.NO3diffusiondown[ll,hh+1]-self.nitNuptake[ll-1,hh+1]
+                            ## get rid of rounding error
+                            self.NO3_pool[ll,hh+1] = np.maximum(self.NO3_pool[ll,hh+1],0.0)
+                            ########################
+                            ## soil water sim
+                            ########################
+                            ## soil water uptaken by crops; soil volumetric water content change, m3/m3
+                            self.wateruptake[ll-1,hh+1] = crop_water_uptake(theta=self.theta[ll,hh+1],theta_WP=theta_wp)*timestep*3600
+                            ## water uptake only takes place between plant date plus seedling periods and harvest date
+                            # self.wateruptake[ll-1,hh+1][dd<=plantidx+day_germinate] = 0.0
+                            # self.wateruptake[ll-1,hh+1][dd>=harvestidx] = 0.0
+                            self.wateruptake[ll-1,hh+1][np.maximum(spring_crop_stage,winter_crop_stage)==0] = 0.0
+                            self.theta[ll,hh+1] = self.theta[ll,hh+1] - self.wateruptake[ll-1,hh+1]
+                            ## update soil moisture 
+                            update_sw = self.theta[ll,hh+1]*zlayers[2] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600 
+                            update_sw[self.drainagerate[ll,hh+1]==infilrate3] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate3]*zlayers[2]
+                            self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[2]
+                self.daily_output(dd,fert="manure")
+                self.daily_init(manure=True)                 
         return
 
     ## main sim function for grazing
@@ -2145,8 +2257,8 @@ class LAND_module:
         print('current simulation is for: '+str(livestock_name)+" grazing")
         soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
-        soilsandds = open_ds(infile_path+soil_data_path+soilsandfile)
-        soilsand = soilsandds.T_SAND.values
+        # soilsandds = open_ds(infile_path+soil_data_path+soilsandfile)
+        # soilsand = soilsandds.T_SAND.values
         soilsiltds = open_ds(infile_path+soil_data_path+soilsiltfile)
         soilsilt = soilsiltds.T_SILT.values
         soilocds = open_ds(infile_path+soil_data_path+soilorgCfile)
@@ -2160,7 +2272,7 @@ class LAND_module:
         Kd_manure = 1.0
         Ks_sat = soil_hydraulic_conductivity(fsilt=soilsilt,fclay=soilclay,fsom=soiloc,BD=soilbd)[self.plat1:self.plat2,:]
         theta_FC = soil_field_capacity(BD=soilbd)[self.plat1:self.plat2,:]
-        theta_wp = soil_wilting_point(fsand=soilsand,fclay=soilclay)[self.plat1:self.plat2,:]
+        # theta_wp = soil_wilting_point(fsand=soilsand,fclay=soilclay)[self.plat1:self.plat2,:]
 
         animal_file_name = CONFIG_animal_file_dict[livestock_name]
         livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
@@ -2606,17 +2718,24 @@ class LAND_module:
         output = sim_result[:dim1]+sim_result[dim1:]
         return output
 
-    def para_out(self,chem_fert_type,output_stat=False,quality_check=False):
+    def para_out(self,chem_fert_type,manure_type=None,output_stat=False,quality_check=False):
 
-        if chem_fert_type == 'ammonium':
-            sim_area = self.ammN_area
-            chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
-        elif chem_fert_type == 'urea':
-            sim_area = self.ureaN_area
-            chemfert_Ntotal = self.land_sim_reshape(self.urea_added)*sim_area
-        elif chem_fert_type == 'nitrate':
-            sim_area = self.nitN_area
-            chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area   
+        if manure_type is None:
+            if chem_fert_type == 'ammonium':
+                sim_area = self.ammN_area
+                chemfert_Ntotal = self.land_sim_reshape(self.TAN_added)*sim_area
+            elif chem_fert_type == 'urea':
+                sim_area = self.ureaN_area
+                chemfert_Ntotal = self.land_sim_reshape(self.urea_added)*sim_area
+            elif chem_fert_type == 'nitrate':
+                sim_area = self.nitN_area
+                chemfert_Ntotal = self.land_sim_reshape(self.NO3_added)*sim_area
+            else:
+                print("Not chem fert sim")
+        else:
+            sim_area = self.manureapparea 
+            manurefert_Ntotal = self.land_sim_reshape(self.TAN_added+self.UA_added+self.avail_N_added+\
+                                                    self.resist_N_added+self.unavail_N_added)*sim_area
 
         self.o_NH3flux = self.o_NH3flux*sim_area
         self.o_washoff = self.o_washoff*sim_area
@@ -2631,7 +2750,10 @@ class LAND_module:
         self.o_NO3diff = self.o_NO3diff*sim_area
 
         if output_stat is True:
-            print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal))+' Gg')
+            if manure_type is None:
+                print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal))+' Gg')
+            else:
+                print('Total N applied: '+str(sum_totalGg(manurefert_Ntotal))+' Gg')
             print('NH3 emission: '+str(sum_totalGg(self.o_NH3flux))+' Gg')
             print('TAN washoff: '+str(sum_totalGg(self.o_washoff))+' Gg')
             print('NH4 nitrification: '+str(sum_totalGg(self.o_nitrif))+' Gg')
@@ -2644,32 +2766,66 @@ class LAND_module:
             print('NO3 leaching: '+ str(sum_totalGg(self.o_NO3leaching))+' Gg')
             print('NO3 diffusion to deeper soil: '+ str(sum_totalGg(self.o_NO3diff))+' Gg')
 
-        TANleft = (self.TAN_pool[0,-1]+self.TAN_pool[1,-1]+self.TAN_pool[2,-1])*sim_area
-        urealeft = (self.urea_pool[0,-1]+self.urea_pool[1,-1]+self.urea_pool[2,-1])*sim_area
+        # TANleft = (self.TAN_pool[0,-1]+self.TAN_pool[1,-1]+self.TAN_pool[2,-1])*sim_area
+        # urealeft = (self.urea_pool[0,-1]+self.urea_pool[1,-1]+self.urea_pool[2,-1])*sim_area
 
         if quality_check is True:
-            check = np.nansum(chemfert_Ntotal-self.o_NH3flux-self.o_washoff-self.o_nitrif-self.o_NH4leaching-\
-                    self.o_diffaq-self.o_diffgas-self.o_ammNuptake,axis=0)
-            result = np.round(sum_totalGg(check)/sum_totalGg(chemfert_Ntotal)*100,decimals=3)
+            if manure_type is None:
+                check = np.nansum(chemfert_Ntotal-self.o_NH3flux-self.o_washoff-self.o_nitrif-self.o_NH4leaching-\
+                        self.o_diffaq-self.o_diffgas-self.o_ammNuptake,axis=0)
+                result = np.round(sum_totalGg(check)/sum_totalGg(chemfert_Ntotal)*100,decimals=3)
+            else:
+                TAN_soil = np.nansum(self.TAN_pool[:,-1],axis=0)*sim_area
+                UA_soil = self.UA_pool[-1]*sim_area
+                availN_soil = self.avail_N_pool[-1]*sim_area
+                resistN_soil = self.resist_N_pool[-1]*sim_area
+                unavailN_soil = self.unavail_N_pool[-1]*sim_area
+                print('TAN in soil: '+ str(sum_totalGg(TAN_soil))+' Gg')
+                print('UA in soil: '+ str(sum_totalGg(UA_soil))+' Gg')
+                print('Avail N in soil: '+ str(sum_totalGg(availN_soil))+' Gg')
+                print('Resist N in soil: '+ str(sum_totalGg(resistN_soil))+' Gg')
+                print('Unavail in soil: '+ str(sum_totalGg(unavailN_soil))+' Gg')
+                check = np.nansum(manurefert_Ntotal-self.o_NH3flux-self.o_washoff-self.o_nitrif-self.o_NH4leaching-\
+                        self.o_diffaq-self.o_diffgas-self.o_ammNuptake,axis=0)-TAN_soil-UA_soil-availN_soil-resistN_soil-unavailN_soil
+                result = np.round(sum_totalGg(check)/sum_totalGg(manurefert_Ntotal)*100,decimals=3)
             print("Integrity check result: "+str(result)+' %')
             # result2 = np.nansum(check,axis=0)/np.nansum(chemfert_Ntotal,axis=0)
             # print("max diff:",np.where(result2==np.nanmax(result2)),np.nanmax(result2))      
             # print("min diff:",np.where(result2==np.nanmin(result2)),np.nanmin(result2))     
     
-    def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,
-                sim_type='base',senstest_var=False,senstest=False,output_stat=False,quality_check=False):
-        self.chem_fert_input(crop=crop_item)
-        self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
-                        sim=sim_type,stvar=senstest_var,st=senstest)
-        self.para_out(chem_fert_type,output_stat,quality_check)
-        return
+    # def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,
+    #             sim_type='base',senstest_var=False,senstest=False,output_stat=False,quality_check=False):
+    #     self.chem_fert_input(crop=crop_item)
+    #     self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
+    #                     sim=sim_type,stvar=senstest_var,st=senstest)
+    #     self.para_out(chem_fert_type,None,output_stat,quality_check)
+    #     return
 
-    def manure_sim_main(self,fert_method,manure_type,livestock_name,production_system,mms_cat,phase,start_day_idx,end_day_idx,
-                        crop_item=None,sim_type='base',senstest_var=False,senstest=False,
-                        output_stat=False,quality_check=False):
-            # manure_fert_input(self,livestock_name,production_system,mms_cat,phase,crop=None):
-        self.manure_fert_input(livestock_name,production_system,mms_cat,phase)
-        self.land_manure_sim(start_day_idx,end_day_idx,manure_type,tech=fert_method,
-                        sim=sim_type,stvar=senstest_var,st=senstest)
-        # self.para_out(chem_fert_type,output_stat,quality_check)
-        return
+    def main(self,fert_method,crop_item,chem_fert_type,start_day_idx,end_day_idx,
+                manure=None,livestock_name=None,production_system=None,mms_cat=None,phase=None,
+                sim_type='base',senstest_var=False,senstest=False,output_stat=False,quality_check=False):
+        ##################
+        ## chem fert sim
+        ##################
+        if manure is None:
+            self.chem_fert_input(crop=crop_item)
+            self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
+                            sim=sim_type,stvar=senstest_var,st=senstest)
+            self.para_out(chem_fert_type,None,output_stat,quality_check)
+        else:
+             #         # manure_fert_input(self,livestock_name,production_system,mms_cat,phase,crop=None):
+            self.manure_fert_input(livestock_name,production_system,mms_cat,phase)
+            self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,manure_fert=True,manure_type=manure,
+                    crop=None,sim=sim_type,stvar=senstest_var,st=senstest)
+            self.para_out("none",manure,output_stat,quality_check)
+
+
+    # def manure_sim_main(self,fert_method,manure_type,livestock_name,production_system,mms_cat,phase,start_day_idx,end_day_idx,
+    #                     crop_item=None,sim_type='base',senstest_var=False,senstest=False,
+    #                     output_stat=False,quality_check=False):
+    #         # manure_fert_input(self,livestock_name,production_system,mms_cat,phase,crop=None):
+    #     self.manure_fert_input(livestock_name,production_system,mms_cat,phase)
+    #     self.land_manure_sim(start_day_idx,end_day_idx,manure_type,tech=fert_method,
+    #                     sim=sim_type,stvar=senstest_var,st=senstest)
+    #     # self.para_out(chem_fert_type,output_stat,quality_check)
+    #     return
