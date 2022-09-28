@@ -38,10 +38,6 @@ CONFIG_dlon = 0.5
 CONFIG_lats = int(180.0/CONFIG_dlat)
 CONFIG_lons = int(360.0/CONFIG_dlon)
 
-## levels: this refers to how many types of practices
-## currently two: housing and MMS (manure management system)
-levels = 2
-
 ## array dimensions;
 CONFIG_mtrx = (CONFIG_time,CONFIG_lats,CONFIG_lons)
 CONFIG_mtrx2 = (CONFIG_time*2,CONFIG_lats,CONFIG_lons)
@@ -105,15 +101,3 @@ CONFIG_MMS_file_dict = {
         'SHEEP':'sheepmms_faogleam.nc',
         'POULTRY':'chickenmms_faogleam.nc'
         }
-# MMS_file_name ='ind_MMS.nc'                           ## input files should be put in AMCLIM/INPUT/
-# MMS_file_name = MMS_file_dict[livestock]
-
-# CONFIG_MMS_type_dict = {
-#         'PIG':['ind','med','bck'],
-#         'BEEF_CATTLE':['grassland','mixed',None],
-#         'DAIRY_CATTLE':['grassland','mixed',None],
-#         'OTHER_CATTLE':['grassland','mixed',None],
-#         'SHEEP':['grassland','mixed',None],
-#         'POULTRY':['broiler','layer','backyard']
-        # }
-# MMS_type = MMS_type_dict[livestock][lvl_idx]

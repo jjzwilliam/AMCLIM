@@ -835,7 +835,7 @@ def min_manurewc(temp,rhum):
 ## unit in kg N per head per year; returning daily values
 def livestock_waste_info(livestock_type, waste_N):
     ## daily N excretion from urine and feces
-    dN = 1000*waste_N/(365*24)
+    dN = 1000*waste_N/(365*(24/timestep))
     N_durine = dN * frac_N[livestock_type]['urine_N']
     N_durea = N_durine * frac_urea[livestock_type]
     N_ddung = dN * frac_N[livestock_type]['dung_N']
@@ -902,7 +902,9 @@ f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3
 ## N concentration in urine and dung; g N per L urine,  g N per kg SM
 ## for poultry, "urine N" (1st value) represents the UA concentration of excretion water (moisture)
 ## for poultry, "dung N" (2nd value) represents the orgN concentration of excretion
-c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
+# c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
+#        [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
+c_N = [[6.90, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
        [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
 ## fraction of dry matter in solid manure; g DM per kg SM
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
@@ -1015,6 +1017,11 @@ absorb_factor = 3.0
 f_avail = 0.5
 f_resist = 0.45
 f_unavail = 0.05
+
+## temperature threshold for ruminants grazing, i.e., when Tmin>10, grazing
+grazing_tempthreshold = 10.0
+## fraction of ruminants manure N excreted while grazing; ref: FANv2
+f_grz = 0.65
 
 # ###################################
 # ## housing parameters

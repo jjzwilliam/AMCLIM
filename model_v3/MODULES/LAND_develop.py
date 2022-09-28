@@ -1,13 +1,3 @@
-from ast import Pass
-from cgi import test
-from cmath import phase, tan
-from logging import raiseExceptions
-from os import times
-from re import sub
-from time import time
-from turtle import st
-from wsgiref.simple_server import demo_app
-
 from pandas import array
 from INPUT.input import *
 from CONFIG.config import *
@@ -236,6 +226,8 @@ class LAND_module:
         self.surfrunoffrate = np.zeros(array_shape)
         ## subsurface runoff rate (m/s)
         self.subrunoffrate = np.zeros(array_shape)
+        ## relative humidity (%)
+        self.rhum = np.zeros(array_shape)
         ## soil pH
         self.soil_pH = np.zeros((Days,) + field_shape)
         self.soil_ccH = np.zeros((Days,) + field_shape)
@@ -408,7 +400,9 @@ class LAND_module:
             ## soil moisture; m3/m3
             self.soil_moist[0,1:] = soilmoist_filelvl1.swvl1[dayidx,self.plat1:self.plat2,:]
             self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[dayidx,self.plat1:self.plat2,:]
-             ## evaporation from bare soil; m to g/m2/s
+            ## relative humidity
+            self.rhum[1:] = rhum_file.Relative_Humidity_2m_06h[dayidx,self.plat1:self.plat2,:]
+            ## evaporation from bare soil; m to g/m2/s
             self.evap[1:] = evap_file.evabs[dayidx,self.plat1:self.plat2,:]*(-1e6)/(24*3600)
             ## rainfall; kg/m2 to g/m2/s
             self.rainfall[1:] = rain_file.tcrw[dayidx,self.plat1:self.plat2,:]*1e3/(24*3600)
@@ -430,6 +424,8 @@ class LAND_module:
             self.soil_moist[1,1:] = soilmoist_filelvl2.swvl2[hhidx:hhidx+24,self.plat1:self.plat2,:]
             self.soil_moist = np.maximum(self.soil_moist,0.0)
 
+            ## relative humidity 
+            self.rhum[1:] = rhum_file.rhum2m[hhidx:hhidx+24,self.plat1:self.plat2,:]
             ## evaporation from bare soil; m to g/m2/s
             self.evap[1:] = evap_file.evabs[hhidx:hhidx+24,self.plat1:self.plat2,:]*(-1e6)/(timestep*3600)
             ## rainfall; kg/m2 to g/m2/s
@@ -553,6 +549,14 @@ class LAND_module:
         print("Total N: ",np.nansum(totalN[self.plat1:self.plat2,:]/1e9))
         ## N application rate is interpolated;
         rateN = fertds.Nrate.sel(year=sim_year).values*1e3/1e4
+
+        ################################
+        ## remove negative rates/totals  
+        ## (negative values should be removed in preprocessing, just in case)        
+        ################################
+        rateN = np.maximum(rateN,0)
+        totalN = np.maximum(totalN,0)
+
         croparea = fertds.croparea.values*1e4
         croparea[totalN!=0] = totalN[totalN!=0]/rateN[totalN!=0]
         croparea = np.nan_to_num(croparea)
@@ -596,6 +600,94 @@ class LAND_module:
         print("urea N:",np.nansum(np.nansum(self.urea_added,axis=0)*self.ureaN_area)/1e9)
         ## met data interpolation
         self.met_input_interp(totalN[self.plat1:self.plat2,:])
+        return
+
+    def pp_chem_fert_input(self,crop,yearofsim,ncfile_o=False):
+        ## read N application rates dataset for crops
+        fertds = open_ds(infile_path+crop_data_path+crop+cropfileformat)
+
+        totalN = fertds.TotalN.sel(year=yearofsim).values*1e3
+        print("Total N: ",np.nansum(totalN/1e9)," GgN")
+        ## N application rate is interpolated;
+        rateN = fertds.Nrate.sel(year=yearofsim).values*1e3/1e4
+
+        ################################
+        ## remove negative rates/totals  
+        ## (negative values should be removed in preprocessing, just in case)        
+        ################################
+        rateN = np.maximum(rateN,0)
+        totalN = np.maximum(totalN,0)
+        
+        croparea = fertds.croparea.values*1e4
+        croparea[totalN!=0] = totalN[totalN!=0]/rateN[totalN!=0]
+        croparea = np.nan_to_num(croparea)
+        ## at least, there will be two applications
+        ## 1st: at the start of planting, 2nd: between planting and harvesting
+        
+        fnitN, fammN, fureaN, nitmean, ammmean, ureamean = self.chem_fert_type()
+        ## when there is no country-level information for fertilizer type, use global mean value
+        fnitN[(np.isnan(fnitN))&(totalN!=0)] = nitmean
+        fammN[(np.isnan(fammN))&(totalN!=0)] = ammmean
+        fureaN[(np.isnan(fureaN))&(totalN!=0)] = ureamean
+        ## N rate of three types of fertilizer;
+        ## the fraction of usage is represented by the 
+        ## fractional cropping area that uses the corresponding N fertilizer
+        self.nitN_area = fnitN * croparea
+        self.ammN_area = fammN* croparea
+        self.ureaN_area = fureaN  * croparea
+
+        nitN = np.nansum(rateN*self.nitN_area)
+        ammN = np.nansum(rateN*self.ammN_area)
+        ureaN = np.nansum(rateN*self.ureaN_area)
+        diffN = (np.nansum(totalN) - nitN - ammN - ureaN)
+
+        print("check diff: ",(diffN), "gN")
+
+        # print("NO3 N:",np.nansum(rateN*self.nitN_area)/1e9)
+        # print("TAN N:",np.nansum(rateN*self.ammN_area)/1e9)
+        # print("urea N:",np.nansum(rateN*self.ureaN_area)/1e9)
+
+        ## output crop fert info
+        if ncfile_o is True:
+            ## define output dims
+            nlat = int(180.0/CONFIG_dlat)
+            nlon = int(360.0/CONFIG_dlon)
+            lats = 90 - 0.5*np.arange(nlat)
+            lons = -180 + 0.5*np.arange(nlon)
+
+            outds = xr.Dataset(
+                data_vars=dict(
+                    Nrate=(['lat','lon'],rateN),
+                    ammN_area=(['lat','lon'],self.ammN_area),
+                    ureaN_area=(['lat','lon'],self.ureaN_area),
+                    nitN_area=(['lat','lon'],self.nitN_area),
+                            ),
+                coords = dict(
+                    lon=(["lon"], lons),
+                    lat=(["lat"], lats),
+                            ),
+                attrs=dict(
+                    description="AMCLIM-Land_chem_fert:"+\
+                        " N application rates and corresponding areas of three types of fertilizer in " +\
+                            str(yearofsim),
+                    info ="Ammonium, urea, nitrate fertilizing area (m^2) for: "+str(crop),
+                ),
+            )
+
+            outds.Nrate.attrs["unit"] = 'gN/m^2'
+            outds.Nrate.attrs["long name"] = 'N application rate'
+            outds.ammN_area["unit"] = 'm^2'
+            outds.ammN_area["long name"] = 'Ammonium fertilizer area'
+            outds.ureaN_area["unit"] = 'm^2'
+            outds.ureaN_area["long_name"] = 'Urea fertilizer area'
+            outds.nitN_area["unit"] = 'm^2'
+            outds.nitN_area["long name"] = 'Nitrate fertilizer area'
+
+            comp = dict(zlib=True, complevel=9)
+            encoding = {var: comp for var in outds.data_vars}
+
+            outds.to_netcdf(output_path+'chemfertinfo.'+str(crop)+'.'+str(yearofsim)+'.nc',encoding=encoding)
+            print("ncfile saved.")
         return
 
     def manure_fert_input(self,livestock_name,production_system,mms_cat,phase,crop=None):
@@ -805,6 +897,22 @@ class LAND_module:
         elif tech == "injection":
             sourcelayer = 2
         return sourcelayer
+
+    ## determining seasonal grazing for ruminants: beef cattle, dairy cattle, sheep etc.
+    ## note that production system should be [mixed]
+    def grazing_indicator(self,dayidx):
+        grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
+        if CONFIG_machine == "STREAM":
+            temp_data = temp_file.t2m[dayidx] - 273.15
+            tempmin = temp_data
+        else:
+            hhidx = dayidx*24
+            temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
+            ## minimum temperature of the day
+            tempmin = np.nanmin(temp_data,axis=0)
+        # print(dayidx,np.nanmax(tempmin[self.plat1:self.plat2,:]),np.where(tempmin[self.plat1:self.plat2,:]>grazing_tempthreshold))
+        grazing_IDX[tempmin>grazing_tempthreshold] = f_grz
+        return grazing_IDX
     
     ## 
     def daily_init(self,manure=False,grazing=False):
@@ -1333,7 +1441,7 @@ class LAND_module:
                             self.resist_N_pool[hh+1] = self.resist_N_pool[hh]+self.resist_N[hh+1]
                             self.unavail_N_pool[hh+1] = self.unavail_N_pool[hh]+self.unavail_N[hh+1]
                             ## UA hydrolysis rate and org N decomposition rates
-                            ua_conv_factor = ua_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],rhum=50.0,ph=sim_pH,
+                            ua_conv_factor = ua_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],rhum=self.rhum[hh+1],ph=sim_pH,
                                     delta_t=timestep)
                             Na_decomp_rate, Nr_decomp_rate = N_pools_decomp_rate(temp=self.soil_temp[llidx,hh+1],delta_t=timestep)
                             ## UA hydrolysis and org N decomposition contributes to TAN pool at a specific soil layer
@@ -1705,7 +1813,7 @@ class LAND_module:
         return
 
     ## main sim function for grazing
-    def grazing_sim(self,livestock_name,start_day_idx,end_day_idx,span_day=60,sim='base',stvar=False,st=False):
+    def grazing_sim(self,livestock_name,production_system,start_day_idx,end_day_idx,span_day=60,sim='base',stvar=False,st=False):
         print('current simulation is for: '+str(livestock_name)+" grazing")
         soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
         soilclay = soilclayds.T_CLAY.values
@@ -1726,12 +1834,23 @@ class LAND_module:
         theta_FC = soil_field_capacity(BD=soilbd)[self.plat1:self.plat2,:]
         # theta_wp = soil_wilting_point(fsand=soilsand,fclay=soilclay)[self.plat1:self.plat2,:]
 
-        animal_file_name = CONFIG_animal_file_dict[livestock_name]
-        livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
-        ## lvl idx 0 is the [Grassland] production system; see config.py
-        excretN_info = livestockds['Excreted_N'][0][self.plat1:self.plat2,:]
-        print("Total N from grazing "+str(livestock_name)+" is: "+str(np.nansum(excretN_info*1e3/1e9))+" Gg.")
-        animal_head = livestockds['Animal_head'][0][self.plat1:self.plat2,:]
+        if production_system == "mixed":
+            print('seasonal grazing of mixed production system '+str(livestock_name))
+            animal_file_name = CONFIG_animal_file_dict[livestock_name]
+            livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
+            ## lvl idx 1 is the [Mixed] production system; see config.py
+            excretN_info = livestockds['Excreted_N'][1][self.plat1:self.plat2,:]
+            print("Total N from mixed production system "+str(livestock_name)+" is: "+str(np.nansum(excretN_info*1e3/1e9))+" Gg.")
+            animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]
+        else:
+            print('year-round grazing of grassland production system '+str(livestock_name))
+            animal_file_name = CONFIG_animal_file_dict[livestock_name]
+            livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
+            ## lvl idx 0 is the [Grassland] production system; see config.py
+            excretN_info = livestockds['Excreted_N'][0][self.plat1:self.plat2,:]
+            print("Total N from "+str(livestock_name)+" grazing (year-round) is: "+str(np.nansum(excretN_info*1e3/1e9))+" Gg.")
+            animal_head = livestockds['Animal_head'][0][self.plat1:self.plat2,:]
+
         field_area = animal_head * grazing_density[livestock_name]
         # source_area = (1-np.exp(-animal_head*patch_area/field_area))*field_area
         source_area = field_area * (f_urine_patch+f_dung_pat)
@@ -1740,22 +1859,24 @@ class LAND_module:
         excret_N = xr_to_np(excret_N)
         durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 
                         waste_N=excret_N)
-        test_N = (durine_N+dmanure_N)*source_area
-        print("test total N ",np.nansum(test_N)*365*24/1e9)
-        self.urea_added = durea*source_area
-        self.avail_N_added = ((durine_N - durea) + dmanure_N)*f_avail*source_area
-        self.resist_N_added = ((durine_N - durea) + dmanure_N)*f_resist*source_area
-        self.unavail_N_added = ((durine_N - durea) + dmanure_N)*f_unavail*source_area
-        ## input of manure N pool at each timestep, manure N only falls on dung pats
+        # test_N = (durine_N+dmanure_N)*source_area
+        # print("test total N ",np.nansum(test_N)*365*24/1e9)
+        
+        self.urea_added[:] = (24/timestep)*durea
+        self.avail_N_added[:] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_avail
+        self.resist_N_added[:] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_resist
+        self.unavail_N_added[:] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_unavail
+        
+        # input of manure N pool at each timestep, manure N only falls on dung pats
         durine_N = durine_N/((f_urine_patch+f_dung_pat*frac_FYM)/(f_urine_patch+f_dung_pat))
         durea = durea/((f_urine_patch+f_dung_pat*frac_FYM)/(f_urine_patch+f_dung_pat))
         dmanure_N = dmanure_N/(f_dung_pat/(f_urine_patch+f_dung_pat))
         durine = durine/((f_urine_patch+f_dung_pat*frac_FYM)/(f_urine_patch+f_dung_pat))
         dmanure = dmanure/(f_dung_pat/f_urine_patch+f_dung_pat)
         manure_wc = manure_wc/(f_dung_pat/f_urine_patch+f_dung_pat)
-        test_N = durine_N*source_area*(f_urine_patch+frac_FYM*f_dung_pat)/(f_urine_patch+f_dung_pat)+\
-                    dmanure_N*source_area*(f_dung_pat)/(f_urine_patch+f_dung_pat)
-        print("test total N ",np.nansum(test_N)*365*24/1e9)
+        # test_N = durine_N*source_area*(f_urine_patch+frac_FYM*f_dung_pat)/(f_urine_patch+f_dung_pat)+\
+        #             dmanure_N*source_area*(f_dung_pat)/(f_urine_patch+f_dung_pat)
+        # print("test total N ",np.nansum(test_N)*365*24/1e9)
         durine = durine * 1000
         manure_wc = manure_wc * 1000
         ## pH and H+ ions concentration
@@ -1774,21 +1895,53 @@ class LAND_module:
 
                 ## manure and N deposited on the field on the first day of each span loop
                 if dd_span == dd:
-                    self.manure[:] = dmanure
-                    self.urine[:] = durine
-                    self.urea[:] = durea
-                    self.urine_N[:] = durine_N
-                    self.manure_N[:] = dmanure_N
-                    self.manure_water[:] = manure_wc
-
-                    ## mark the day when urine deposited
-                    N_app_mark = np.zeros(soilph.shape)
                     if dd_span < Days:
-                        N_app_mark[dd_span] = 1
+                        app_mark_idx = dd_span
                     else:
-                        N_app_mark[int(dd_span-np.floor(dd_span/Days)*Days)] = 1
-                    self.soil_pH = soil_pH_postapp(base_pH=soilph,app_timing_map=N_app_mark,fert_pH=8.5)[:,self.plat1:self.plat2,:] 
-                    self.soil_ccH = 10**(-self.soil_pH) 
+                        app_mark_idx = int(dd_span-np.floor(dd_span/Days)*Days)
+                    if production_system == "mixed":
+                        ## mark the day when excretion deposited
+                        grazing_idx = self.grazing_indicator(app_mark_idx)[self.plat1:self.plat2,:]
+                        # print(dd_span,app_mark_idx,np.where(grazing_idx>0.0))
+
+                        self.manure[:] = dmanure*grazing_idx
+                        self.urine[:] = durine*grazing_idx
+                        self.urea[:] = durea*grazing_idx
+                        self.urine_N[:] = durine_N*grazing_idx
+                        self.manure_N[:] = dmanure_N*grazing_idx
+                        self.manure_water[:] = manure_wc*grazing_idx
+
+                        self.urea_added[app_mark_idx] = self.urea_added[app_mark_idx]*grazing_idx
+                        self.avail_N_added[app_mark_idx] = self.avail_N_added[app_mark_idx]*grazing_idx
+                        self.resist_N_added[app_mark_idx] = self.resist_N_added[app_mark_idx]*grazing_idx
+                        self.unavail_N_added[app_mark_idx] = self.unavail_N_added[app_mark_idx]*grazing_idx
+
+                        N_app_mark = np.zeros(soilph.shape)
+                        N_app_mark[app_mark_idx][np.nansum(self.urine_N[:])!=0] = 1
+                        self.soil_pH = soil_pH_postapp(base_pH=soilph,app_timing_map=N_app_mark,fert_pH=8.5)[:,self.plat1:self.plat2,:] 
+                        self.soil_ccH = 10**(-self.soil_pH) 
+                        
+                    else:
+                        self.manure[:] = dmanure
+                        self.urine[:] = durine
+                        self.urea[:] = durea
+                        self.urine_N[:] = durine_N
+                        self.manure_N[:] = dmanure_N
+                        self.manure_water[:] = manure_wc
+
+                        # self.urea_added[app_mark_idx] = (24/timestep)*durea*source_area
+                        # self.avail_N_added[app_mark_idx] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_avail
+                        # self.resist_N_added[app_mark_idx] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_resist
+                        # self.unavail_N_added[app_mark_idx] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_unavail
+
+                        ## mark the day when urine deposited
+                        N_app_mark = np.zeros(soilph.shape)
+                        if dd_span < Days:
+                            N_app_mark[dd_span] = 1
+                        else:
+                            N_app_mark[int(dd_span-np.floor(dd_span/Days)*Days)] = 1
+                        self.soil_pH = soil_pH_postapp(base_pH=soilph,app_timing_map=N_app_mark,fert_pH=8.5)[:,self.plat1:self.plat2,:] 
+                        self.soil_ccH = 10**(-self.soil_pH) 
                 else:
                     self.manure[:] = 0.0
                     self.urine[:] = 0.0
@@ -1830,7 +1983,7 @@ class LAND_module:
                     init_water = (self.urine[hh+1]+self.manure_water[hh+1]) - init_infil
                     frac_init_infil = init_infil/(durine+manure_wc)
                     self.Total_water_pool_FYM[hh+1] = self.Total_water_pool_FYM[hh] + init_water + (self.rainfall[hh+1]-evap)*timestep*3600
-                    mois_coeff = min_manurewc(temp=self.soil_temp[0,hh+1],rhum=50)
+                    mois_coeff = min_manurewc(temp=self.soil_temp[0,hh+1],rhum=self.rhum[hh+1])
                     manure_minwc = self.manure_pool_FYM[hh+1] * mois_coeff
                     self.Total_water_pool_FYM[hh+1] = np.maximum(self.Total_water_pool_FYM[hh+1],manure_minwc)
                     ## thichness of the manure layer
@@ -2161,6 +2314,144 @@ class LAND_module:
 
         # print(test_annual_N*source_area[34,388]/1e9)   
         return
+
+    ## main sim function for grazing
+    def grazing_sim_test(self,livestock_name,production_system,start_day_idx,end_day_idx,span_day=60,sim='base',stvar=False,st=False):
+        print('current simulation is for: '+str(livestock_name)+" grazing")
+        soilclayds = open_ds(infile_path+soil_data_path+soilclayfile)
+        soilclay = soilclayds.T_CLAY.values
+        # soilsandds = open_ds(infile_path+soil_data_path+soilsandfile)
+        # soilsand = soilsandds.T_SAND.values
+        soilsiltds = open_ds(infile_path+soil_data_path+soilsiltfile)
+        soilsilt = soilsiltds.T_SILT.values
+        soilocds = open_ds(infile_path+soil_data_path+soilorgCfile)
+        soiloc = soilocds.T_OC.values
+        soilbd_ds = open_ds(infile_path+soil_data_path+soilbdfile)
+        soilbd = soilbd_ds.T_BULK_DEN.values
+        soilpHds = open_ds(infile_path+soil_data_path+soilpHfile)
+        soilph = np.zeros(CONFIG_mtrx2)
+        soilph[:] = soilpHds.T_PH_H2O.values
+        Kd = ammonium_adsorption(clay_content=soilclay)[self.plat1:self.plat2,:]
+        Kd_manure = 1.0
+        Ks_sat = soil_hydraulic_conductivity(fsilt=soilsilt,fclay=soilclay,fsom=soiloc,BD=soilbd)[self.plat1:self.plat2,:]
+        theta_FC = soil_field_capacity(BD=soilbd)[self.plat1:self.plat2,:]
+        # theta_wp = soil_wilting_point(fsand=soilsand,fclay=soilclay)[self.plat1:self.plat2,:]
+
+        if production_system == "mixed":
+            print('seasonal grazing of mixed production system '+str(livestock_name))
+            animal_file_name = CONFIG_animal_file_dict[livestock_name]
+            livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
+            ## lvl idx 1 is the [Mixed] production system; see config.py
+            excretN_info = livestockds['Excreted_N'][1][self.plat1:self.plat2,:]
+            print("Total N from mixed production system "+str(livestock_name)+" is: "+str(np.nansum(excretN_info*1e3/1e9))+" Gg.")
+            animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]
+        else:
+            print('year-round grazing of grassland production system '+str(livestock_name))
+            animal_file_name = CONFIG_animal_file_dict[livestock_name]
+            livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
+            ## lvl idx 0 is the [Grassland] production system; see config.py
+            excretN_info = livestockds['Excreted_N'][0][self.plat1:self.plat2,:]
+            print("Total N from "+str(livestock_name)+" grazing (year-round) is: "+str(np.nansum(excretN_info*1e3/1e9))+" Gg.")
+            animal_head = livestockds['Animal_head'][0][self.plat1:self.plat2,:]
+
+        field_area = animal_head * grazing_density[livestock_name]
+        # source_area = (1-np.exp(-animal_head*patch_area/field_area))*field_area
+        source_area = field_area * (f_urine_patch+f_dung_pat)
+        self.pastarea = source_area
+        excret_N = excretN_info/source_area
+        excret_N = xr_to_np(excret_N)
+        durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 
+                        waste_N=excret_N)
+        # test_N = (durine_N+dmanure_N)*source_area
+        # print("test total N ",np.nansum(test_N)*365*24/1e9)
+        
+        self.urea_added[:] = (24/timestep)*durea
+        self.avail_N_added[:] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_avail
+        self.resist_N_added[:] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_resist
+        self.unavail_N_added[:] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_unavail
+        
+        # input of manure N pool at each timestep, manure N only falls on dung pats
+        durine_N = durine_N/((f_urine_patch+f_dung_pat*frac_FYM)/(f_urine_patch+f_dung_pat))
+        durea = durea/((f_urine_patch+f_dung_pat*frac_FYM)/(f_urine_patch+f_dung_pat))
+        dmanure_N = dmanure_N/(f_dung_pat/(f_urine_patch+f_dung_pat))
+        durine = durine/((f_urine_patch+f_dung_pat*frac_FYM)/(f_urine_patch+f_dung_pat))
+        dmanure = dmanure/(f_dung_pat/f_urine_patch+f_dung_pat)
+        manure_wc = manure_wc/(f_dung_pat/f_urine_patch+f_dung_pat)
+        # test_N = durine_N*source_area*(f_urine_patch+frac_FYM*f_dung_pat)/(f_urine_patch+f_dung_pat)+\
+        #             dmanure_N*source_area*(f_dung_pat)/(f_urine_patch+f_dung_pat)
+        # print("test total N ",np.nansum(test_N)*365*24/1e9)
+        durine = durine * 1000
+        manure_wc = manure_wc * 1000
+        ## pH and H+ ions concentration
+        sim_ccH = np.float(10**(-sim_pH))
+
+        for dd in np.arange(start_day_idx,end_day_idx):
+            ## 
+            for dd_span in np.arange(dd,dd+span_day):
+
+                # if dd_span < Days:
+                #     self.sim_env(dd_span)
+                # else:
+                #     self.sim_env(int(dd_span-np.floor(dd_span/Days)*Days))
+                # self.theta[0,1:] = np.copy(self.soil_moist[0,1:])
+                # self.theta[1,1:] = np.copy(self.soil_moist[0,1:]) 
+
+                ## manure and N deposited on the field on the first day of each span loop
+                if dd_span == dd:
+                    if dd_span < Days:
+                        app_mark_idx = dd_span
+                    else:
+                        app_mark_idx = int(dd_span-np.floor(dd_span/Days)*Days)
+                    if production_system == "mixed":
+                        ## mark the day when excretion deposited
+                        grazing_idx = self.grazing_indicator(app_mark_idx)[self.plat1:self.plat2,:]
+                        # print(dd_span,app_mark_idx,np.where(grazing_idx>0.0))
+
+                        self.manure[:] = dmanure*grazing_idx
+                        self.urine[:] = durine*grazing_idx
+                        self.urea[:] = durea*grazing_idx
+                        self.urine_N[:] = durine_N*grazing_idx
+                        self.manure_N[:] = dmanure_N*grazing_idx
+                        self.manure_water[:] = manure_wc*grazing_idx
+
+                        self.urea_added[app_mark_idx] = self.urea_added[app_mark_idx]*grazing_idx
+                        self.avail_N_added[app_mark_idx] = self.avail_N_added[app_mark_idx]*grazing_idx
+                        self.resist_N_added[app_mark_idx] = self.resist_N_added[app_mark_idx]*grazing_idx
+                        self.unavail_N_added[app_mark_idx] = self.unavail_N_added[app_mark_idx]*grazing_idx
+
+                        # N_app_mark = np.zeros(soilph.shape)
+                        # N_app_mark[app_mark_idx][np.nansum(self.urine_N[:])!=0] = 1
+                        # self.soil_pH = soil_pH_postapp(base_pH=soilph,app_timing_map=N_app_mark,fert_pH=8.5)[:,self.plat1:self.plat2,:] 
+                        # self.soil_ccH = 10**(-self.soil_pH) 
+                        
+                    else:
+                        self.manure[:] = dmanure
+                        self.urine[:] = durine
+                        self.urea[:] = durea
+                        self.urine_N[:] = durine_N
+                        self.manure_N[:] = dmanure_N
+                        self.manure_water[:] = manure_wc
+
+                        # self.urea_added[app_mark_idx] = (24/timestep)*durea*source_area
+                        # self.avail_N_added[app_mark_idx] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_avail
+                        # self.resist_N_added[app_mark_idx] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_resist
+                        # self.unavail_N_added[app_mark_idx] = (24/timestep)*((durine_N - durea) + dmanure_N)*f_unavail
+
+                        ## mark the day when urine deposited
+                        # N_app_mark = np.zeros(soilph.shape)
+                        # if dd_span < Days:
+                        #     N_app_mark[dd_span] = 1
+                        # else:
+                        #     N_app_mark[int(dd_span-np.floor(dd_span/Days)*Days)] = 1
+                        # self.soil_pH = soil_pH_postapp(base_pH=soilph,app_timing_map=N_app_mark,fert_pH=8.5)[:,self.plat1:self.plat2,:] 
+                        # self.soil_ccH = 10**(-self.soil_pH) 
+                else:
+                    self.manure[:] = 0.0
+                    self.urine[:] = 0.0
+                    self.urea[:] = 0.0
+                    self.urine_N[:] = 0.0
+                    self.manure_N[:] = 0.0
+                    self.manure_water[:] = 0.0
 
     def land_sim_reshape(self,sim_result):
         shape = sim_result.shape

@@ -2,12 +2,7 @@
 ####################################
 ## import essential AMCLIM modules
 ####################################
-'''file_path = os.getcwd()
-module_path = str(Path(file_path).parent)
-print(module_path)
 
-if module_path not in sys.path:
-    sys.path.append(module_path)'''
 from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
@@ -351,6 +346,14 @@ class HOUSING_MODULE:
                 self.ua_conv_factor = np.zeros(array_shape)
                 ## area of housing area
                 self.floor_area = self.housing_area
+
+        if self.production_system == "mixed":
+            self.grazing_manure = np.zeros(outarray_shape)
+            self.grazing_manure_N = np.zeros(outarray_shape)
+            self.grazing_urea = np.zeros(outarray_shape)
+            self.grazing_urine = np.zeros(outarray_shape)
+            self.grazing_urine_N = np.zeros(outarray_shape)
+            self.grazing_manurewc = np.zeros(outarray_shape)
     
     ## surface resistance assumed to be 100 s/m (for bedding etc.)
     R_surf = 100.0
@@ -576,20 +579,32 @@ class HOUSING_MODULE:
         for dd in np.arange(start_day_idx,end_day_idx):
             if dd<Days:
                 self.sim_env(self.house_env,"barn",dd)
+                ## ruminants of "mixed" production system are condersider to be grazed seasonally
+                if self.production_system == "mixed":
+                    grazing_idx = self.grazing_indicator(dd)
+                    self.grazing_excretion_N(dd,grazing_idx)
+                else:
+                    grazing_idx = np.zeros((CONFIG_lats,CONFIG_lons))
             else:
                 self.sim_env(self.house_env,"barn",dd-Days)
+                ## ruminants of "mixed" production system are condersider to be grazed seasonally
+                if self.production_system == "mixed":
+                    grazing_idx = self.grazing_indicator(dd-Days)
+                    self.grazing_excretion_N(dd-Days,grazing_idx)
+                else:
+                    grazing_idx = np.zeros((CONFIG_lats,CONFIG_lons))       
             self.daily_init(housing_type="barn")
             for hh in np.arange(24):
-                self.manure[hh+1] = self.dmanure
-                self.urine[hh+1] = self.durine
+                self.manure[hh+1] = self.dmanure*(1-grazing_idx)
+                self.urine[hh+1] = self.durine*(1-grazing_idx)
                 ## manure pool
                 self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1]
 
                 ## N input in multiple forms
-                self.urea[hh+1] = self.durea
-                self.avail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_avail
-                self.resist_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_resist
-                self.unavail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_unavail
+                self.urea[hh+1] = self.durea*(1-grazing_idx)
+                self.avail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_avail*(1-grazing_idx)
+                self.resist_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_resist*(1-grazing_idx)
+                self.unavail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_unavail*(1-grazing_idx)
 
                 ## urea hydrolysis rate
                 self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_gnd[hh+1],theta=1.0,delta_t=timestep)
@@ -616,7 +631,7 @@ class HOUSING_MODULE:
                 self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]* (1 - self.Nr_decomp_rate[hh+1])  
 
                 ## water from the fresh dung
-                self.manure_initwc[hh+1] = self.manure_wc
+                self.manure_initwc[hh+1] = self.manure_wc*(1-grazing_idx)
                 ## water amount when mositure content reach equilibrium
                 # mois_coeff = min_manurewc(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1])
                 mois_coeff = 1.0 
@@ -957,6 +972,41 @@ class HOUSING_MODULE:
                 self.urea_pool_to_storage[:] = 0.0
             elif housing_type.lower() == 'poultry_house':
                 self.UA_pool_to_storage[:] = 0.0
+                
+    ## determining seasonal grazing for ruminants: beef cattle, dairy cattle, sheep etc.
+    ## note that production system should be [mixed]
+    def grazing_indicator(self,dayidx):
+        grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
+        if CONFIG_machine == "STREAM":
+            temp_data = temp_file.t2m[dayidx] - 273.15
+            tempmin = temp_data
+        else:
+            hhidx = dayidx*24
+            temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
+            ## minimum temperature of the day
+            tempmin = np.nanmin(temp_data,axis=0)
+        # print(dayidx,np.nanmax(tempmin[self.plat1:self.plat2,:]),np.where(tempmin[self.plat1:self.plat2,:]>grazing_tempthreshold))
+        grazing_IDX[tempmin>grazing_tempthreshold] = f_grz
+        return grazing_IDX
+
+    ## determining the amount of N and excretions excreted while grazing
+    def grazing_excretion_N(self,dayidx,grazing_idx):
+        ## note that the total amount should multiply by the housing area 
+        self.grazing_manure[dayidx] = self.housing_area*(self.dmanure*grazing_idx)*(24/timestep)
+        ## IMPORTANT note: self.grazing_manure_N will be used to give values for manure_N
+        ##                  for mixed production system ruminants, however, there is no specific 
+        ##                  manure_N_added in LAND module when initialising. As a result,
+        ##                  self.grazing_manure_N is stored in self.resist_N_added in LAND module 
+        self.grazing_manure_N[dayidx] = self.housing_area*(self.dmanure_N*grazing_idx)*(24/timestep)
+        self.grazing_urea[dayidx] = self.housing_area*(self.durea * grazing_idx)*(24/timestep)
+        self.grazing_urine[dayidx] = self.housing_area*(self.durine * grazing_idx)*(24/timestep)
+        ## IMPORTANT note: self.grazing_urine_N will be used to give values for urine_N
+        ##                  for mixed production system ruminants, however, there is no specific 
+        ##                  urine_N_added in LAND module when initialising. As a result,
+        ##                  self.grazing_urine_N is stored in self.avail_N_added in LAND module
+        self.grazing_urine_N[dayidx] = self.housing_area*(self.durine_N * grazing_idx)*(24/timestep)
+        self.grazing_manurewc[dayidx] = self.housing_area*(self.manure_wc * grazing_idx)*(24/timestep)
+
 
     def sim_out(self,housing_type,poultry_insitu=False):
         nlat = int(180.0/CONFIG_dlat)
@@ -1051,7 +1101,7 @@ class HOUSING_MODULE:
         print("ncfile saved.")
         return
     
-    def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency):
+    def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,ncfile_o=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', slat/pit housing, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         self.housing_init(housing_type)
@@ -1064,10 +1114,11 @@ class HOUSING_MODULE:
                 self.slat_pit_housing_sim(dd,end_idx,self.fslat,self.fgap)
         self.housing_2nd_init(housing_type)
         self.slat_pit_housing_sim(0,start_idx,self.fslat,self.fgap)
-        self.sim_out(housing_type)
+        if ncfile_o is True:
+            self.sim_out(housing_type)
         return
 
-    def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False):
+    def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False,ncfile_o=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', barn, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         self.housing_init(housing_type)
@@ -1085,10 +1136,11 @@ class HOUSING_MODULE:
                 self.barn_housing_sim(dd,end_idx)
         self.housing_2nd_init(housing_type)
         self.barn_housing_sim(0,start_idx)
-        self.sim_out(housing_type)
+        if ncfile_o is True:
+            self.sim_out(housing_type)
         return
 
-    def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,insitu_storage=False):
+    def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,insitu_storage=False,ncfile_o=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', poultry_house, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         if insitu_storage is True:
@@ -1106,7 +1158,8 @@ class HOUSING_MODULE:
                 self.poultry_housing_sim(dd,end_idx)
         self.housing_2nd_init(housing_type)
         self.poultry_housing_sim(0,start_idx)
-        self.sim_out(housing_type,insitu_storage)
+        if ncfile_o is True:
+            self.sim_out(housing_type,insitu_storage)
         return 
 
     
