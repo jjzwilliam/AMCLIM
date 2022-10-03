@@ -994,7 +994,7 @@ manure_porosity = 0.42
 ## manure bulk density
 manure_BD = manure_PD*(1-manure_porosity)
 ## adsorption constant for manure; m3/m3
-Kd = 1.0
+Kd_manure = 1.0
 ## NO3- diffusivity scaling factor
 f_DNO3 = 1.3e-8/9.8e-10
 ## molar mass of air

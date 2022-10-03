@@ -2,13 +2,6 @@
 ####################################
 ## import essential AMCLIM modules
 ####################################
-'''file_path = os.getcwd()
-module_path = str(Path(file_path).parent)
-print(module_path)
-
-if module_path not in sys.path:
-    sys.path.append(module_path)'''
-from asyncio import format_helpers
 from INPUT.input import *
 from CONFIG.config import *
 from MODULES.PARAMETERS import *
@@ -22,6 +15,7 @@ from MODULES.FUNC import *
 MMS_area_factor = {
     "mms_indoor_solid":0.25,
     "mms_indoor_liquid":0.5,
+    "mms_cover_liquid":0.5,
     "mms_open_solid":0.25,
     "mms_open_liquid":0.5,
     "mms_open_lagoon":2.5}
@@ -30,6 +24,8 @@ MMS_area_factor = {
 MMS_area = {
     "mms_indoor_solid_area":None,
     "mms_indoor_liquid_area":None,
+    "mms_cover_liquid_area":None,
+    "mms_thermal_solid_area":None,
     "mms_open_solid_area":None,
     "mms_open_liquid_area":None}
 
@@ -68,6 +64,8 @@ f_washoff_N = 0.001
 f_manure_anoxic = 0.6
 ## lagoon TAN conc; g/mL
 lagoon_TAN_conc = 630.0e-6
+## reduction factor for covered storage; i.e., 95 % reduction by covering manure with a lid/crust 
+cover_reduction = 0.95
 
 
 ##################################
@@ -339,7 +337,13 @@ class MMS_module:
                 self.o_Nwashoff = np.zeros(outarray_shape)
 
         elif  phase == "liquid":
+            ## MMS_open and MMS_lagoon
             if mms_cat == "MMS_open":
+                ## rain fall (Note the unit)
+                self.rainfall = np.zeros(array_shape)
+                ## atmospheric resistances
+                self.R_atm = np.zeros(array_shape)
+            if mms_cat == "MMS_lagoon":
                 ## rain fall (Note the unit)
                 self.rainfall = np.zeros(array_shape)
                 ## atmospheric resistances
@@ -365,6 +369,9 @@ class MMS_module:
         return
 
     def sim_env(self,mms_type,mms_phase,dayidx):
+
+        if dayidx >= Days:
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         
         if CONFIG_machine == "STREAM":
             temp_data = temp_file.t2m[dayidx] - 273.15
@@ -375,6 +382,12 @@ class MMS_module:
             temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
             rhum_data = rhum_file.rh2m[hhidx:hhidx+24]
             wind_data = wind_file.wind10m[hhidx:hhidx+24]
+        
+        if mms_type == 'MMS_cover':
+            mms_type = 'MMS_indoor'
+        if mms_type == 'MMS_lagoon':
+            mms_type = 'MMS_open'
+
         if mms_type == 'MMS_indoor':
             self.T_sim[1:],self.T_gnd[1:],self.u_sim[1:] = barn_env(temp_data,
                 wind_profile(uref=wind_data,height_ref=wind_data_height,height_out=ref_height,zo=zo_barn))
@@ -439,26 +452,33 @@ class MMS_module:
             ## area of MMS_indoor_liquid
             MMS_area["mms_indoor_liquid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor['mms_indoor_liquid']
             self.mmsarea = MMS_area["mms_indoor_liquid_area"].values
+            mms_cover_reduction = 0.0
         elif mms_cat == "MMS_open":
             f_MMSarea = self.f_MMS_open_liquid/self.f_MMS
             ## area of MMS_open_liquid
             MMS_area["mms_open_liquid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor['mms_open_liquid']
             self.mmsarea = MMS_area["mms_open_liquid_area"].values
-        
+            mms_cover_reduction = 0.0
+        elif mms_cat == "MMS_cover":
+            f_MMSarea = self.f_MMS_preserve_liquid/self.f_MMS
+            ## area of MMS_indoor_liquid
+            MMS_area["mms_cover_liquid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor['mms_cover_liquid']
+            self.mmsarea = MMS_area["mms_cover_liquid_area"].values
+            mms_cover_reduction = cover_reduction
+
         if self.livestock.lower()=="poultry":
             print("Simulation for poultry.")
 
         for dd in np.arange(start_day_idx,end_day_idx):
             ## environment
-            if dd<Days:
-                self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd)
-            if dd>=Days:
-                self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd-Days)
+            self.sim_env(mms_type=mms_cat,mms_phase="liquid",dayidx=dd)
             ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
+            elif mms_cat == "MMS_cover":
+                self.daily_init(dayidx=dd,mms_info="mms_cover_liquid")
             
             ## simulations at hourly timestep
             for hh in np.arange(24):
@@ -528,19 +548,16 @@ class MMS_module:
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss[hh+1] = np.minimum(self.modelled_emiss[hh+1],self.TAN_pool[hh+1])
                 ## final emission flux
-                self.NH3flux[hh+1] = self.modelled_emiss[hh+1]
+                self.NH3flux[hh+1] = self.modelled_emiss[hh+1]*(1-mms_cover_reduction)
                 ## update TAN pool
-                self.TAN_pool[hh+1] = self.TAN_pool[hh+1] - self.NH3flux[hh+1]
-            
-            if dd >= Days:
-                ddidx = dd - Days
-            else:
-                ddidx = dd
+                self.TAN_pool[hh+1] = self.TAN_pool[hh+1] - self.NH3flux[hh+1]          
             if mms_cat == "MMS_indoor":
-                self.daily_output(dayidx=ddidx,mms_info="mms_indoor_liquid")
+                self.daily_output(dayidx=dd,mms_info="mms_indoor_liquid")
             elif mms_cat == "MMS_open":
-                self.daily_output(dayidx=ddidx,mms_info="mms_open_liquid")
-            self.mms_to_landspreading(dayidx=ddidx)
+                self.daily_output(dayidx=dd,mms_info="mms_open_liquid")
+            elif mms_cat == "MMS_cover":
+                self.daily_output(dayidx=dd,mms_info="mms_cover_liquid")
+            self.mms_to_landspreading(dayidx=dd)
         return
 
     ## Simulation: Cat A.1 manure stored in barns (as solid) 
@@ -578,7 +595,6 @@ class MMS_module:
     ##                   F_tosurf(aq+gas) = F_atm + F_runoff
     ## Note) NO3- pools in the bulk manure and soil have similar processes as TAN, which do not include 1) adsorption, 2) gaseous diffustion
     ##       NO3- aqueous diffusion is moderated by a scaling factor regarding the different diffusivity of NO3- from NH4+ 
-
     def MMS_solid_sim(self,mms_cat,start_day_idx,end_day_idx):
         print('current simulation is for: ['+str(mms_cat)+', solid], '+\
                                 str(self.livestock)+', '+str(self.production_system))
@@ -596,10 +612,7 @@ class MMS_module:
 
         for dd in np.arange(start_day_idx,end_day_idx):
             ## environemnts
-            if dd < Days:
-                self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd)
-            if dd>=Days:
-                self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd-Days)
+            self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd)
             ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid")
@@ -900,15 +913,11 @@ class MMS_module:
                     NO3surfamount = surf_Ncnc(N_cnc=self.NO3_amount[hh+1],rliq=self.R_manurel[hh+1]/f_DNO3,qrunoff=self.rain_avail_washoff[hh+1])
                     self.NO3washoff[hh+1] = NO3surfamount*self.rain_avail_washoff[hh+1]*timestep*3600
                     self.NO3_pool[hh+1] = self.NO3_pool[hh+1] - self.NO3washoff[hh+1]
-            if dd >= Days:
-                ddidx = dd - Days
-            else:
-                ddidx = dd
             if mms_cat == "MMS_indoor":
-                self.daily_output(dayidx=ddidx,mms_info="mms_indoor_solid")
+                self.daily_output(dayidx=dd,mms_info="mms_indoor_solid")
             elif mms_cat == "MMS_open":
-                self.daily_output(dayidx=ddidx,mms_info="mms_open_solid")
-            self.mms_to_landspreading(dayidx=ddidx)
+                self.daily_output(dayidx=dd,mms_info="mms_open_solid")
+            self.mms_to_landspreading(dayidx=dd)
         return
   
     ## Simulation: Cat B.3 manure stored in open environment (as solid) //// under development 08/Sep
@@ -916,9 +925,7 @@ class MMS_module:
         print('current simulation is for: MMS open (lagoon,liquid), '+str(self.livestock)+', '+str(self.production_system))
         f_MMSarea = self.f_MMS_open_lagoon/self.f_MMS
         MMS_area["mms_open_lagoon_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor["mms_open_lagoon"]
-        
-        if self.livestock.lower()=="poultry":
-            print("Simulation for poultry.")
+        self.mmsarea = MMS_area["mms_open_lagoon_area"].values
 
         for dd in np.arange(start_day_idx,end_day_idx):
             self.sim_env(mms_type="MMS_open",mms_phase="liquid",dayidx=dd)
@@ -934,12 +941,30 @@ class MMS_module:
                                                 Rpit=self.R_star[hh+1])*timestep*3600
 
                 self.NH3flux[hh+1] = self.modelled_emiss[hh+1]
-            if dd >= Days:
-                ddidx = dd - Days
-            else:
-                ddidx = dd
-            self.daily_output(dayidx=ddidx,mms_info="mms_open_lagoon")
+            self.daily_output(dayidx=dd,mms_info="mms_open_lagoon")
         return
+
+    ## Simulation: Cat C.I solid manure being thermally dried
+    def MMS_thermal_sim(self,start_day_idx,end_day_idx):
+        print('current simulation is for: MMS thermal (solid), '+\
+                                str(self.livestock)+', '+str(self.production_system))
+        
+        f_MMSarea = self.f_MMS_preserve_solid/self.f_MMS
+        MMS_area["mms_thermal_solid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor["mms_indoor_solid"]
+        self.mmsarea = MMS_area["mms_thermal_solid_area"].values
+
+        if self.livestock.lower()=="poultry":
+            print("Simulation for poultry.")
+
+        for dd in np.arange(start_day_idx,end_day_idx):
+            self.daily_init(dayidx=dd,mms_info="mms_thermal_solid")
+            self.TAN_pool[-1] = self.TAN_pool[0] + self.TAN_added[dd]
+            self.urea_pool[-1] = self.urea_pool[0] + self.urea_added[dd]
+            self.UA_pool[-1] = self.UA_pool[0] + self.UA_added[dd]
+            self.avail_N_pool[-1] = self.avail_N_pool[0] + self.avail_N_added[dd]
+            self.resist_N_pool[-1] = self.resist_N_pool[0] + self.resist_N_added[dd]
+            self.unavail_N_pool[-1] = self.unavail_N_pool[0] + self.unavail_N_added[dd]
+
 
     def daily_init(self,dayidx,mms_info):
         self.manure_pool[0] = self.manure_pool[-1]
@@ -956,7 +981,7 @@ class MMS_module:
             self.NO3_pool[0] = self.NO3_pool[-1]
 
         if dayidx >= Days:
-            dayidx = dayidx - Days
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         ## inputs from housing (added in the mid-day)
         ## the equations used to represent these pools need to be explained here:
         ## each pool should be in a unit of, mass/unit area, i.e., g/m^2
@@ -980,8 +1005,8 @@ class MMS_module:
         return
 
     def daily_output(self,dayidx,mms_info):
-        # if dayidx >= Days:
-        #     dayidx = dayidx - Days
+        if dayidx >= Days:
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         self.o_NH3flux[dayidx] = np.nansum(self.NH3flux[1:],axis=0)
         if mms_info == "mms_indoor_solid":
             self.o_NH4nitrif[dayidx] = np.nansum(self.TANnitrif_manure[1:],axis=0)
@@ -1000,6 +1025,8 @@ class MMS_module:
         self.winter_app_cal[idx] = self.spring_app_cal[idx] + int(180)
 
     def mms_to_landspreading(self,dayidx):
+        if dayidx >= Days:
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         ## spring planting season
         self.spring_Napp[self.spring_app_cal==dayidx] = (self.TAN_pool[-1][self.spring_app_cal==dayidx]+\
                                                         self.urea_pool[-1][self.spring_app_cal==dayidx])*\
@@ -1052,7 +1079,7 @@ class MMS_module:
         self.UA_pool[-1][self.winter_app_cal==dayidx]  = 0.0
         self.TAN_pool[-1][self.winter_app_cal==dayidx]  = 0.0
     
-    def sim_out(self,mms_cat,phase):
+    def sim_out(self,mms_cat,phase,output_stat=False):
         nlat = int(180.0/CONFIG_dlat)
         nlon = int(360.0/CONFIG_dlon)
         ntime = Days
@@ -1061,8 +1088,16 @@ class MMS_module:
         yearidx = str(sim_year)+'-01-01'
         times = pd.date_range(yearidx,periods=ntime)
         if phase == "liquid":
+            if mms_cat == "MMS_indoor":
+                f_area = MMS_area_factor['mms_indoor_liquid']
+            elif mms_cat == "MMS_open":
+                f_area = MMS_area_factor['mms_open_liquid']
+            elif mms_cat == "MMS_cover":
+                f_area = MMS_area_factor['mms_cover_liquid']
+            elif mms_cat == "MMS_lagoon":
+                f_area = MMS_area_factor['mms_open_lagoon']
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
-            MMS_totalN = self.total_N_MMS*self.mmsarea/self.housingarea
+            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea*f_area)
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],MMS_NH3emiss),
@@ -1089,9 +1124,14 @@ class MMS_module:
             outds.sourcearea.attrs["long name"] = 'Source area for NH3 emission from '+mms_cat+" "+phase
 
         elif phase == "solid":
+            if mms_cat == "MMS_indoor":
+                f_area = MMS_area_factor['mms_indoor_solid']
+            elif mms_cat == "MMS_open":
+                f_area = MMS_area_factor['mms_open_solid']
+            MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH4nitrif = self.o_NH4nitrif*self.mmsarea
-            MMS_totalN = self.total_N_MMS*self.mmsarea/self.housingarea
+            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea*f_area)
             if mms_cat == "MMS_open":
                 MMS_Nwashoff = self.o_Nwashoff*self.mmsarea
                 outds = xr.Dataset(
@@ -1155,6 +1195,33 @@ class MMS_module:
                 outds.NtotalMMS.attrs["long name"] = 'Total N of '+mms_cat+" "+phase
                 outds.sourcearea.attrs["unit"] = 'm2'
                 outds.sourcearea.attrs["long name"] = 'Source area for NH3 emission from '+mms_cat+" "+phase
+        else:
+            MMS_NH3emiss = self.o_NH3flux*self.mmsarea
+            MMS_totalN = self.total_N_MMS*self.mmsarea/self.housingarea
+            outds = xr.Dataset(
+                data_vars=dict(
+                    NH3emiss=(['time','lat','lon'],MMS_NH3emiss),
+                    NtotalMMS=(['lat','lon'],MMS_totalN),
+                    sourcearea=(['lat','lon'],self.mmsarea),
+                            ),
+                coords = dict(
+                    time=(["time"], times),
+                    lon=(["lon"], lons),
+                    lat=(["lat"], lats),
+                            ),
+                attrs=dict(
+                    description="AMCLIM-MMS: NH3 emissions from "+\
+                            self.production_system+" "+self.livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
+                    info = self.production_system+" "+self.livestock+" "+mms_cat+" "+phase,
+                    units="gN per grid",
+                ),
+            )
+            outds.NH3emiss.attrs["unit"] = 'gN/day'
+            outds.NH3emiss.attrs["long name"] = 'NH3 emission from '+mms_cat+" "+phase
+            outds.NtotalMMS.attrs["unit"] = 'gN'
+            outds.NtotalMMS.attrs["long name"] = 'Total N of '+mms_cat+" "+phase
+            outds.sourcearea.attrs["unit"] = 'm2'
+            outds.sourcearea.attrs["long name"] = 'Source area for NH3 emission from '+mms_cat+" "+phase
 
         comp = dict(zlib=True, complevel=9)
         encoding = {var: comp for var in outds.data_vars}
@@ -1162,6 +1229,12 @@ class MMS_module:
         outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+mms_cat+'.'+phase+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
+
+        if output_stat is True:
+            print("Total N for "+mms_cat+' '+phase+' of '+self.production_system+' '+self.livestock+\
+                    ' is '+str(np.round(np.nansum(MMS_totalN)/1e9,decimals=2))+' GgN.')
+            print("NH3 emission from "+mms_cat+' '+phase+' of '+self.production_system+' '+self.livestock+\
+                    ' is '+str(np.round(np.nansum(MMS_NH3emiss)/1e9,decimals=2))+' GgN.')
 
         outds = xr.Dataset(
                 data_vars=dict(
@@ -1200,7 +1273,7 @@ class MMS_module:
         print("manure app ncfile saved.")
         return
 
-    def output_MMS_pathway(self):
+    def output_MMS_pathway(self,output_stat=False):
         nlat = int(180.0/CONFIG_dlat)
         nlon = int(360.0/CONFIG_dlon)
         ntime = Days
@@ -1209,18 +1282,33 @@ class MMS_module:
         yearidx = str(sim_year)+'-01-01'
         times = pd.date_range(yearidx,periods=ntime)
 
+        ## excluding loss and sold
+        allmms = (1.0-self.f_loss-self.f_sold)
+        
+        Nloss = self.total_N_MMS*self.f_loss
+        Nsold = self.total_N_MMS*self.f_sold
+        mms_Ncoveredliq = self.total_N_MMS*self.f_MMS_preserve_liquid*allmms
+        mms_Nthermalsol = self.total_N_MMS*self.f_MMS_preserve_solid*allmms
+        mms_Nfuel = self.total_N_MMS*self.f_MMS_fuel*allmms
+        mms_Nindoorliq = self.total_N_MMS*self.f_MMS_indoor_liquid*allmms
+        mms_Nindoorsol = self.total_N_MMS*self.f_MMS_indoor_solid*allmms
+        mms_Nopenliq = self.total_N_MMS*self.f_MMS_open_liquid*allmms
+        mms_Nopensol = self.total_N_MMS*self.f_MMS_open_solid*allmms
+        mms_Nopenlagoon = self.total_N_MMS*self.f_MMS_open_lagoon*allmms
+
+
         outds = xr.Dataset(
                 data_vars=dict(
-                    N_loss=(['lat','lon'],self.total_N_MMS*self.f_loss),
-                    N_sold=(['lat','lon'],self.total_N_MMS*self.f_sold),
-                    N_preserved_liquid=(['lat','lon'],self.total_N_MMS*self.f_MMS_preserve_liquid),
-                    N_preserved_solid=(['lat','lon'],self.total_N_MMS*self.f_MMS_preserve_solid),
-                    N_fuel=(['lat','lon'],self.total_N_MMS*self.f_MMS_fuel),
-                    N_indoor_liquid=(['lat','lon'],self.total_N_MMS*self.f_MMS_indoor_liquid),
-                    N_indoor_solid=(['lat','lon'],self.total_N_MMS*self.f_MMS_indoor_solid),
-                    N_outdoor_liquid=(['lat','lon'],self.total_N_MMS*self.f_MMS_open_liquid),
-                    N_outdoor_solid=(['lat','lon'],self.total_N_MMS*self.f_MMS_open_solid),
-                    N_outdoor_lagoon=(['lat','lon'],self.total_N_MMS*self.f_MMS_open_lagoon),
+                    N_loss=(['lat','lon'],Nloss),
+                    N_sold=(['lat','lon'],Nsold),
+                    N_covered_liquid=(['lat','lon'],mms_Ncoveredliq),
+                    N_thermal_solid=(['lat','lon'],mms_Nthermalsol),
+                    N_fuel=(['lat','lon'],mms_Nfuel),
+                    N_indoor_liquid=(['lat','lon'],mms_Nindoorliq),
+                    N_indoor_solid=(['lat','lon'],mms_Nindoorsol),
+                    N_open_liquid=(['lat','lon'],mms_Nopenliq),
+                    N_open_solid=(['lat','lon'],mms_Nopensol),
+                    N_open_lagoon=(['lat','lon'],mms_Nopenlagoon),
                             ),
                 coords = dict(
                     lon=(["lon"], lons),
@@ -1240,19 +1328,34 @@ class MMS_module:
         outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+\
                             '.'+str(sim_year)+'.MMSpathway.nc',encoding=encoding)
         print("manure pathway ncfile saved.")
+
+        if output_stat is True:
+            print("indoor liquid",np.round(np.nansum(mms_Nindoorliq)/1e9,decimals=2))
+            print("indoor solid",np.round(np.nansum(mms_Nindoorsol)/1e9,decimals=2))
+            print("open liquid",np.round(np.nansum(mms_Nopenliq)/1e9,decimals=2))
+            print("open solid",np.round(np.nansum(mms_Nopensol)/1e9,decimals=2))
+            print("open lagoon",np.round(np.nansum(mms_Nopenlagoon)/1e9,decimals=2))
+            print("thermal solid",np.round(np.nansum(mms_Nthermalsol)/1e9,decimals=2))
+            print("covered liquid",np.round(np.nansum(mms_Ncoveredliq)/1e9,decimals=2))
+            print("fuel",np.round(np.nansum(mms_Nfuel)/1e9,decimals=2))
+            print("loss",np.round(np.nansum(Nloss)/1e9,decimals=2))
+            print("sold",np.round(np.nansum(Nsold)/1e9,decimals=2))
+            print('N_total',np.round(np.nansum(self.total_N_MMS)/1e9,decimals=2))
+
         return
 
 
-    def MMS_sim_main(self,mms_cat,phase,start_day_idx,end_day_idx):
+    def MMS_sim_main(self,mms_cat,phase,start_day_idx,end_day_idx,stat=False):
         spinup = np.floor((end_day_idx - Days)/Days)
         print("Spinup year is: "+str(spinup)+" yr(s)")
         self.manure_app_calendar()
         if phase == "liquid":
-            self.MMS_liquid_sim(mms_cat,start_day_idx,end_day_idx)
+            if mms_cat == "MMS_lagoon":
+                self.MMS_open_lagoon_sim(start_day_idx,end_day_idx)
+            else:
+                self.MMS_liquid_sim(mms_cat,start_day_idx,end_day_idx)
         elif phase == "solid":
             self.MMS_solid_sim(mms_cat,start_day_idx,end_day_idx)
-        else:
-            self.MMS_open_lagoon_sim(start_day_idx,end_day_idx)
-        self.sim_out(mms_cat,phase)
+        self.sim_out(mms_cat,phase,stat)
         return
 

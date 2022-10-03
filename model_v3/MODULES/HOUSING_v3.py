@@ -73,7 +73,7 @@ class HOUSING_MODULE:
         self.MMS_file = xr.open_dataset(infile_path+animal_data_path+self.MMS_file_name)
         ## livestock info: N excretion, heads, body weights
         self.excretN_info = self.animal_file['Excreted_N'][self.lvl_idx]
-        print("test total N: ",np.nansum(self.excretN_info)/1e9)
+        print("Total excreted N from "+str(self.livestock)+" :",np.nansum(self.excretN_info*1e3)/1e9, " GgN")
         self.animal_head = self.animal_file['Animal_head'][self.lvl_idx]
         if self.livestock == "POULTRY":
             self.animal_weight = xr.DataArray(
@@ -96,7 +96,7 @@ class HOUSING_MODULE:
         ## N excretion 
         self.excret_N = self.excretN_info/self.housing_area   ## unit: kg N per m^2 per year
         self.excret_N = xr_to_np(self.excret_N)
-        print("test total N 2: ",np.nansum(self.excret_N*self.housing_area)/1e9)
+        # print("test total N 2: ",np.nansum(self.excret_N*self.housing_area)/1e9)
         ## MMS info
         self.f_loss = np.zeros(CONFIG_mtrx[1:])
         self.f_sold = np.zeros(CONFIG_mtrx[1:])
@@ -1008,7 +1008,7 @@ class HOUSING_MODULE:
         self.grazing_manurewc[dayidx] = self.housing_area*(self.manure_wc * grazing_idx)*(24/timestep)
 
 
-    def sim_out(self,housing_type,poultry_insitu=False):
+    def sim_out(self,housing_type,poultry_insitu=False,output_stat=False):
         nlat = int(180.0/CONFIG_dlat)
         nlon = int(360.0/CONFIG_dlon)
         ntime = Days
@@ -1016,12 +1016,17 @@ class HOUSING_MODULE:
         lons = -180 + 0.5*np.arange(nlon)
         yearidx = str(sim_year)+'-01-01'
         times = pd.date_range(yearidx,periods=ntime)
+
+        if self.production_system == "mixed":
+            grazing_total_N = self.grazing_manure_N+self.grazing_urine_N
+
         if housing_type.lower() == 'slat/pit house':
             slat_emiss = self.o_NH3flux_slat*self.floor_area.values
             pit_emiss = self.o_NH3flux_pit*self.pit_area.values
-            n_excret = self.excret_N*self.floor_area.values
+            n_excret = 1000*self.excret_N*self.floor_area.values
             source_area_slat = self.floor_area.values
             source_area_pit = self.pit_area.values
+            total_emiss = slat_emiss + pit_emiss
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss_slat=(['time','lat','lon'],slat_emiss),
@@ -1057,6 +1062,11 @@ class HOUSING_MODULE:
             outds.sourcearea_pit.attrs["unit"] = 'm2'
             outds.sourcearea_pit.attrs["long name"] = 'Source area for NH3 emission (pit)'
 
+            if self.production_system == "mixed":
+                outds["grazing_N"] = (['time','lat','lon'],  grazing_total_N)
+                outds.grazing_N.attrs["unit"] = 'gN/day'
+                outds.grazing_N.attrs["long name"] = 'Excreted N while grazing'
+
         # elif housing_type.lower() == 'barn':
         else:
             if poultry_insitu is True:
@@ -1064,8 +1074,9 @@ class HOUSING_MODULE:
             else:
                 insitu = ''
             housing_NH3emiss = self.o_NH3flux*self.floor_area.values
-            n_excret = self.excret_N*self.floor_area.values
+            n_excret = 1000*self.excret_N*self.floor_area.values
             source_area = self.floor_area.values
+            total_emiss = housing_NH3emiss
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],housing_NH3emiss),
@@ -1093,15 +1104,30 @@ class HOUSING_MODULE:
             outds.sourcearea_slat.attrs["unit"] = 'm2'
             outds.sourcearea_slat.attrs["long name"] = 'Source area for NH3 emission (floor)'
 
+            if self.production_system == "mixed":
+                outds["grazing_N"] = (['time','lat','lon'],  grazing_total_N)
+                outds.grazing_N.attrs["unit"] = 'gN/day'
+                outds.grazing_N.attrs["long name"] = 'Excreted N while grazing'
+
         comp = dict(zlib=True, complevel=9)
         encoding = {var: comp for var in outds.data_vars}
 
         outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+housing_type+insitu+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
+
+        if output_stat is True:
+            print("Total excreted N from "+self.production_system+' '+self.livestock+' in '+housing_type+\
+                ' is '+str(np.round(np.nansum(n_excret)/1e9,decimals=2))+' GgN.')
+            print("NH3 emission from "+self.production_system+' '+self.livestock+' in '+housing_type+\
+                ' is '+str(np.round(np.nansum(total_emiss)/1e9,decimals=2))+' GgN.')
+            if self.production_system == "mixed":
+                print("Excreted N while grazing is "+\
+                    str(np.round(np.nansum(grazing_total_N)/1e9,decimals=2))+" GgN.")
+
         return
     
-    def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,ncfile_o=True):
+    def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,ncfile_o=True,stat=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', slat/pit housing, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         self.housing_init(housing_type)
@@ -1115,10 +1141,10 @@ class HOUSING_MODULE:
         self.housing_2nd_init(housing_type)
         self.slat_pit_housing_sim(0,start_idx,self.fslat,self.fgap)
         if ncfile_o is True:
-            self.sim_out(housing_type)
+            self.sim_out(housing_type,output_stat=stat)
         return
 
-    def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False,ncfile_o=True):
+    def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False,ncfile_o=True,stat=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', barn, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         self.housing_init(housing_type)
@@ -1137,10 +1163,10 @@ class HOUSING_MODULE:
         self.housing_2nd_init(housing_type)
         self.barn_housing_sim(0,start_idx)
         if ncfile_o is True:
-            self.sim_out(housing_type)
+            self.sim_out(housing_type,output_stat=stat)
         return
 
-    def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,insitu_storage=False,ncfile_o=True):
+    def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,insitu_storage=False,ncfile_o=True,stat=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', poultry_house, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         if insitu_storage is True:
@@ -1159,7 +1185,7 @@ class HOUSING_MODULE:
         self.housing_2nd_init(housing_type)
         self.poultry_housing_sim(0,start_idx)
         if ncfile_o is True:
-            self.sim_out(housing_type,insitu_storage)
+            self.sim_out(housing_type,insitu_storage,output_stat=stat)
         return 
 
     
