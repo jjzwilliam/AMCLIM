@@ -18,9 +18,9 @@ rank = comm.Get_rank()
 
 crops = [sys.argv[1]]
 chem_ferts = ['ammonium','urea']
-#chem_ferts = ['urea']
+# chem_ferts = ['urea']
 startday = 0
-endday = 730
+endday = CONFIG.Days*2
 methods = ['broadcasting-surf','incorporating-disk','deep injection']
 # methods = ['broadcasting-surf']
 
@@ -46,35 +46,36 @@ start = time.time()
 for chem_fert_use in chem_ferts:
     for crop_item in crops:
         for method_used in methods:
-            test_chemfert_sim1 = LAND.LAND_module(prank=rank,psize=band,
+            chemfertapp_sim = LAND.LAND_module(prank=rank,psize=band,
 fert_type='mineral',manure_added=np.zeros(arr),urea_added=np.zeros(arr),
 UA_added=np.zeros(arr),avail_N_added=np.zeros(arr),resist_N_added=np.zeros(arr),
 unavail_N_added=np.zeros(arr),
 TAN_added=np.zeros(arr),NO3_added=np.zeros(arr),water_added=np.zeros(arr),
 pH_value=7.0)
-            test_chemfert_sim1.main(techs[method_used],crop_item,chem_fert_use,startday,endday,
+            chemfertapp_sim.main(techs[method_used],crop_item,chem_fert_use,startday,endday,
 sim_type='base',output_stat=True,quality_check=True)
             mid = time.time()
             cal_time = mid - start
             print("=======================================================")
+            print(crop_item)
             print("Rank: ",rank)
             print('sim time: ', np.round(cal_time/60,decimals=2),' mins')
 
             newshape = int(365*720)
-            sendNH3flux = np.transpose(test_chemfert_sim1.o_NH3flux,(1,0,2)).reshape((band,newshape))
-            sendwashoff = np.transpose(test_chemfert_sim1.o_washoff,(1,0,2)).reshape((band,newshape))
-            sendnitrif = np.transpose(test_chemfert_sim1.o_nitrif,(1,0,2)).reshape((band,newshape))
-            sendNH4leaching = np.transpose(test_chemfert_sim1.o_NH4leaching,(1,0,2)).reshape((band,newshape))
-            senddiffaq = np.transpose(test_chemfert_sim1.o_diffaq,(1,0,2)).reshape((band,newshape))
-            senddiffgas = np.transpose(test_chemfert_sim1.o_diffgas,(1,0,2)).reshape((band,newshape))
-            sendammNuptake = np.transpose(test_chemfert_sim1.o_ammNuptake,(1,0,2)).reshape((band,newshape))
-            sendnitNuptake = np.transpose(test_chemfert_sim1.o_nitNuptake,(1,0,2)).reshape((band,newshape))
-            sendNO3washoff = np.transpose(test_chemfert_sim1.o_NO3washoff,(1,0,2)).reshape((band,newshape))
-            sendNO3leaching = np.transpose(test_chemfert_sim1.o_NO3leaching,(1,0,2)).reshape((band,newshape))
-            sendNO3diff = np.transpose(test_chemfert_sim1.o_NO3diff,(1,0,2)).reshape((band,newshape))
+            sendNH3flux = np.transpose(chemfertapp_sim.o_NH3flux,(1,0,2)).reshape((band,newshape))
+            sendwashoff = np.transpose(chemfertapp_sim.o_washoff,(1,0,2)).reshape((band,newshape))
+            sendnitrif = np.transpose(chemfertapp_sim.o_nitrif,(1,0,2)).reshape((band,newshape))
+            sendNH4leaching = np.transpose(chemfertapp_sim.o_NH4leaching,(1,0,2)).reshape((band,newshape))
+            senddiffaq = np.transpose(chemfertapp_sim.o_diffaq,(1,0,2)).reshape((band,newshape))
+            senddiffgas = np.transpose(chemfertapp_sim.o_diffgas,(1,0,2)).reshape((band,newshape))
+            sendammNuptake = np.transpose(chemfertapp_sim.o_ammNuptake,(1,0,2)).reshape((band,newshape))
+            sendnitNuptake = np.transpose(chemfertapp_sim.o_nitNuptake,(1,0,2)).reshape((band,newshape))
+            sendNO3washoff = np.transpose(chemfertapp_sim.o_NO3washoff,(1,0,2)).reshape((band,newshape))
+            sendNO3leaching = np.transpose(chemfertapp_sim.o_NO3leaching,(1,0,2)).reshape((band,newshape))
+            sendNO3diff = np.transpose(chemfertapp_sim.o_NO3diff,(1,0,2)).reshape((band,newshape))
 
             NH3flux = None
-            TANwashoff = None
+            Nwashoff = None
             TANnitrif = None
             NH4leaching = None
             TANdiff = None
@@ -87,7 +88,7 @@ sim_type='base',output_stat=True,quality_check=True)
 
             if rank == 0:
                 NH3flux = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
-                TANwashoff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
+                Nwashoff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
                 TANnitrif = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
                 NH4leaching = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
                 TANdiff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
@@ -99,7 +100,7 @@ sim_type='base',output_stat=True,quality_check=True)
                 NO3diff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
 
             comm.Gather(sendNH3flux, NH3flux, root=0)
-            comm.Gather(sendwashoff, TANwashoff, root=0)
+            comm.Gather(sendwashoff, Nwashoff, root=0)
             comm.Gather(sendnitrif, TANnitrif, root=0)
             comm.Gather(sendNH4leaching, NH4leaching, root=0)
             comm.Gather(senddiffaq, TANdiff, root=0)
@@ -111,8 +112,8 @@ sim_type='base',output_stat=True,quality_check=True)
             comm.Gather(sendNO3diff, NO3diff, root=0)
 
             if rank == 0:
-                nlat = int(180.0/CONFIG.dlat)
-                nlon = int(360.0/CONFIG.dlon)
+                nlat = int(180.0/CONFIG.CONFIG_dlat)
+                nlon = int(360.0/CONFIG.CONFIG_dlon)
                 ntime = CONFIG.Days
                 lats = 90 - 0.5*np.arange(nlat)
                 lons = -180 + 0.5*np.arange(nlon)
@@ -122,11 +123,11 @@ sim_type='base',output_stat=True,quality_check=True)
                 outds = xr.Dataset(
                     data_vars=dict(
                         NH3emiss=(['time','lat','lon'],np.transpose(NH3flux.reshape((360,365,720)),(1,0,2))),
-                        TANwashoff=(['time','lat','lon'],np.transpose(TANwashoff.reshape((360,365,720)),(1,0,2))),
-                        TANleaching=(['time','lat','lon'],np.transpose(TANnitrif.reshape((360,365,720)),(1,0,2))),
-                        TANdiffaq=(['time','lat','lon'],np.transpose(NH4leaching.reshape((360,365,720)),(1,0,2))),
-                        NH3diffgas=(['time','lat','lon'],np.transpose(TANdiff.reshape((360,365,720)),(1,0,2))),
-                        NH4nitrif=(['time','lat','lon'],np.transpose(NH3diff.reshape((360,365,720)),(1,0,2))),
+                        TANwashoff=(['time','lat','lon'],np.transpose(Nwashoff.reshape((360,365,720)),(1,0,2))),
+                        TANleaching=(['time','lat','lon'],np.transpose(NH4leaching.reshape((360,365,720)),(1,0,2))),
+                        TANdiffaq=(['time','lat','lon'],np.transpose(TANdiff.reshape((360,365,720)),(1,0,2))),
+                        NH3diffgas=(['time','lat','lon'],np.transpose(NH3diff.reshape((360,365,720)),(1,0,2))),
+                        NH4nitrif=(['time','lat','lon'],np.transpose(TANnitrif.reshape((360,365,720)),(1,0,2))),
                         NH4uptake=(['time','lat','lon'],np.transpose(Ammuptake.reshape((360,365,720)),(1,0,2))),
                         NO3uptake=(['time','lat','lon'],np.transpose(Nituptake.reshape((360,365,720)),(1,0,2))),
                         NO3washoff=(['time','lat','lon'],np.transpose(NO3washoff.reshape((360,365,720)),(1,0,2))),
@@ -148,25 +149,25 @@ sim_type='base',output_stat=True,quality_check=True)
 
                 outds.NH3emiss.attrs["unit"] = 'gN/day'
                 outds.NH3emiss.attrs["long name"] = 'NH3 emission from fertilizer application'
-                outds.TANwashoff.attrs["unit"] = 'gN/year'
+                outds.TANwashoff.attrs["unit"] = 'gN/day'
                 outds.TANwashoff.attrs["long name"] = 'TAN washoff from fertilizer application'
-                outds.TANleaching.attrs["unit"] = 'gN/year'
+                outds.TANleaching.attrs["unit"] = 'gN/day'
                 outds.TANleaching.attrs["long name"] = 'TAN leaching from fertilizer application'
-                outds.TANdiffaq.attrs["unit"] = 'gN/year'
+                outds.TANdiffaq.attrs["unit"] = 'gN/day'
                 outds.TANdiffaq.attrs["long name"] = 'TAN diffusion to deep soil from fertilizer application'
-                outds.NH3diffgas.attrs["unit"] = 'gN/year'
+                outds.NH3diffgas.attrs["unit"] = 'gN/day'
                 outds.NH3diffgas.attrs["long name"] = 'NH3 diffusion to deep soil from fertilizer application'
-                outds.NH4nitrif.attrs["unit"] = 'gN/year'
+                outds.NH4nitrif.attrs["unit"] = 'gN/day'
                 outds.NH4nitrif.attrs["long name"] = 'Nitrification'
-                outds.NH4uptake.attrs["unit"] = 'gN/year'
+                outds.NH4uptake.attrs["unit"] = 'gN/day'
                 outds.NH4uptake.attrs["long name"] = 'Uptake of NH4+ by crops'
-                outds.NO3uptake.attrs["unit"] = 'gN/year'
+                outds.NO3uptake.attrs["unit"] = 'gN/day'
                 outds.NO3uptake.attrs["long name"] = 'Uptake of NO3- by crops'
-                outds.NO3washoff.attrs["unit"] = 'gN/year'
+                outds.NO3washoff.attrs["unit"] = 'gN/day'
                 outds.NO3washoff.attrs["long name"] = 'Nitrate washoff from fertilizer application'
-                outds.NO3leaching.attrs["unit"] = 'gN/year'
+                outds.NO3leaching.attrs["unit"] = 'gN/day'
                 outds.NO3leaching.attrs["long name"] = 'Nitrate leaching from fertilizer application'
-                outds.NO3diff.attrs["unit"] = 'gN/year'
+                outds.NO3diff.attrs["unit"] = 'gN/day'
                 outds.NO3diff.attrs["long name"] = 'Nitrate diffusion to deep soil from fertilizer application'
 
                 comp = dict(zlib=True, complevel=9)

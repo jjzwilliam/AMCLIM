@@ -1878,6 +1878,8 @@ class LAND_module:
         ## pH and H+ ions concentration
         sim_ccH = np.float(10**(-sim_pH))
 
+        print("Grazing sim span period is: ",span_day," days.")
+
         for dd in np.arange(start_day_idx,end_day_idx):
             ## 
             for dd_span in np.arange(dd,dd+span_day):
@@ -2510,6 +2512,15 @@ class LAND_module:
             self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,manure_fert=True,manure_type=manure,
                     crop=None,sim=sim_type,stvar=senstest_var,st=senstest)
             self.para_out("none",manure,output_stat,quality_check)
+
+    # def manure_sim_main(self,fert_method,manure_type,livestock_name,production_system,mms_cat,phase,start_day_idx,end_day_idx,
+    #                     crop_item=None,sim_type='base',senstest_var=False,senstest=False,
+    #                     output_stat=False,quality_check=False):
+    #     self.manure_fert_input(livestock_name,production_system,mms_cat,phase)
+    #     self.land_manure_sim(start_day_idx,end_day_idx,manure_type,tech=fert_method,
+    #                     sim=sim_type,stvar=senstest_var,st=senstest)
+    #     # self.para_out(chem_fert_type,output_stat,quality_check)
+    #     return
 
     def grazing_main(self,livestock_name,production_system,start_day_idx,end_day_idx,
                         span_day=grazing_span,sim='base',stvar=False,st=False,stat=False):

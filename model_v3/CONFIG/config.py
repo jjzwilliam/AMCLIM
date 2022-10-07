@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ## specify CONFIG_machine: STREAM, JASMIN, ARCHER
-CONFIG_machine = 'STREAM'
+CONFIG_machine = 'ARCHER'
 
 CONFIG_inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
@@ -51,7 +51,7 @@ Months_idx = [0,31,59,90,120,151,181,212,243,273,304,334,365]
 
 ## specify livestock type and production sytem
 ## livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
-livestock = 'BEEF_CATTLE'
+# livestock = 'BEEF_CATTLE'
 # livestock = 'POULTRY'
 
 ## level index: 
@@ -61,7 +61,7 @@ livestock = 'BEEF_CATTLE'
 ## OTHER CATTLE: grassland-0; mixed-1
 ## SHEEP: grassland-0; mixed-1
 ## POULTRY: broiler-0, layer-1, backyard-2
-lvl_idx = 1
+# lvl_idx = 1
 CONFIG_production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
         'BEEF_CATTLE':['grassland','mixed',None],
@@ -70,7 +70,16 @@ CONFIG_production_system_dict = {
         'SHEEP':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
-production_system = CONFIG_production_system_dict[livestock][lvl_idx]
+## manure N to land production systems
+CONFIG_livestock_prodsyst_Nappland_lict = {
+        'PIG':['industrial','intermediate','backyard'],
+        'BEEF_CATTLE':['mixed'],
+        'DAIRY_CATTLE':['mixed'],
+        'OTHER_CATTLE':['mixed'],
+        'SHEEP':['mixed'],
+        'POULTRY':['broiler','layer','backyard']
+        }
+# production_system = CONFIG_production_system_dict[livestock][lvl_idx]
 ## housing_system: 1. insulated building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
 ## housing_system_list = ['slat/pit house','barn','poultry_house','bck_poultry']
 CONFIG_housing_system_dict = {

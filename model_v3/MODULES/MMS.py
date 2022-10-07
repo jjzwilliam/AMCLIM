@@ -380,7 +380,7 @@ class MMS_module:
         else:
             hhidx = dayidx*24
             temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
-            rhum_data = rhum_file.rh2m[hhidx:hhidx+24]
+            rhum_data = rhum_file.rhum2m[hhidx:hhidx+24]
             wind_data = wind_file.wind10m[hhidx:hhidx+24]
         
         if mms_type == 'MMS_cover':

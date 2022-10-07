@@ -22,8 +22,8 @@ f_uan = 0.6
 f_excretn = 0.05
 ## adsorption constant for manure; m3/m3
 Kd_manure = 1.0
-## system pH is assumed to be manure pH varied by animals
-pH = pH_info[livestock.upper()]
+# ## system pH is assumed to be manure pH varied by animals
+# pH = pH_info[livestock.upper()]
 ## surface roughness height of slatted floor; default 2mm
 zo_house = 0.002
 ## surface roughness of water surface (pit storage, mostly liquid)
@@ -380,7 +380,7 @@ class HOUSING_MODULE:
         else:
             hhidx = dayidx*24
             temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
-            rhum_data = rhum_file.rh2m[hhidx:hhidx+24]
+            rhum_data = rhum_file.rhum2m[hhidx:hhidx+24]
             wind_data = wind_file.wind10m[hhidx:hhidx+24]
         ## housing environmental conditions
         if house_env.lower() == 'insulated':
@@ -1021,6 +1021,7 @@ class HOUSING_MODULE:
             grazing_total_N = self.grazing_manure_N+self.grazing_urine_N
 
         if housing_type.lower() == 'slat/pit house':
+            insitu = ''
             slat_emiss = self.o_NH3flux_slat*self.floor_area.values
             pit_emiss = self.o_NH3flux_pit*self.pit_area.values
             n_excret = 1000*self.excret_N*self.floor_area.values
