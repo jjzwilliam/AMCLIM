@@ -954,7 +954,7 @@ MMS_preserve_solid_list = ['mmsthermal']
 ## Cat I.C.2: N mostly preserved for further use (as liquid), e.g., manure stored in liquid phase with emission mitigation measures: lagoon (typically with cover), liquid crust
 MMS_preserve_liquid_list = ['mmsliqcrust']
 ## Cat I.A.1: manure stored in barns (as solid): composting, deep litter, litter (poultry), no litter (poultry), pit (layer),solid storage (inc. ot)
-MMS_indoor_solid_list = ['mmscompost','mmssolid','mmsolidot']
+MMS_indoor_solid_list = ['mmscompost','mmssolid','mmsolidot','mmsnolitt']
 ##  Cat I.A.2: manure stored in barns (as liquid): aerobic processing, liquid, pit1, pit2
 MMS_indoor_liquid_list = ['mmslagoon']
 ## Cat I.B.1: manure in open/outdoor environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
@@ -966,7 +966,7 @@ MMS_outdoor_lagoon_list = ['mmsaerobic']
 
 ## MMS for housing module (in-situ storage of manure in animal houses)
 ## Cat II.A.1: in-situ storage of manure (as solid)
-MMS_house_storage_solid_list = ['mmsdeeplitt','mmslitter','mmsnolitt'] 
+MMS_house_storage_solid_list = ['mmsdeeplitt','mmslitter'] 
 ## Cat II.A.2: in-situ storgate of manure (as liquid)
 MMS_house_storage_liquid_list = ['mmspit1','mmspit2']
 

@@ -67,7 +67,7 @@ pmids = [0.01, 0.045, 0.105, 0.21]
 ## patch area; 0.25 m2
 patch_area = 0.25
 ## grazing density; 2500 m2/head
-grazing_density = {"BEEF_CATTLE":2500,"DAIRY_CATTLE":2500,"SHEEP":400,"GOAT":400} 
+grazing_density = {"BEEF_CATTLE":2500,"DAIRY_CATTLE":2500,"OTHER_CATTLE":2500,"SHEEP":400,"GOAT":400} 
 ## fraction of N_avail, N_resist and N_unavail; 50, 45, 5 per cent
 ## ref: CLM_FANv1 (Riddick et al., 2016)
 f_avail = 0.5
@@ -906,6 +906,8 @@ class LAND_module:
     ## determining seasonal grazing for ruminants: beef cattle, dairy cattle, sheep etc.
     ## note that production system should be [mixed]
     def grazing_indicator(self,dayidx):
+        if dayidx >= Days:
+            dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
         if CONFIG_machine == "STREAM":
             temp_data = temp_file.t2m[dayidx] - 273.15

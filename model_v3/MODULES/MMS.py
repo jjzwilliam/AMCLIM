@@ -73,7 +73,7 @@ cover_reduction = 0.95
 ##################################
 class MMS_module:
     def __init__(self,livestock_name,production_system_lvl_idx,mms_cat,phase,manure_added,urea_added,UA_added,avail_N_added,resist_N_added,unavail_N_added,\
-    TAN_added,water_added,pH_value,area_housing):
+    TAN_added,water_added,area_housing):
         ## livestock and production system info
         self.livestock = livestock_name
         self.lvl_idx = production_system_lvl_idx
@@ -256,8 +256,8 @@ class MMS_module:
         self.Na_decomp_rate = np.zeros(array_shape)
         self.Nr_decomp_rate = np.zeros(array_shape)
         ## pH and H+ ions concentration
-        self.pH = pH_value
-        self.cc_H = np.float(10**(-pH_value))
+        self.pH = pH_info[self.livestock]
+        self.cc_H = np.float(10**(-self.pH))
         ## housing area that is used to determine MMS area
         self.housingarea = area_housing
         self.mmsarea = area_housing.shape
