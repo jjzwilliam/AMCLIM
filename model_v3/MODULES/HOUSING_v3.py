@@ -35,9 +35,11 @@ rsurf = 100
 ## NH3 absorbed by bedding
 bedding_reduction = 0.4
 ## cleaning frequency of each housing type
-cleaning_freq = {"slat-pit_house": 60,
+cleaning_freq = {"slat-pit_house_insitu": 60,
+                "slat-pit_house": 1,
                 "barn": 1,
-                "poultry_house": 60}
+                "poultry_house": 60,
+                "poultry_house_with_litter": Days}
 
 ############################################
 ## HOUSING MODULE: various housing systems
@@ -286,7 +288,7 @@ class HOUSING_MODULE:
             self.fpit = fpit
 
             ## area of slatted floor: multiplied by the fraction of slat-pit housing
-            self.floor_area = self.housing_area*self.f_housing_pit/(1.0-self.f_loss-self.f_sold)
+            self.floor_area = self.housing_area
             ## area of pit: multiplied by the fraction of slat-pit housing
             self.pit_area = fpit * self.floor_area
             ## manure application calendar
@@ -333,7 +335,7 @@ class HOUSING_MODULE:
             self.o_NH3flux = np.zeros(outarray_shape)
 
             ## area of housing area
-            self.floor_area = self.housing_area*(1.0-self.f_housing_pit/(1.0-self.f_loss-self.f_sold))
+            self.floor_area = self.housing_area
 
             if housing_type.lower() == 'barn':
                 ## urea pool
@@ -429,7 +431,7 @@ class HOUSING_MODULE:
     ###################################
     ## define model functions
     ###################################
-    ## simulation: for houses with slatted floor (two-source model: slat+pit); industrial production system
+    ## simulation: for houses with slatted floor (two-source model: slat+pit); industrial pig production system
     def slat_pit_housing_sim(self,start_day_idx,end_day_idx,cleaning_frequency,f_slat,f_gap):
         fpitcorrect = 1/self.fpit
         for dd in np.arange(start_day_idx,end_day_idx):
@@ -892,69 +894,89 @@ class HOUSING_MODULE:
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
 
-        manure_cleaningidx = self.manure_app_cal - np.floor(self.manure_app_cal/cleaning_freq)*cleaning_freq
-        cleaning_dayidx = dayidx - np.floor(dayidx/cleaning_freq)*cleaning_freq
-        cleaning_con = (manure_cleaningidx==cleaning_dayidx)
+        ## mostly for ind pig of which MMS is not pit1 or pit2
+        if cleaning_freq == 1:
+            if housing_type.lower() == 'slat-pit_house':
+                self.manure_pool_to_storage[dayidx] = self.manure_pool_pit[-1]*self.pit_area
+                self.avail_N_pool_to_storage[dayidx] = self.avail_N_pool_pit[-1]*self.pit_area
+                self.resist_N_pool_to_storage[dayidx] = self.resist_N_pool_pit[-1]*self.pit_area
+                self.unavail_N_pool_to_storage[dayidx] = self.unavail_N_pool_pit[-1]*self.pit_area
+                self.urea_pool_to_storage[dayidx] = self.urea_pool_pit[-1]*self.pit_area
+                self.TAN_pool_to_storage[dayidx] = self.TAN_pool_pit[-1]*self.pit_area
+                self.Total_water_pool_to_storage[dayidx] = self.Total_water_pool_pit[-1]*self.pit_area
 
-        if housing_type.lower() == 'slat-pit_house':
-            ## pools: from housing to MMS
-            ## Note: by multiplying the housing area, we get the total mass of each pool rather than mass/unit area
-            self.manure_pool_to_storage[dayidx][cleaning_con] = self.manure_pool_pit[-1][cleaning_con]*\
-                                                                    self.pit_area.values[cleaning_con]
-            self.avail_N_pool_to_storage[dayidx][cleaning_con] = self.avail_N_pool_pit[-1][cleaning_con]*\
-                                                                    self.pit_area.values[cleaning_con]
-            self.resist_N_pool_to_storage[dayidx][cleaning_con] = self.resist_N_pool_pit[-1][cleaning_con]*\
-                                                                    self.pit_area.values[cleaning_con]
-            self.unavail_N_pool_to_storage[dayidx][cleaning_con] = self.unavail_N_pool_pit[-1][cleaning_con]*\
-                                                                    self.pit_area.values[cleaning_con]
-            self.urea_pool_to_storage[dayidx][cleaning_con] = self.urea_pool_pit[-1][cleaning_con]*\
-                                                                    self.pit_area.values[cleaning_con]
-            self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool_pit[-1][cleaning_con]*self.pit_area.values[cleaning_con]
-            self.Total_water_pool_to_storage[dayidx][cleaning_con] = self.Total_water_pool_pit[-1][cleaning_con]*\
-                                                                    self.pit_area.values[cleaning_con]
-        
-            self.manure_pool_pit[-1][cleaning_con] = 0.0
-            self.manure_initwc_pit[-1][cleaning_con] = 0.0
-            self.urea_pool_pit[-1][cleaning_con] = 0.0
-            self.avail_N_pool_pit[-1][cleaning_con] = 0.0
-            self.resist_N_pool_pit[-1][cleaning_con] = 0.0
-            self.unavail_N_pool_pit[-1][cleaning_con] = 0.0
-            self.TAN_pool_pit[-1][cleaning_con] = 0.0
-            self.Total_water_pool_pit[-1][cleaning_con] = 0.0
+                self.manure_pool_pit[-1] = 0.0
+                self.urea_pool_pit[-1] = 0.0
+                self.avail_N_pool_pit[-1] = 0.0
+                self.resist_N_pool_pit[-1] = 0.0
+                self.unavail_N_pool_pit[-1] = 0.0
+                self.TAN_pool_pit[-1] = 0.0
+                self.Total_water_pool_pit[-1] = 0.0
+
         else:
-            #print(housing_type)
-            ## pools: from housing to MMS
-            self.manure_pool_to_storage[dayidx][cleaning_con] = self.manure_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
-            self.avail_N_pool_to_storage[dayidx][cleaning_con] = self.avail_N_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
-            self.resist_N_pool_to_storage[dayidx][cleaning_con] = self.resist_N_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
-            self.unavail_N_pool_to_storage[dayidx][cleaning_con] = self.unavail_N_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
-            self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
-            ## get rid of numpy rounding error: maximum NH3 flux is equivalent to TAN pool and should not exceed TAN pool
-            ## however, when do calculations, NH3 flux is sometimes rounded to a value that is bigger than TAN pool
-            ## e.g. NH3 flux = 2.7233141344, TAN pool = 2.7233141343; this leads to the [TAN to storage] a negative value,
-            ## which is against reality/mass conservative principle due to the rounding error in numpy
-            self.TAN_pool_to_storage[dayidx][self.TAN_pool_to_storage[dayidx]<0] = 0.0
-            #print("TAN pool to storage: ",self.TAN_pool_to_storage[dayidx,41,84])
-            self.Total_water_pool_to_storage[dayidx][cleaning_con] = self.Total_water_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
+            manure_cleaningidx = self.manure_app_cal - np.floor(self.manure_app_cal/cleaning_freq)*cleaning_freq
+            cleaning_dayidx = dayidx - np.floor(dayidx/cleaning_freq)*cleaning_freq
+            cleaning_con = (manure_cleaningidx==cleaning_dayidx)
 
-            self.manure_pool[-1][cleaning_con] = 0.0
-            self.manure_water[-1][cleaning_con] = 0.0
-            self.avail_N_pool[-1][cleaning_con] = 0.0
-            self.resist_N_pool[-1][cleaning_con] = 0.0
-            self.unavail_N_pool[-1][cleaning_con] = 0.0
-            self.TAN_pool[-1][cleaning_con] = 0.0
-            self.Total_water_pool[-1][cleaning_con] = 0.0
+            if housing_type.lower() == 'slat-pit_house':
+                ## pools: from housing to MMS
+                ## Note: by multiplying the housing area, we get the total mass of each pool rather than mass/unit area
+                self.manure_pool_to_storage[dayidx][cleaning_con] = self.manure_pool_pit[-1][cleaning_con]*\
+                                                                        self.pit_area.values[cleaning_con]
+                self.avail_N_pool_to_storage[dayidx][cleaning_con] = self.avail_N_pool_pit[-1][cleaning_con]*\
+                                                                        self.pit_area.values[cleaning_con]
+                self.resist_N_pool_to_storage[dayidx][cleaning_con] = self.resist_N_pool_pit[-1][cleaning_con]*\
+                                                                        self.pit_area.values[cleaning_con]
+                self.unavail_N_pool_to_storage[dayidx][cleaning_con] = self.unavail_N_pool_pit[-1][cleaning_con]*\
+                                                                        self.pit_area.values[cleaning_con]
+                self.urea_pool_to_storage[dayidx][cleaning_con] = self.urea_pool_pit[-1][cleaning_con]*\
+                                                                        self.pit_area.values[cleaning_con]
+                self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool_pit[-1][cleaning_con]*self.pit_area.values[cleaning_con]
+                self.Total_water_pool_to_storage[dayidx][cleaning_con] = self.Total_water_pool_pit[-1][cleaning_con]*\
+                                                                        self.pit_area.values[cleaning_con]
+            
+                self.manure_pool_pit[-1][cleaning_con] = 0.0
+                self.manure_initwc_pit[-1][cleaning_con] = 0.0
+                self.urea_pool_pit[-1][cleaning_con] = 0.0
+                self.avail_N_pool_pit[-1][cleaning_con] = 0.0
+                self.resist_N_pool_pit[-1][cleaning_con] = 0.0
+                self.unavail_N_pool_pit[-1][cleaning_con] = 0.0
+                self.TAN_pool_pit[-1][cleaning_con] = 0.0
+                self.Total_water_pool_pit[-1][cleaning_con] = 0.0
+            else:
+                #print(housing_type)
+                ## pools: from housing to MMS
+                self.manure_pool_to_storage[dayidx][cleaning_con] = self.manure_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
+                self.avail_N_pool_to_storage[dayidx][cleaning_con] = self.avail_N_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
+                self.resist_N_pool_to_storage[dayidx][cleaning_con] = self.resist_N_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
+                self.unavail_N_pool_to_storage[dayidx][cleaning_con] = self.unavail_N_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
+                self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
+                ## get rid of numpy rounding error: maximum NH3 flux is equivalent to TAN pool and should not exceed TAN pool
+                ## however, when do calculations, NH3 flux is sometimes rounded to a value that is bigger than TAN pool
+                ## e.g. NH3 flux = 2.7233141344, TAN pool = 2.7233141343; this leads to the [TAN to storage] a negative value,
+                ## which is against reality/mass conservative principle due to the rounding error in numpy
+                self.TAN_pool_to_storage[dayidx][self.TAN_pool_to_storage[dayidx]<0] = 0.0
+                #print("TAN pool to storage: ",self.TAN_pool_to_storage[dayidx,41,84])
+                self.Total_water_pool_to_storage[dayidx][cleaning_con] = self.Total_water_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
 
-            if housing_type.lower() == 'poultry_house':
-                self.UA_pool_to_storage[dayidx][cleaning_con] = self.UA_pool[-1][cleaning_con]*\
-                                                                    self.floor_area.values[cleaning_con]
-                self.UA_pool[-1][cleaning_con] = 0.0
+                self.manure_pool[-1][cleaning_con] = 0.0
+                self.manure_water[-1][cleaning_con] = 0.0
+                self.avail_N_pool[-1][cleaning_con] = 0.0
+                self.resist_N_pool[-1][cleaning_con] = 0.0
+                self.unavail_N_pool[-1][cleaning_con] = 0.0
+                self.TAN_pool[-1][cleaning_con] = 0.0
+                self.Total_water_pool[-1][cleaning_con] = 0.0
+
+                if housing_type.lower() == 'poultry_house':
+                    self.UA_pool_to_storage[dayidx][cleaning_con] = self.UA_pool[-1][cleaning_con]*\
+                                                                        self.floor_area.values[cleaning_con]
+                    self.UA_pool[-1][cleaning_con] = 0.0
 
     ## barn cleaning
     def cleaning_barn(self,dayidx):
@@ -1040,7 +1062,8 @@ class HOUSING_MODULE:
         self.grazing_manurewc[dayidx] = self.housing_area*(self.manure_wc * grazing_idx)*(24/timestep)
 
 
-    def sim_out(self,housing_type,litter=False,output_stat=False):
+    ## in-situ storage: MMS[pit1, pit2, deeplitter, litter(poultry)]
+    def sim_out(self,housing_type,insitu_storage=False,litter_management=False,output_stat=False):
         nlat = int(180.0/CONFIG_dlat)
         nlon = int(360.0/CONFIG_dlon)
         ntime = Days
@@ -1051,6 +1074,11 @@ class HOUSING_MODULE:
 
         if self.production_system == "mixed":
             grazing_total_N = self.grazing_manure_N+self.grazing_urine_N
+        
+        if insitu_storage is True:
+            insitu = '_insitu'
+        else:
+            insitu = ''
 
         if housing_type.lower() == 'slat-pit_house':
             with_litter = ''
@@ -1102,7 +1130,7 @@ class HOUSING_MODULE:
 
         # elif housing_type.lower() == 'barn':
         else:
-            if litter is True:
+            if litter_management is True:
                 with_litter = '_litter'
             else:
                 with_litter = ''
@@ -1145,7 +1173,7 @@ class HOUSING_MODULE:
         comp = dict(zlib=True, complevel=9)
         encoding = {var: comp for var in outds.data_vars}
 
-        outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+housing_type+with_litter+\
+        outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+housing_type+with_litter+insitu+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
 
@@ -1159,18 +1187,33 @@ class HOUSING_MODULE:
                     str(np.round(np.nansum(grazing_total_N)/1e9,decimals=2))+" GgN.")
 
         return
+
     
     def slat_pit_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,ncfile_o=True,stat=True):
         print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', slat-pit housing, '+\
                                                             str(self.livestock)+', '+str(self.production_system))
         print("cleaning frequency is: every "+str(cleaning_frequency)+" day(s)")
+        ## in-situ storage
+        if cleaning_frequency >= 7:
+            print("in-situ manure storage in slat-pit house")
+            self.floor_area = self.housing_area*self.f_housing_pit*(1.0-self.f_loss-self.f_sold)
+            self.pit_area = self.fpit * self.floor_area
+        else:
+            ## short term storage in slatted house
+            print("short-time storage in slat-pit house")
+            self.floor_area = self.housing_area*(1.0-(self.f_housing_pit*(1.0-self.f_loss-self.f_sold)))
+            self.pit_area = self.fpit * self.floor_area
+
         ## manurea application calendar
         self.manure_app_calendar()
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
         self.slat_pit_housing_sim(start_idx,end_idx,cleaning_frequency,self.fslat,self.fgap)
         if ncfile_o is True:
-            self.sim_out(housing_type,output_stat=stat)
+            if cleaning_frequency >= 7:
+                self.sim_out(housing_type,insitu_storage=True,output_stat=stat)
+            else:
+                self.sim_out(housing_type,output_stat=stat)
         return
 
     def barn_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False,ncfile_o=True,stat=True):
@@ -1184,9 +1227,9 @@ class HOUSING_MODULE:
             ## surface resistance; assumed to be 100 s/m (if bedding etc.)
             self.R_surf = rsurf
             self.f_reduction = bedding_reduction
-            self.floor_area = self.floor_area*self.f_housing_litter
+            self.floor_area = self.housing_area*(self.f_housing_litter*(1.0-self.f_loss-self.f_sold))
         else:
-            self.floor_area = self.floor_area*(1.0-self.f_housing_litter)
+            self.floor_area = self.housing_area*(1.0-(self.f_housing_litter*(1.0-self.f_loss-self.f_sold)))
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency)
@@ -1196,7 +1239,7 @@ class HOUSING_MODULE:
         self.housing_2nd_init(housing_type)
         self.barn_housing_sim(0,start_idx)
         if ncfile_o is True:
-            self.sim_out(housing_type,litter,output_stat=stat)
+            self.sim_out(housing_type,litter_management=litter,output_stat=stat)
         return
 
     def poultry_house_sim_main(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False,ncfile_o=True,stat=True):
@@ -1210,16 +1253,16 @@ class HOUSING_MODULE:
             self.R_surf = rsurf
             self.f_reduction = bedding_reduction
             ## poultry housing with litter
-            self.floor_area = self.floor_area*(self.f_housing_litter)/(1.0-self.f_loss-self.f_sold)
+            self.floor_area = self.housing_area*(self.f_housing_litter*(1.0-self.f_loss-self.f_sold))
         else:
-            self.floor_area = self.floor_area*(1.0-(self.f_housing_litter))/(1.0-self.f_loss-self.f_sold)
+            self.floor_area = self.housing_area*(1.0-(self.f_housing_litter*(1.0-self.f_loss-self.f_sold)))
         self.housing_init(housing_type)
         self.housing_to_storage_init(housing_type)
 
         self.poultry_housing_sim(start_idx,end_idx,cleaning_frequency)
 
         if ncfile_o is True:
-            self.sim_out(housing_type,litter,output_stat=stat)
+            self.sim_out(housing_type,litter_management=litter,output_stat=stat)
         return 
 
     
