@@ -129,6 +129,7 @@ def ua_hydrolysis_rate(temp,rhum,ph,delta_t):
     frh = np.minimum(frh,1.0)
     # frh = 0.0125*rhum-0.0014
     fph = (1.34*ph - 7.2)/(1.34*9 - 7.2)
+    fph = np.maximum(fph,0.01)
     ## conversion rate
     fenv = ft*frh*fph
     # fenv[fenv>1.0] = 1.0

@@ -707,6 +707,9 @@ class LAND_module:
         soilph = np.zeros(CONFIG_mtrx2)
         soilph[:] = soilpHds.T_PH_H2O.values
         self.pH = soilph[:,self.plat1:self.plat2,:] 
+        # if phase == "solid":
+        #     self.pH[:] = pH_info[livestock_name]
+        self.pH[:] = pH_info[livestock_name]
         self.cc_H = 10**(-self.pH)
 
         tan = np.zeros(CONFIG_mtrx[1:])
@@ -763,6 +766,7 @@ class LAND_module:
             self.unavail_N_added[dd] = unavailN[self.plat1:self.plat2,:]
 
             tan[:] = 0.0
+            uan[:] = 0.0
             manure[:]  = 0.0
             water[:]  = 0.0
             availN[:] = 0.0
@@ -1448,6 +1452,11 @@ class LAND_module:
                             Na_decomp_rate, Nr_decomp_rate = N_pools_decomp_rate(temp=self.soil_temp[llidx,hh+1],delta_t=timestep)
                             ## UA hydrolysis and org N decomposition contributes to TAN pool at a specific soil layer
                             self.uahydrolysis[ll,hh+1] = self.UA_pool[hh+1]*ua_conv_factor
+                            # print("dd",dd,"hh+1",hh+1,"tempr",self.soil_temp[llidx,hh+1,0,496],
+                            #                             "rhum",self.rhum[hh+1,0,496],
+                            #                             "pH",sim_pH[0,496])
+                            # print("dd",dd,"hh+1",hh+1,"UAhydro factor",ua_conv_factor[0,496])
+                            # print("dd",dd,"hh+1",hh+1,"UA hydrolysis",self.uahydrolysis[ll,hh+1,0,496])
                             self.orgN_decomp[ll,hh+1] = self.avail_N_pool[hh+1]*Na_decomp_rate + \
                                                         self.resist_N_pool[hh+1]*Nr_decomp_rate
                             if ll == 0:
@@ -1457,6 +1466,8 @@ class LAND_module:
                                 self.resist_N_washoff[hh+1] = N_washoff_rate*self.resist_N_pool[hh+1]
                                 self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
                             self.UA_pool[hh+1] = self.UA_pool[hh+1]-self.uahydrolysis[ll,hh+1]-self.UAwashoff[hh+1]
+                            # print("dd",dd,"hh+1",hh+1,"UA washoff",self.UAwashoff[hh+1,0,496],"UA added",self.UA[hh+1,0,496])
+                            # print("dd",dd,"hh+1",hh+1,"UA pool",self.UA_pool[hh+1,0,496])
                             self.avail_N_pool[hh+1] = self.avail_N_pool[hh+1]-(self.avail_N_pool[hh+1]*Na_decomp_rate)-\
                                                         self.avail_N_washoff[hh+1]
                             self.resist_N_pool[hh+1] = self.resist_N_pool[hh+1]-(self.resist_N_pool[hh+1]*Nr_decomp_rate)-\
@@ -1493,7 +1504,8 @@ class LAND_module:
                         ########################
                         ## TAN pool
                         self.TAN_pool[ll,hh+1] = self.TAN_pool[ll,hh]+self.TANdiffusionup[ll,hh]+self.NH3diffusionup[ll,hh]+TANprod
-
+                        # print("dd",dd,"hh+1",hh+1,"TANprod",TANprod[0,496])
+                        # print("dd",dd,"hh+1",hh+1,"TAN pool 1st",self.TAN_pool[ll,hh+1,0,496])
                         ## fraction of aqueous NH4
                         fNH4 = frac_NH4(theta=self.theta[ll,hh+1],theta_sat=self.soil_satmoist[llidx,hh+1],
                                         temp=self.soil_temp[llidx,hh+1],cncH=sim_ccH,kd=Kd)
