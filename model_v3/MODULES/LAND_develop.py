@@ -741,6 +741,8 @@ class LAND_module:
         ## the aim is testing/debugging
         croparea = (spring_manure+spring_water)/5e3
         self.manureapparea = croparea[self.plat1:self.plat2,:]
+        self.manureapparea = np.nan_to_num(self.manureapparea)
+        # self.manureapparea[:] = 1e3
 
         for dd in np.arange(Days):
 
@@ -1853,6 +1855,7 @@ class LAND_module:
         # source_area = (1-np.exp(-animal_head*patch_area/field_area))*field_area
         source_area = field_area * (f_urine_patch+f_dung_pat)
         self.pastarea = source_area
+        # self.pastarea = np.nan_to_num(self.pastarea)
         excret_N = excretN_info/source_area
         excret_N = xr_to_np(excret_N)
         durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 

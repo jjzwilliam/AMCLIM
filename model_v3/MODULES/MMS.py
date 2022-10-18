@@ -1133,7 +1133,7 @@ class MMS_module:
             elif mms_cat == "MMS_lagoon":
                 f_area = MMS_area_factor['mms_open_lagoon']
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
-            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea*f_area)
+            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea.values*f_area)
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],MMS_NH3emiss),
@@ -1169,7 +1169,7 @@ class MMS_module:
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH4nitrif = self.o_NH4nitrif*self.mmsarea
-            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea*f_area)
+            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea.values*f_area)
             if mms_cat == "MMS_open":
                 MMS_Nwashoff = self.o_Nwashoff*self.mmsarea
                 outds = xr.Dataset(
@@ -1246,45 +1246,43 @@ class MMS_module:
                     ' is '+str(np.round(np.nansum(MMS_totalN)/1e9,decimals=2))+' GgN.')
             print("NH3 emission from "+mms_cat+' '+phase+' of '+self.production_system+' '+self.livestock+\
                     ' is '+str(np.round(np.nansum(MMS_NH3emiss)/1e9,decimals=2))+' GgN.')
+                    
+        outds = xr.Dataset(
+                data_vars=dict(
+                    spring_TAN=(['lat','lon'],self.spring_Napp),
+                    spring_UAN=(['lat','lon'],self.spring_UANapp),
+                    spring_manure=(['lat','lon'],self.spring_manureapp),
+                    spring_water=(['lat','lon'],self.spring_waterapp),
+                    spring_availN=(['lat','lon'],self.spring_availNapp),
+                    spring_resistN=(['lat','lon'],self.spring_resistNapp),
+                    spring_unavailN=(['lat','lon'],self.spring_unavailNapp),
+                    winter_TAN=(['lat','lon'],self.winter_Napp),
+                    winter_UAN=(['lat','lon'],self.winter_UANapp),
+                    winter_manure=(['lat','lon'],self.winter_manureapp),
+                    winter_water=(['lat','lon'],self.winter_waterapp),
+                    winter_availN=(['lat','lon'],self.winter_availNapp),
+                    winter_resistN=(['lat','lon'],self.winter_resistNapp),
+                    winter_unavailN=(['lat','lon'],self.winter_unavailNapp),
+                            ),
+                coords = dict(
+                    lon=(["lon"], lons),
+                    lat=(["lat"], lats),
+                            ),
+                attrs=dict(
+                    description="AMCLIM-MMS: manure application to land in spring and winter season "+\
+                            self.production_system+" "+self.livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
+                    info = self.production_system+" "+self.livestock+" "+mms_cat+" "+phase,
+                    units="gN per grid",
+                ),
+            )
 
-        if (mms_cat!="MMS_opne")&(phase!="solid"):
-            outds = xr.Dataset(
-                    data_vars=dict(
-                        spring_TAN=(['lat','lon'],self.spring_Napp),
-                        spring_UAN=(['lat','lon'],self.spring_UANapp),
-                        spring_manure=(['lat','lon'],self.spring_manureapp),
-                        spring_water=(['lat','lon'],self.spring_waterapp),
-                        spring_availN=(['lat','lon'],self.spring_availNapp),
-                        spring_resistN=(['lat','lon'],self.spring_resistNapp),
-                        spring_unavailN=(['lat','lon'],self.spring_unavailNapp),
-                        winter_TAN=(['lat','lon'],self.winter_Napp),
-                        winter_UAN=(['lat','lon'],self.winter_UANapp),
-                        winter_manure=(['lat','lon'],self.winter_manureapp),
-                        winter_water=(['lat','lon'],self.winter_waterapp),
-                        winter_availN=(['lat','lon'],self.winter_availNapp),
-                        winter_resistN=(['lat','lon'],self.winter_resistNapp),
-                        winter_unavailN=(['lat','lon'],self.winter_unavailNapp),
-                                ),
-                    coords = dict(
-                        lon=(["lon"], lons),
-                        lat=(["lat"], lats),
-                                ),
-                    attrs=dict(
-                        description="AMCLIM-MMS: manure application to land in spring and winter season "+\
-                                self.production_system+" "+self.livestock+" "+mms_cat+" "+phase+" in " +str(sim_year),
-                        info = self.production_system+" "+self.livestock+" "+mms_cat+" "+phase,
-                        units="gN per grid",
-                    ),
-                )
+        comp = dict(zlib=True, complevel=9)
+        encoding = {var: comp for var in outds.data_vars}
 
-            comp = dict(zlib=True, complevel=9)
-            encoding = {var: comp for var in outds.data_vars}
+        outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+mms_cat+'.'+phase+\
+                            '.'+str(sim_year)+'.manureapp.nc',encoding=encoding)
+        print("manure app ncfile saved.")
 
-            outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+mms_cat+'.'+phase+\
-                                '.'+str(sim_year)+'.manureapp.nc',encoding=encoding)
-            print("manure app ncfile saved.")
-        else:
-            print("manure left on field. (no subsequent application)")
         return
 
     def output_MMS_pathway(self,output_stat=False):

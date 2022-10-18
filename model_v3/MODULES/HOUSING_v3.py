@@ -912,6 +912,22 @@ class HOUSING_MODULE:
                 self.unavail_N_pool_pit[-1] = 0.0
                 self.TAN_pool_pit[-1] = 0.0
                 self.Total_water_pool_pit[-1] = 0.0
+            if housing_type.lower() == 'poultry_house':
+                self.manure_pool_to_storage[dayidx] = self.manure_pool[-1]*self.floor_area
+                self.avail_N_pool_to_storage[dayidx] = self.avail_N_pool[-1]*self.floor_area
+                self.resist_N_pool_to_storage[dayidx] = self.resist_N_pool[-1]*self.floor_area
+                self.unavail_N_pool_to_storage[dayidx] = self.unavail_N_pool[-1]*self.floor_area
+                self.UA_pool_to_storage[dayidx] = self.UA_pool[-1]*self.floor_area
+                self.TAN_pool_to_storage[dayidx] = self.TAN_pool[-1]*self.floor_area
+                self.Total_water_pool_to_storage[dayidx] = self.Total_water_pool[-1]*self.floor_area
+
+                self.manure_pool[-1] = 0.0
+                self.avail_N_pool[-1] = 0.0
+                self.resist_N_pool[-1] = 0.0
+                self.unavail_N_pool[-1] = 0.0
+                self.UA_pool[-1] = 0.0
+                self.TAN_pool[-1] = 0.0
+                self.Total_water_pool[-1] = 0.0
 
         else:
             manure_cleaningidx = self.manure_app_cal - np.floor(self.manure_app_cal/cleaning_freq)*cleaning_freq
@@ -1037,6 +1053,14 @@ class HOUSING_MODULE:
             temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
             ## minimum temperature of the day
             tempmin = np.nanmin(temp_data,axis=0)
+            
+            # tempmin10d = 0
+            # for dd in np.arange(dayidx-10,dayidx):
+            #     hhidx = dd*24
+            #     tempmin = np.nanmin(temp_file.t2m[hhidx:hhidx+24] - 273.15,axis=0)   
+            #     tempmin10d = tempmin10d + tempmin
+            # tempmin10d = np.nanmean(tempmin10d,axis=0) 
+
         # print(dayidx,np.nanmax(tempmin[self.plat1:self.plat2,:]),np.where(tempmin[self.plat1:self.plat2,:]>grazing_tempthreshold))
         grazing_IDX[tempmin>grazing_tempthreshold] = f_grz
         return grazing_IDX
