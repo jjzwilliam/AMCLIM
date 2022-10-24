@@ -639,9 +639,9 @@ class MMS_module:
             self.sim_env(mms_type=mms_cat,mms_phase="solid",dayidx=dd)
             ## daily input from housing
             if mms_cat == "MMS_indoor":
-                self.daily_init(dayidx=dd,mms_info="mms_indoor_solid")
+                self.daily_init(dayidx=dd,mms_info="mms_indoor_solid",insitu_Ninit=N_frominsitu)
             elif mms_cat == "MMS_open":
-                self.daily_init(dayidx=dd,mms_info="mms_indoor_solid")
+                self.daily_init(dayidx=dd,mms_info="mms_indoor_solid",insitu_Ninit=N_frominsitu)
             
             ## simulations at hourly timestep
             for hh in np.arange(24):
@@ -1002,7 +1002,7 @@ class MMS_module:
     #         self.unavail_N_pool[-1] = self.unavail_N_pool[0] + self.unavail_N_added[dd]
 
 
-    def daily_init(self,dayidx,mms_info):
+    def daily_init(self,dayidx,mms_info,insitu_Ninit=False):
         self.manure_pool[0] = self.manure_pool[-1]
         self.avail_N_pool[0] = self.avail_N_pool[-1]
         self.resist_N_pool[0] = self.resist_N_pool[-1]
@@ -1027,17 +1027,22 @@ class MMS_module:
         ##     MMS_area["MMS type"] = self.housingarea*(1.0-f_loss-f_sold)*f_MMS_[MMS type]*MMS_area_factor["MMS type"]
         ##     self.[pool] = self.[poolmass]/(self.housingarea*MMS_area_factor["MMS_type"])
         ## this is different to the HOUSING module as N excretion has been divided by the housing area before used as input
-        self.manure[12] = self.manure_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
+        if insitu_Ninit is False:
+            area = self.housingarea*MMS_area_factor[mms_info]
+        elif insitu_Ninit is True:
+            area = self.housingarea
+        
+        self.manure[12] = self.manure_added[dayidx]/area
         ## N input in multiple forms
-        self.urea[12] = self.urea_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
-        self.UA[12] = self.UA_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
-        self.avail_N[12] = self.avail_N_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
-        self.resist_N[12] = self.resist_N_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
-        self.unavail_N[12] = self.unavail_N_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
+        self.urea[12] = self.urea_added[dayidx]/area
+        self.UA[12] = self.UA_added[dayidx]/area
+        self.avail_N[12] = self.avail_N_added[dayidx]/area
+        self.resist_N[12] = self.resist_N_added[dayidx]/area
+        self.unavail_N[12] = self.unavail_N_added[dayidx]/area
         ## TAN from housing to storage
-        self.TAN[12] = self.TAN_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
+        self.TAN[12] = self.TAN_added[dayidx]/area
         ## water from housing to storage (this is unconstrained)
-        self.water[12] = self.water_added[dayidx]/(self.housingarea*MMS_area_factor[mms_info])
+        self.water[12] = self.water_added[dayidx]/area
         return
 
     def daily_output(self,dayidx,mms_info):

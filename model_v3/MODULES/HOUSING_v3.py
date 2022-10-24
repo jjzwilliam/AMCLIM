@@ -357,6 +357,7 @@ class HOUSING_MODULE:
             self.grazing_urine = np.zeros(outarray_shape)
             self.grazing_urine_N = np.zeros(outarray_shape)
             self.grazing_manurewc = np.zeros(outarray_shape)
+            self.tempmin10d_avg = np.zeros(outarray_shape)
     
     ## surface resistance;
     R_surf = 0.0
@@ -579,6 +580,7 @@ class HOUSING_MODULE:
             ## ruminants of "mixed" production system are condersider to be grazed seasonally
             if self.production_system == "mixed":
                 grazing_idx = self.grazing_indicator(dd)
+                # grazing_idx = self.grazing_indicator(dd)
                 self.grazing_excretion_N(dd,grazing_idx)
             else:
                 grazing_idx = np.zeros((CONFIG_lats,CONFIG_lons))     
@@ -1045,24 +1047,7 @@ class HOUSING_MODULE:
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
-        if CONFIG_machine == "STREAM":
-            temp_data = temp_file.t2m[dayidx] - 273.15
-            tempmin = temp_data
-        else:
-            hhidx = dayidx*24
-            temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
-            ## minimum temperature of the day
-            tempmin = np.nanmin(temp_data,axis=0)
-            
-            # tempmin10d = 0
-            # for dd in np.arange(dayidx-10,dayidx):
-            #     hhidx = dd*24
-            #     tempmin = np.nanmin(temp_file.t2m[hhidx:hhidx+24] - 273.15,axis=0)   
-            #     tempmin10d = tempmin10d + tempmin
-            # tempmin10d = np.nanmean(tempmin10d,axis=0) 
-
-        # print(dayidx,np.nanmax(tempmin[self.plat1:self.plat2,:]),np.where(tempmin[self.plat1:self.plat2,:]>grazing_tempthreshold))
-        grazing_IDX[tempmin>grazing_tempthreshold] = f_grz
+        grazing_IDX[self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
         return grazing_IDX
 
     ## determining the amount of N and excretions excreted while grazing
@@ -1196,7 +1181,7 @@ class HOUSING_MODULE:
 
         comp = dict(zlib=True, complevel=9)
         encoding = {var: comp for var in outds.data_vars}
-
+        print("xarray saved.")
         outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+housing_type+with_litter+insitu+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
@@ -1254,6 +1239,10 @@ class HOUSING_MODULE:
             self.floor_area = self.housing_area*(self.f_housing_litter*(1.0-self.f_loss-self.f_sold))
         else:
             self.floor_area = self.housing_area*(1.0-(self.f_housing_litter*(1.0-self.f_loss-self.f_sold)))
+        if self.production_system == "mixed":
+            tempmin = temp_file.t2m.resample(time="D").min()
+            tempmin10d = tempmin.rolling(time=10).mean().values
+            self.tempmin10d_avg[:] = tempmin10d
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency)

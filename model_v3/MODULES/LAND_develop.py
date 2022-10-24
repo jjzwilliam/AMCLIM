@@ -336,6 +336,7 @@ class LAND_module:
         self.o_NO3diff = np.zeros(outarray_shape)
 
         if grazing is True:
+            self.tempmin10d_avg = np.zeros(outarray_shape)
             ##
             self.urine_N = np.zeros(array_shape)
             self.manure_N = np.zeros(array_shape)
@@ -915,16 +916,7 @@ class LAND_module:
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
-        if CONFIG_machine == "STREAM":
-            temp_data = temp_file.t2m[dayidx] - 273.15
-            tempmin = temp_data
-        else:
-            hhidx = dayidx*24
-            temp_data = temp_file.t2m[hhidx:hhidx+24] - 273.15
-            ## minimum temperature of the day
-            tempmin = np.nanmin(temp_data,axis=0)
-        # print(dayidx,np.nanmax(tempmin[self.plat1:self.plat2,:]),np.where(tempmin[self.plat1:self.plat2,:]>grazing_tempthreshold))
-        grazing_IDX[tempmin>grazing_tempthreshold] = f_grz
+        grazing_IDX[self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
         return grazing_IDX
     
     ## 
@@ -1854,6 +1846,10 @@ class LAND_module:
             excretN_info = livestockds['Excreted_N'][1][self.plat1:self.plat2,:]
             print("Total excreted N from mixed production system "+str(livestock_name)+" is: "+str(np.round(np.nansum(excretN_info*1e3/1e9),decimals=2))+" Gg.")
             animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]
+            ## 10d running average of daily minimum temperature
+            tempmin = temp_file.t2m.resample(time="D").min()
+            tempmin10d = tempmin.rolling(time=10).mean().values
+            self.tempmin10d_avg[:] = tempmin10d
         else:
             print('year-round grazing of grassland production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
@@ -2540,7 +2536,7 @@ class LAND_module:
     #     return
 
     def grazing_main(self,livestock_name,production_system,start_day_idx,end_day_idx,
-                        span_day=grazing_span,sim='base',stvar=False,st=False,stat=False):
+                        span_day=grazing_span,sim='base',stvar=False,st=False,stat=False):         
         self.grazing_sim(livestock_name,production_system,start_day_idx,end_day_idx,
                         span_day,sim,stvar,st)
         self.grazing_para_out(output_stat=stat)
