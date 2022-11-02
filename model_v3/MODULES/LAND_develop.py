@@ -1482,10 +1482,10 @@ class LAND_module:
                                                 theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
                                     ## soil moisture change due to the manure water addition at the top 2 soil layers
-                                    delta_sw12 = theta1_post*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
-                                    self.TAN_pool[0,hh] = self.TAN_pool[0,hh]+self.TAN[hh+1]*\
-                                                                (theta1_post*zlayers[0]/delta_sw12)
-                                    self.TAN_pool[1,hh] = self.TAN_pool[1,hh]+self.TAN[hh+1]*\
+                                    delta_sw12 = (theta1_post-self.theta[0,hh+1])*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
+                                    self.TAN_pool[0,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
+                                                                ((theta1_post-self.theta[0,hh+1])*zlayers[0]/delta_sw12)
+                                    self.TAN_pool[1,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
                                                                 ((theta2_post-self.theta[1,hh+1])*zlayers[0]/delta_sw12)
                                     self.theta[0,hh+1] = theta1_post
                                     self.theta[1,hh+1] = theta2_post
@@ -1884,8 +1884,12 @@ class LAND_module:
             animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]
             ## 10d running average of daily minimum temperature
             tempmin = temp_file.t2m.resample(time="D").min()
-            tempmin10d = tempmin.rolling(time=10).mean().values
-            self.tempmin10d_avg[:] = tempmin10d[:,self.plat1:self.plat2,:]
+            tempmin10d = tempmin.rolling(time=10).mean().values 
+            ## drop nan values due to dataarray rolling
+            for dd in np.arange(0,10):
+                tempmin10d[dd] = tempmin10d[-1] + dd*(tempmin10d[10] - tempmin10d[-1])/10
+            ## IMPORTANT: kelvin to degC
+            self.tempmin10d_avg[:] = tempmin10d - 273.15
         else:
             print('year-round grazing of grassland production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
