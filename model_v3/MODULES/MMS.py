@@ -1128,6 +1128,7 @@ class MMS_module:
         lons = -180 + 0.5*np.arange(nlon)
         yearidx = str(sim_year)+'-01-01'
         times = pd.date_range(yearidx,periods=ntime)
+        insitu = ''
         if phase == "liquid":
             if mms_cat == "MMS_indoor":
                 f_area = MMS_area_factor['mms_indoor_liquid']
@@ -1171,6 +1172,7 @@ class MMS_module:
                 f_area = MMS_area_factor['mms_open_solid']
                 if N_frominsitu is True:
                     f_area = 1.0
+                    insitu = ".insitu"
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH4nitrif = self.o_NH4nitrif*self.mmsarea
@@ -1242,7 +1244,7 @@ class MMS_module:
         comp = dict(zlib=True, complevel=9)
         encoding = {var: comp for var in outds.data_vars}
 
-        outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+mms_cat+'.'+phase+\
+        outds.to_netcdf(output_path+self.livestock+'.'+self.production_system+'.'+mms_cat+'.'+phase+insitu+\
                             '.'+str(sim_year)+'.nc',encoding=encoding)
         print("ncfile saved.")
 

@@ -336,6 +336,7 @@ class LAND_module:
         self.o_NO3diff = np.zeros(outarray_shape)
 
         if grazing is True:
+            self.pastarea = np.zeros(field_shape)
             self.tempmin10d_avg = np.zeros(outarray_shape)
             ##
             self.urine_N = np.zeros(array_shape)
@@ -740,10 +741,13 @@ class LAND_module:
         spring_plantdate = calds.spring_plant_mean.values
         winter_plantdate = calds.winter_plant_mean.values
 
-        ## test code: area needs to be revised
-        ## current test used fixed application rate of manure (5mm slurry) to determine the crop area
-        ## the aim is testing/debugging
-        croparea = (spring_manure+spring_water)/5e3
+        ## areas of manure application
+        ## slurry: 3mm (3kg/m2 or 30 tons/hectare)
+        ## solid manure: 1kg/m2 or 10 tons/hectare
+        if phase == "liquid":
+            croparea = (spring_manure+spring_water)/3e3
+        elif phase == "solid":
+            croparea = (spring_manure+spring_water)/1e3
         self.manureapparea = croparea[self.plat1:self.plat2,:]
         self.manureapparea = np.nan_to_num(self.manureapparea)
         # self.manureapparea[:] = 1e3
@@ -916,7 +920,7 @@ class LAND_module:
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
         grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
-        grazing_IDX[self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
+        grazing_IDX[self.plat1:self.plat2,:][self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
         return grazing_IDX
     
     ## 
@@ -1473,13 +1477,21 @@ class LAND_module:
                                                 theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1],tech="disk")
                             else:
-                                self.TAN_pool[ll,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]
                                 if sourcelayer == 0:
-                                    self.theta[0,hh+1],self.theta[1,hh+1],self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
+                                    theta1_post, theta2_post, theta3_post = self.post_soil_moist(theta1=self.theta[0,hh+1],
                                                 theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
-                                    # print("dd",dd,"hh+1",hh+1,"theta n6",self.theta[2,hh+1][0,597])
+                                    ## soil moisture change due to the manure water addition at the top 2 soil layers
+                                    delta_sw12 = (theta1_post-self.self.theta[0,hh+1])*zlayers[0] + (theta2_post-self.self.theta[1,hh+1])*zlayers[1]
+                                    self.TAN_pool[0,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
+                                                                ((theta1_post-self.self.theta[0,hh+1])*zlayers[0]/delta_sw12)
+                                    self.TAN_pool[1,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
+                                                                ((theta2_post-self.self.theta[1,hh+1])*zlayers[0]/delta_sw12)
+                                    self.theta[0,hh+1] = theta1_post
+                                    self.theta[1,hh+1] = theta2_post
+                                    self.theta[2,hh+1] = theta3_post
                                 elif sourcelayer == 2:
+                                    self.TAN_pool[ll,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]
                                     self.theta[0,hh+1],self.theta[1,hh+1],self.theta[2,hh+1] = self.post_soil_moist(theta1=self.theta[0,hh+1],
                                                 theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1],tech="injection")
@@ -1849,7 +1861,7 @@ class LAND_module:
             ## 10d running average of daily minimum temperature
             tempmin = temp_file.t2m.resample(time="D").min()
             tempmin10d = tempmin.rolling(time=10).mean().values
-            self.tempmin10d_avg[:] = tempmin10d
+            self.tempmin10d_avg[:] = tempmin10d[:,self.plat1:self.plat2,:]
         else:
             print('year-round grazing of grassland production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
