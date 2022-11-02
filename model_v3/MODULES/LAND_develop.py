@@ -1482,10 +1482,10 @@ class LAND_module:
                                                 theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
                                     ## soil moisture change due to the manure water addition at the top 2 soil layers
-                                    delta_sw12 = (theta1_post-self.theta[0,hh+1])*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
-                                    self.TAN_pool[0,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
-                                                                ((theta1_post-self.theta[0,hh+1])*zlayers[0]/delta_sw12)
-                                    self.TAN_pool[1,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
+                                    delta_sw12 = theta1_post*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
+                                    self.TAN_pool[0,hh] = self.TAN_pool[0,hh]+self.TAN[hh+1]*\
+                                                                (theta1_post*zlayers[0]/delta_sw12)
+                                    self.TAN_pool[1,hh] = self.TAN_pool[1,hh]+self.TAN[hh+1]*\
                                                                 ((theta2_post-self.theta[1,hh+1])*zlayers[0]/delta_sw12)
                                     self.theta[0,hh+1] = theta1_post
                                     self.theta[1,hh+1] = theta2_post
@@ -1820,12 +1820,36 @@ class LAND_module:
                         update_sw = self.theta[ll,hh+1]*zlayers[2] - (self.drainagerate[ll,hh+1]-self.drainagerate[ll-1,hh+1])*timestep*3600 
                         update_sw[self.drainagerate[ll,hh+1]==infilrate3] = self.theta[ll,hh+1][self.drainagerate[ll,hh+1]==infilrate3]*zlayers[2]
                         self.theta[ll,hh+1][self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]] = (update_sw[self.theta[ll,hh+1]!=self.soil_moist[llidx,hh+1]])/zlayers[2]
+            
+            ######################
+            ## INTEGRITY TEST
+            ######################
+            # if manure_fert is False:
+            #     self.daily_output(dd)
+            # elif manure_fert is True:
+            #     self.daily_output(dd,fert="manure")
+            # test_allNpathways = self.o_NH3flux[dd]+self.o_washoff[dd]+self.o_nitrif[dd]+self.o_NH4leaching[dd]+\
+            #             self.o_diffaq[dd]+self.o_diffgas[dd]+self.o_ammNuptake[dd]
+            # # Npoolchange = (self.TAN_added[dd]+self.avail_N_added[dd]+self.resist_N_added[dd]+self.unavail_N_added[dd]) -\
+            # #              (self.TAN_pool[0,-1]-self.TAN_pool[0,0]) - (self.TAN_pool[1,-1]-self.TAN_pool[1,0]) -(self.TAN_pool[2,-1]-self.TAN_pool[2,0]) -\
+            # #             (self.avail_N_pool[-1]-self.avail_N_pool[0]) - (self.resist_N_pool[-1]-self.resist_N_pool[0]) - \
+            # #             (self.unavail_N_pool[-1]-self.unavail_N_pool[0])
+            # Nadded = (self.TAN_added[dd]+self.avail_N_added[dd]+self.resist_N_added[dd]+self.unavail_N_added[dd])
+            # Npoolchange = (self.TAN_pool[0,-1]-self.TAN_pool[0,0]) + (self.TAN_pool[1,-1]-self.TAN_pool[1,0]) + (self.TAN_pool[2,-1]-self.TAN_pool[2,0]) +\
+            #             (self.avail_N_pool[-1]-self.avail_N_pool[0]) + (self.resist_N_pool[-1]-self.resist_N_pool[0]) + \
+            #             (self.unavail_N_pool[-1]-self.unavail_N_pool[0])
+            # netchange = Nadded - test_allNpathways - Npoolchange
+            # print("day",dd,"net change",Nadded[0,342],netchange[0,342])
+            # print("day",dd,"N added",Nadded[0,342],"N pool change",Npoolchange[0,342],"pathways",test_allNpathways[0,342])
+            # print("day",dd,"TAN pools",self.TAN_pool[0,-1,0,342],self.TAN_pool[1,-1,0,342],self.TAN_pool[2,-1,0,342])
+            # print("day",dd,"orgN pools",self.avail_N_pool[-1,0,342],self.resist_N_pool[-1,0,342],self.unavail_N_pool[-1,0,342])
+            #######################################
             if manure_fert is False:
                 self.daily_output(dd)
                 self.daily_init()  
             elif manure_fert is True:
                 self.daily_output(dd,fert="manure")
-                self.daily_init(manure=True)   
+                self.daily_init(manure=True)  
         return
 
     ## main sim function for grazing
