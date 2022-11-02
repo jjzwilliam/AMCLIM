@@ -1241,8 +1241,12 @@ class HOUSING_MODULE:
             self.floor_area = self.housing_area*(1.0-(self.f_housing_litter*(1.0-self.f_loss-self.f_sold)))
         if self.production_system == "mixed":
             tempmin = temp_file.t2m.resample(time="D").min()
-            tempmin10d = tempmin.rolling(time=10).mean().values
-            self.tempmin10d_avg[:] = tempmin10d
+            tempmin10d = tempmin.rolling(time=10).mean().values 
+            ## drop nan values due to dataarray rolling
+            for dd in np.arange(0,10):
+                tempmin10d[dd] = tempmin10d[-1] + dd*(tempmin10d[10] - tempmin10d[-1])/10
+            ## IMPORTANT: kelvin to degC
+            self.tempmin10d_avg[:] = tempmin10d - 273.15
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency)
