@@ -1483,9 +1483,9 @@ class LAND_module:
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
                                     ## soil moisture change due to the manure water addition at the top 2 soil layers
                                     delta_sw12 = (theta1_post-self.theta[0,hh+1])*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
-                                    self.TAN_pool[0,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
+                                    self.TAN_pool[0,hh] = self.TAN_pool[0,hh]+self.TAN[hh+1]*\
                                                                 ((theta1_post-self.theta[0,hh+1])*zlayers[0]/delta_sw12)
-                                    self.TAN_pool[1,hh] = self.TAN_pool[ll,hh]+self.TAN[hh+1]*\
+                                    self.TAN_pool[1,hh] = self.TAN_pool[1,hh]+self.TAN[hh+1]*\
                                                                 ((theta2_post-self.theta[1,hh+1])*zlayers[0]/delta_sw12)
                                     self.theta[0,hh+1] = theta1_post
                                     self.theta[1,hh+1] = theta2_post
