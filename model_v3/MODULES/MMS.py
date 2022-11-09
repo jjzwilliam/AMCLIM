@@ -155,6 +155,14 @@ class MMS_module:
                 f_mms = np.nan_to_num(f_mms)
                 self.f_MMS_open_solid = self.f_MMS_open_solid + f_mms
             except:pass
+        ## exclude excreted N while grazing for ruminants (mixed production system)
+        if self.production_system == "mixed":
+            for mms in MMS_ruminants_grazing_list:
+                try:
+                    f_mms = self.MMS_file[mms][self.lvl_idx].values
+                    f_mms = np.nan_to_num(f_mms)
+                    self.f_MMS_open_solid = self.f_MMS_open_solid - f_mms
+                except:pass
         for mms in MMS_outdoor_liquid_list:
             try:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
@@ -277,8 +285,8 @@ class MMS_module:
         self.pH = pH_info[self.livestock]
         self.cc_H = np.float(10**(-self.pH))
         ## housing area that is used to determine MMS area
-        self.housingarea = area_housing
-        self.mmsarea = area_housing.shape
+        self.housingarea = np.nan_to_num(area_housing)
+        self.mmsarea = np.zeros(area_housing.shape)
         ## output of NH3 flux
         self.o_NH3flux = np.zeros(outarray_shape)
 
@@ -469,19 +477,19 @@ class MMS_module:
             f_MMSarea = self.f_MMS_indoor_liquid/self.f_MMS
             ## area of MMS_indoor_liquid
             MMS_area["mms_indoor_liquid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor['mms_indoor_liquid']
-            self.mmsarea = MMS_area["mms_indoor_liquid_area"].values
+            self.mmsarea = MMS_area["mms_indoor_liquid_area"]
             mms_cover_reduction = 0.0
         elif mms_cat == "MMS_open":
             f_MMSarea = self.f_MMS_open_liquid/self.f_MMS
             ## area of MMS_open_liquid
             MMS_area["mms_open_liquid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor['mms_open_liquid']
-            self.mmsarea = MMS_area["mms_open_liquid_area"].values
+            self.mmsarea = MMS_area["mms_open_liquid_area"]
             mms_cover_reduction = 0.0
         elif mms_cat == "MMS_cover":
             f_MMSarea = self.f_MMS_preserve_liquid/self.f_MMS
             ## area of MMS_indoor_liquid
             MMS_area["mms_cover_liquid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor['mms_cover_liquid']
-            self.mmsarea = MMS_area["mms_cover_liquid_area"].values
+            self.mmsarea = MMS_area["mms_cover_liquid_area"]
             mms_cover_reduction = cover_reduction
 
         if self.livestock.lower()=="poultry":
@@ -619,17 +627,17 @@ class MMS_module:
         if mms_cat == "MMS_indoor":
             f_MMSarea = self.f_MMS_indoor_solid/self.f_MMS
             MMS_area["mms_indoor_solid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor["mms_indoor_solid"]
-            self.mmsarea = MMS_area["mms_indoor_solid_area"].values
+            self.mmsarea = MMS_area["mms_indoor_solid_area"]
         elif mms_cat == "MMS_open":
             if N_frominsitu is True:
                 f_MMSarea = 1.0
                 # MMS_area["mms_open_solid_area"] = self.housingarea*f_MMSarea*MMS_area_factor["mms_open_solid"]
                 MMS_area["mms_open_solid_area"] = self.housingarea
-                self.mmsarea = MMS_area["mms_open_solid_area"].values
+                self.mmsarea = MMS_area["mms_open_solid_area"]
             else:
                 f_MMSarea = self.f_MMS_open_solid/self.f_MMS
                 MMS_area["mms_open_solid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor["mms_open_solid"]
-                self.mmsarea = MMS_area["mms_open_solid_area"].values
+                self.mmsarea = MMS_area["mms_open_solid_area"]
 
         if self.livestock.lower()=="poultry":
             print("Simulation for poultry.")
@@ -961,7 +969,7 @@ class MMS_module:
         print('current simulation is for: MMS open (lagoon,liquid), '+str(self.livestock)+', '+str(self.production_system))
         f_MMSarea = self.f_MMS_open_lagoon/self.f_MMS
         MMS_area["mms_open_lagoon_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor["mms_open_lagoon"]
-        self.mmsarea = MMS_area["mms_open_lagoon_area"].values
+        self.mmsarea = MMS_area["mms_open_lagoon_area"]
 
         for dd in np.arange(start_day_idx,end_day_idx):
             self.sim_env(mms_type="MMS_open",mms_phase="liquid",dayidx=dd)
@@ -987,7 +995,7 @@ class MMS_module:
         
     #     f_MMSarea = self.f_MMS_preserve_solid/self.f_MMS
     #     MMS_area["mms_thermal_solid_area"] = self.housingarea*(1.0-self.f_loss-self.f_sold)*f_MMSarea*MMS_area_factor["mms_indoor_solid"]
-    #     self.mmsarea = MMS_area["mms_thermal_solid_area"].values
+    #     self.mmsarea = MMS_area["mms_thermal_solid_area"]
 
     #     if self.livestock.lower()=="poultry":
     #         print("Simulation for poultry.")
@@ -1139,7 +1147,7 @@ class MMS_module:
             elif mms_cat == "MMS_lagoon":
                 f_area = MMS_area_factor['mms_open_lagoon']
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
-            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea.values*f_area)
+            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea*f_area)
             outds = xr.Dataset(
                 data_vars=dict(
                     NH3emiss=(['time','lat','lon'],MMS_NH3emiss),
@@ -1174,9 +1182,8 @@ class MMS_module:
                     f_area = 1.0
                     insitu = ".insitu"
             MMS_NH3emiss = self.o_NH3flux*self.mmsarea
-            MMS_NH3emiss = self.o_NH3flux*self.mmsarea
             MMS_NH4nitrif = self.o_NH4nitrif*self.mmsarea
-            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea.values*f_area)
+            MMS_totalN = self.total_N_MMS*self.mmsarea/(self.housingarea*f_area)
             if mms_cat == "MMS_open":
                 MMS_Nwashoff = self.o_Nwashoff*self.mmsarea
                 outds = xr.Dataset(

@@ -102,7 +102,7 @@ class HOUSING_MODULE:
         # print(str(livestock)+" stocking density is "+str(animal_density)+" kg/m^2")
         self.massgrid = self.animal_head*self.animal_weight.values
         ## calculate housing area
-        self.housing_area = self.animal_head*self.animal_weight.values/self.animal_density
+        self.housing_area = self.animal_head.values*self.animal_weight.values/self.animal_density
         ## N excretion 
         self.excret_N = self.excretN_info/self.housing_area   ## unit: kg N per m^2 per year
         self.excret_N = xr_to_np(self.excret_N)
@@ -112,6 +112,7 @@ class HOUSING_MODULE:
         self.f_sold = np.zeros(CONFIG_mtrx[1:])
         self.f_housing_litter = np.zeros(CONFIG_mtrx[1:])
         self.f_housing_pit = np.zeros(CONFIG_mtrx[1:])
+        self.f_ruminants_grazing = np.zeros(CONFIG_mtrx[1:])
         # self.f_dailyspread = np.zeros(CONFIG_mtrx[1:])
         ## attribute pathways to each cluster
         for mms in loss_list:
@@ -137,6 +138,12 @@ class HOUSING_MODULE:
                 f_mms = self.MMS_file[mms][self.lvl_idx].values
                 f_mms = np.nan_to_num(f_mms)
                 self.f_housing_pit = self.f_housing_pit + f_mms
+            except:pass
+        for mms in MMS_ruminants_grazing_list:
+            try:
+                f_mms = self.MMS_file[mms][self.lvl_idx].values
+                f_mms = np.nan_to_num(f_mms)
+                self.f_ruminants_grazing = self.f_ruminants_grazing + f_mms
             except:pass
         # for mms in MMS_land_spread_list:
         #     try:
@@ -358,6 +365,9 @@ class HOUSING_MODULE:
             self.grazing_urine_N = np.zeros(outarray_shape)
             self.grazing_manurewc = np.zeros(outarray_shape)
             self.tempmin10d_avg = np.zeros(outarray_shape)
+            self.grazing_dailyidx = np.zeros(outarray_shape)
+            self.grazing_days = np.zeros(field_shape)
+            self.grazing_periods = np.zeros(field_shape)
     
     ## surface resistance;
     R_surf = 0.0
@@ -940,18 +950,18 @@ class HOUSING_MODULE:
                 ## pools: from housing to MMS
                 ## Note: by multiplying the housing area, we get the total mass of each pool rather than mass/unit area
                 self.manure_pool_to_storage[dayidx][cleaning_con] = self.manure_pool_pit[-1][cleaning_con]*\
-                                                                        self.pit_area.values[cleaning_con]
+                                                                        self.pit_area[cleaning_con]
                 self.avail_N_pool_to_storage[dayidx][cleaning_con] = self.avail_N_pool_pit[-1][cleaning_con]*\
-                                                                        self.pit_area.values[cleaning_con]
+                                                                        self.pit_area[cleaning_con]
                 self.resist_N_pool_to_storage[dayidx][cleaning_con] = self.resist_N_pool_pit[-1][cleaning_con]*\
-                                                                        self.pit_area.values[cleaning_con]
+                                                                        self.pit_area[cleaning_con]
                 self.unavail_N_pool_to_storage[dayidx][cleaning_con] = self.unavail_N_pool_pit[-1][cleaning_con]*\
-                                                                        self.pit_area.values[cleaning_con]
+                                                                        self.pit_area[cleaning_con]
                 self.urea_pool_to_storage[dayidx][cleaning_con] = self.urea_pool_pit[-1][cleaning_con]*\
-                                                                        self.pit_area.values[cleaning_con]
-                self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool_pit[-1][cleaning_con]*self.pit_area.values[cleaning_con]
+                                                                        self.pit_area[cleaning_con]
+                self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool_pit[-1][cleaning_con]*self.pit_area[cleaning_con]
                 self.Total_water_pool_to_storage[dayidx][cleaning_con] = self.Total_water_pool_pit[-1][cleaning_con]*\
-                                                                        self.pit_area.values[cleaning_con]
+                                                                        self.pit_area[cleaning_con]
             
                 self.manure_pool_pit[-1][cleaning_con] = 0.0
                 self.manure_initwc_pit[-1][cleaning_con] = 0.0
@@ -965,15 +975,15 @@ class HOUSING_MODULE:
                 #print(housing_type)
                 ## pools: from housing to MMS
                 self.manure_pool_to_storage[dayidx][cleaning_con] = self.manure_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
                 self.avail_N_pool_to_storage[dayidx][cleaning_con] = self.avail_N_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
                 self.resist_N_pool_to_storage[dayidx][cleaning_con] = self.resist_N_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
                 self.unavail_N_pool_to_storage[dayidx][cleaning_con] = self.unavail_N_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
                 self.TAN_pool_to_storage[dayidx][cleaning_con] = self.TAN_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
                 ## get rid of numpy rounding error: maximum NH3 flux is equivalent to TAN pool and should not exceed TAN pool
                 ## however, when do calculations, NH3 flux is sometimes rounded to a value that is bigger than TAN pool
                 ## e.g. NH3 flux = 2.7233141344, TAN pool = 2.7233141343; this leads to the [TAN to storage] a negative value,
@@ -981,7 +991,7 @@ class HOUSING_MODULE:
                 self.TAN_pool_to_storage[dayidx][self.TAN_pool_to_storage[dayidx]<0] = 0.0
                 #print("TAN pool to storage: ",self.TAN_pool_to_storage[dayidx,41,84])
                 self.Total_water_pool_to_storage[dayidx][cleaning_con] = self.Total_water_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
 
                 self.manure_pool[-1][cleaning_con] = 0.0
                 self.manure_water[-1][cleaning_con] = 0.0
@@ -993,7 +1003,7 @@ class HOUSING_MODULE:
 
                 if housing_type.lower() == 'poultry_house':
                     self.UA_pool_to_storage[dayidx][cleaning_con] = self.UA_pool[-1][cleaning_con]*\
-                                                                        self.floor_area.values[cleaning_con]
+                                                                        self.floor_area[cleaning_con]
                     self.UA_pool[-1][cleaning_con] = 0.0
 
     ## barn cleaning
@@ -1046,8 +1056,16 @@ class HOUSING_MODULE:
     def grazing_indicator(self,dayidx):
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
+        # grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
+        # grazing_IDX[self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
+
         grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
-        grazing_IDX[self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
+        ## year-round grazing
+        condition1 = (self.grazing_periods < self.f_ruminants_grazing)
+        grazing_IDX[condition1] = self.f_ruminants_grazing[condition1]
+        ## seasonal grazing
+        condition2 = (self.grazing_periods >= self.f_ruminants_grazing)&(self.grazing_dailyidx[dayidx]!=0)
+        grazing_IDX[condition2] = (self.f_ruminants_grazing/self.grazing_periods)[condition2]
         return grazing_IDX
 
     ## determining the amount of N and excretions excreted while grazing
@@ -1091,11 +1109,11 @@ class HOUSING_MODULE:
 
         if housing_type.lower() == 'slat-pit_house':
             with_litter = ''
-            slat_emiss = self.o_NH3flux_slat*self.floor_area.values
-            pit_emiss = self.o_NH3flux_pit*self.pit_area.values
-            n_excret = 1000*self.excret_N*self.floor_area.values
-            source_area_slat = self.floor_area.values
-            source_area_pit = self.pit_area.values
+            slat_emiss = self.o_NH3flux_slat*self.floor_area
+            pit_emiss = self.o_NH3flux_pit*self.pit_area
+            n_excret = 1000*self.excret_N*self.floor_area
+            source_area_slat = self.floor_area
+            source_area_pit = self.pit_area
             total_emiss = slat_emiss + pit_emiss
             outds = xr.Dataset(
                 data_vars=dict(
@@ -1143,9 +1161,9 @@ class HOUSING_MODULE:
                 with_litter = '_litter'
             else:
                 with_litter = ''
-            housing_NH3emiss = self.o_NH3flux*self.floor_area.values
-            n_excret = 1000*self.excret_N*self.floor_area.values
-            source_area = self.floor_area.values
+            housing_NH3emiss = self.o_NH3flux*self.floor_area
+            n_excret = 1000*self.excret_N*self.floor_area
+            source_area = self.floor_area
             total_emiss = housing_NH3emiss
             outds = xr.Dataset(
                 data_vars=dict(
@@ -1247,12 +1265,65 @@ class HOUSING_MODULE:
                 tempmin10d[dd] = tempmin10d[-1] + dd*(tempmin10d[10] - tempmin10d[-1])/10
             ## IMPORTANT: kelvin to degC
             self.tempmin10d_avg[:] = tempmin10d - 273.15
+            ## grazing index: when temp indicator > 10 degC
+            self.grazing_dailyidx[self.tempmin10d_avg>10.0] = 1.0
+            ## grazing days
+            self.grazing_days = np.nansum(self.grazing_dailyidx,axis=0)
+            ## fraction of total grazing days in a year
+            self.grazing_periods = self.grazing_days/Days
         for dd in np.arange(start_idx,end_idx,cleaning_frequency):
             if dd + cleaning_frequency < end_idx:
                 self.barn_housing_sim(dd,dd+cleaning_frequency)
                 self.cleaning_barn(dd+cleaning_frequency)
             else:
                 self.barn_housing_sim(dd,end_idx)
+        self.housing_2nd_init(housing_type)
+        self.barn_housing_sim(0,start_idx)
+        if ncfile_o is True:
+            self.sim_out(housing_type,litter_management=litter,output_stat=stat)
+        return
+
+    def barn_sim_grazingN_test(self,housing_type,start_idx,end_idx,cleaning_frequency,litter=False,ncfile_o=True,stat=True):
+        print('HOUSING Sim - current simulation is for: '+str(self.house_env)+', barn, '+\
+                                                            str(self.livestock)+', '+str(self.production_system))
+        print("cleaning frequency is: every "+str(cleaning_frequency)+" day(s)")
+        self.housing_init(housing_type)
+        self.housing_to_storage_init(housing_type)
+        if litter is True:
+            print("Litter - bedding added.")
+            ## surface resistance; assumed to be 100 s/m (if bedding etc.)
+            self.R_surf = rsurf
+            self.f_reduction = bedding_reduction
+            self.floor_area = self.housing_area*(self.f_housing_litter*(1.0-self.f_loss-self.f_sold))
+        else:
+            self.floor_area = self.housing_area*(1.0-(self.f_housing_litter*(1.0-self.f_loss-self.f_sold)))
+        if self.production_system == "mixed":
+            tempmin = temp_file.t2m.resample(time="D").min()
+            tempmin10d = tempmin.rolling(time=10).mean().values 
+            ## drop nan values due to dataarray rolling
+            for dd in np.arange(0,10):
+                tempmin10d[dd] = tempmin10d[-1] + dd*(tempmin10d[10] - tempmin10d[-1])/10
+            ## IMPORTANT: kelvin to degC
+            self.tempmin10d_avg[:] = tempmin10d - 273.15
+            ## grazing index: when temp indicator > 10 degC
+            self.grazing_dailyidx[self.tempmin10d_avg>10.0] = 1.0
+            ## grazing days
+            self.grazing_days = np.nansum(self.grazing_dailyidx,axis=0)
+            ## fraction of total grazing days in a year
+            self.grazing_periods = self.grazing_days/Days
+            self.floor_area = self.housing_area*(1.0-self.f_ruminants_grazing)
+        for dd in np.arange(start_idx,end_idx,cleaning_frequency):
+            if dd + cleaning_frequency < end_idx:
+                if self.production_system == "mixed":
+                    grazing_idx = self.grazing_indicator(dd)
+                    # grazing_idx = self.grazing_indicator(dd)
+                    self.grazing_excretion_N(dd,grazing_idx)
+                self.cleaning_barn(dd+cleaning_frequency)
+            else:
+                if self.production_system == "mixed":
+                    grazing_idx = self.grazing_indicator(dd)
+                    # grazing_idx = self.grazing_indicator(dd)
+                    self.grazing_excretion_N(dd,grazing_idx)
         self.housing_2nd_init(housing_type)
         self.barn_housing_sim(0,start_idx)
         if ncfile_o is True:

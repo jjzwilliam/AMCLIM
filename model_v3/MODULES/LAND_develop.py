@@ -338,6 +338,10 @@ class LAND_module:
         if grazing is True:
             self.pastarea = np.zeros(field_shape)
             self.tempmin10d_avg = np.zeros(outarray_shape)
+            self.grazing_dailyidx = np.zeros(outarray_shape)
+            self.grazing_days = np.zeros(field_shape)
+            self.grazing_periods = np.zeros(field_shape)
+            self.f_ruminants_grazing = np.zeros(field_shape)
             ##
             self.urine_N = np.zeros(array_shape)
             self.manure_N = np.zeros(array_shape)
@@ -919,8 +923,16 @@ class LAND_module:
     def grazing_indicator(self,dayidx):
         if dayidx >= Days:
             dayidx = int(dayidx - np.floor(dayidx/Days)*Days)
+        # grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
+        # grazing_IDX[self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
+
         grazing_IDX = np.zeros((CONFIG_lats,CONFIG_lons))
-        grazing_IDX[self.plat1:self.plat2,:][self.tempmin10d_avg[dayidx]>grazing_tempthreshold] = f_grz
+        ## year-round grazing
+        condition1 = (self.grazing_periods < self.f_ruminants_grazing)
+        grazing_IDX[self.plat1:self.plat2,:][condition1] = self.f_ruminants_grazing[condition1]
+        ## seasonal grazing
+        condition2 = (self.grazing_periods >= self.f_ruminants_grazing)&(self.grazing_dailyidx[dayidx]!=0)
+        grazing_IDX[self.plat1:self.plat2,:][condition2] = (self.f_ruminants_grazing/self.grazing_periods)[condition2]
         return grazing_IDX
     
     ## 
@@ -1877,11 +1889,20 @@ class LAND_module:
         if production_system == "mixed":
             print('seasonal grazing of mixed production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
+            MMS_file_name = CONFIG_MMS_file_dict[livestock_name]
             livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
+            mmsds = open_ds(infile_path+animal_data_path+MMS_file_name)
             ## lvl idx 1 is the [Mixed] production system; see config.py
             excretN_info = livestockds['Excreted_N'][1][self.plat1:self.plat2,:]
             print("Total excreted N from mixed production system "+str(livestock_name)+" is: "+str(np.round(np.nansum(excretN_info*1e3/1e9),decimals=2))+" Gg.")
             animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]
+            ## fraction of manure/N from ruminants while grazing
+            for mms in MMS_ruminants_grazing_list:
+                try:
+                    f_mms = mmsds[mms][1].values
+                    f_mms = np.nan_to_num(f_mms)
+                    self.f_ruminants_grazing = self.f_ruminants_grazing + f_mms[self.plat1:self.plat2,:]
+                except:pass
             ## 10d running average of daily minimum temperature
             tempmin = temp_file.t2m.resample(time="D").min()
             tempmin10d = tempmin.rolling(time=10).mean().values 
@@ -1889,7 +1910,12 @@ class LAND_module:
             for dd in np.arange(0,10):
                 tempmin10d[dd] = tempmin10d[-1] + dd*(tempmin10d[10] - tempmin10d[-1])/10
             ## IMPORTANT: kelvin to degC
-            self.tempmin10d_avg[:] = tempmin10d - 273.15
+            self.tempmin10d_avg[:] = tempmin10d[:,self.plat1:self.plat2,:] - 273.15
+            self.grazing_dailyidx[self.tempmin10d_avg>10.0] = 1.0
+            ## grazing days
+            self.grazing_days = np.nansum(self.grazing_dailyidx,axis=0)
+            ## fraction of total grazing days in a year
+            self.grazing_periods = self.grazing_days/Days
         else:
             print('year-round grazing of grassland production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
@@ -2272,7 +2298,7 @@ class LAND_module:
                     self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
                     ## urea hydrolysis
                     self.ureahydrolysis[llidx,hh+1] = self.urea_pool[llidx,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[0,hh+1],
-                                                                                                theta=self.theta[llidx,hh+1],delta_t=timestep,k_h=0.03)
+                                                                                                theta=self.theta[llidx,hh+1],delta_t=timestep)
                     ## subtracting chemical losses
                     self.urea_pool[llidx,hh+1] = self.urea_pool[llidx,hh+1]-self.ureahydrolysis[llidx,hh+1]
                     ## urea concentration

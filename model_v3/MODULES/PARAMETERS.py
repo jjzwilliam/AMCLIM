@@ -960,6 +960,9 @@ MMS_indoor_solid_list = ['mmscompost','mmssolid','mmsolidot','mmsnolitt']
 MMS_indoor_liquid_list = ['mmslagoon']
 ## Cat I.B.1: manure in open/outdoor environment; left on land (as solid): aerobic processing, daily spreading, dry lot, pasture, pasture+paddock
 MMS_outdoor_solid_list = ['mmsconfin','mmsdrylot','mmspasture','mmspastpad','mmsdaily']
+## Cat I.B.1.x: manure from ruminants while grazing, these N should not be simulated in HOUSING and MMS Module
+##              but should be simulated by Grazing module to avoid double counting
+MMS_ruminants_grazing_list = ['mmspasture','mmspastpad']
 ## Cat I.B.2: manure in open/ooutdoor environment (as liquid): aerobic lagoon, liquid
 MMS_outdoor_liquid_list = ['mmsaerproc','mmsliquid','mmsliqoth']
 ## Cat I.B.3: manure in open environment (as liquid): aerobic lagoon, liquid
