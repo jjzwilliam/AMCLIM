@@ -452,6 +452,7 @@ class LAND_module:
         soilporosity = 1 - (soilbd/(rho_soil/1000))
         self.soil_satmoist[:] = soilporosity
         self.soil_satmoist = np.minimum(self.soil_satmoist,0.99)
+        self.soil_moist = np.maximum(self.soil_moist,0.0)
            
     
     def met_input_interp(self,template):
@@ -1927,13 +1928,20 @@ class LAND_module:
 
         field_area = animal_head * grazing_density[livestock_name]
         # source_area = (1-np.exp(-animal_head*patch_area/field_area))*field_area
+        ## average annual coverage of urine and dung
         source_area = field_area * (f_urine_patch+f_dung_pat)
         self.pastarea = source_area
         # self.pastarea = np.nan_to_num(self.pastarea)
         excret_N = excretN_info/source_area
         excret_N = xr_to_np(excret_N)
-        durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 
-                        waste_N=excret_N)
+        if production_system == "grassland":
+            durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 
+                            waste_N=excret_N)
+            print(production_system,livestock_name,"fixed urinary N content scheme")
+        elif production_system == "mixed":
+            durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 
+                            waste_N=excret_N,number_density=(animal_head/(source_area/Days)).values)
+            print(production_system,livestock_name,"fixed elimination (urination+defecation) scheme")
         # test_N = (durine_N+dmanure_N)*source_area
         # print("test total N ",np.nansum(test_N)*365*24/1e9)
         
@@ -1952,8 +1960,8 @@ class LAND_module:
         # test_N = durine_N*source_area*(f_urine_patch+frac_FYM*f_dung_pat)/(f_urine_patch+f_dung_pat)+\
         #             dmanure_N*source_area*(f_dung_pat)/(f_urine_patch+f_dung_pat)
         # print("test total N ",np.nansum(test_N)*365*24/1e9)
-        durine = durine * 1000
-        manure_wc = manure_wc * 1000
+        # durine = durine * 1000
+        # manure_wc = manure_wc * 1000
         ## pH and H+ ions concentration
         sim_ccH = np.float(10**(-sim_pH))
 
@@ -2274,6 +2282,12 @@ class LAND_module:
                     self.theta[llidx,hh+1][self.theta[llidx,hh+1]>self.soil_satmoist[0,hh+1]] = self.soil_satmoist[0,hh+1][self.theta[llidx,hh+1]>self.soil_satmoist[0,hh+1]]
                     self.drainagerate[llidx,hh+1] = np.maximum(subrunoffrate,water_drainage(theta=self.theta[llidx,hh+1],theta_sat=self.soil_satmoist[0,hh+1],
                                                         Ksat=Ks_sat,fc=theta_FC,layerthickness=z_source))
+
+                    # print("dd",dd,"dd_span",dd_span,"hh+1",hh+1,"urine",self.urine[hh+1,0,456],
+                    #         "theta",self.theta[llidx,hh+1,0,456],"drainagerate",self.drainagerate[llidx,hh+1,0,456])
+
+
+
                     Rdiffsrfaq = diff_resistance(distance=z_source/2,phase='aqueous',
                                 theta_sat=self.soil_satmoist[0,hh+1],theta=self.theta[llidx,hh+1],temp=self.soil_temp[0,hh+1])
                     Rdiffsrfgas = diff_resistance(distance=z_source/2,phase='gaseous',
@@ -2383,6 +2397,10 @@ class LAND_module:
                     ## update soil moisture 
                     update_sw = (self.theta[llidx,hh+1]*z_source - self.drainagerate[llidx,hh+1]*timestep*3600-evap)/z_source
                     self.theta[llidx,hh+1] = np.maximum(update_sw,self.soil_moist[0,hh+1])
+
+                    # print("dd",dd,"dd_span",dd_span,"hh+1",hh+1,"NH3 flux",self.NH3flux[hh+1,0,456],
+                    #         "theta",self.theta[llidx,hh+1,0,456],"sw",self.soil_moist[0,hh+1,0,456])
+
                 self.daily_output(dd_span,grazing=True)
                 self.daily_init(grazing=True)
                 ## manure and N pools re-initialise on the last day of each span loop

@@ -172,12 +172,18 @@ class HOUSING_MODULE:
             except ValueError as exp:
                 print("Error occurrs! Please check [idealised settings]")
         else:
-            ## animal waste info    
-            self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
-                        waste_N=self.excret_N)
+            ## animal waste info
+            if self.livestock == "POULTRY":    
+                print(self.livestock,"fixed N content scheme")
+                self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
+                            waste_N=self.excret_N)
+            else:
+                print(self.livestock,"fixed elimination (urination+defecation) scheme")
+                self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
+                            waste_N=self.excret_N,number_density=(self.animal_head.values/self.housing_area))
 
-        self.durine = self.durine * 1000
-        self.manure_wc = self.manure_wc * 1000
+        # self.durine = self.durine * 1000
+        # self.manure_wc = self.manure_wc * 1000
         ## pH and H+ ions concentration
         self.cc_H = np.float(10**(-self.pH))
 

@@ -834,18 +834,31 @@ def min_manurewc(temp,rhum):
     return mois_coeff/100
 ## aniaml info: waste N should be consistent to livestock_N
 ## unit in kg N per head per year; returning daily values
-def livestock_waste_info(livestock_type, waste_N):
-    ## daily N excretion from urine and feces
-    dN = 1000*waste_N/(365*(24/timestep))
-    N_durine = dN * frac_N[livestock_type]['urine_N']
-    N_durea = N_durine * frac_urea[livestock_type]
-    N_ddung = dN * frac_N[livestock_type]['dung_N']
-    ## daily urination and excretion
-    durine = N_durine/conc_N[livestock_type]['conc_N_urine']
-    ddung = m_DM[livestock_type] * N_ddung/conc_N[livestock_type]['conc_N_dung']
-    ## convert g water per kg SM to L water per kg SM
-    dmanure_water = (1000-m_DM[livestock_type])* N_ddung/conc_N[livestock_type]['conc_N_dung']/1000
-    pH = pH_info[livestock_type]
+## two scheme: 1) fixed urinary N concentration, 2) fixed urination
+def livestock_waste_info(livestock_type, waste_N, number_density=None):
+    
+    if number_density is None:
+        ## daily N excretion from urine and feces
+        dN = 1000*waste_N/(365*(24/timestep))
+        N_durine = dN * frac_N[livestock_type]['urine_N']
+        N_durea = N_durine * frac_urea[livestock_type]
+        N_ddung = dN * frac_N[livestock_type]['dung_N']
+        ## daily urination and excretion
+        durine = N_durine/conc_N[livestock_type]['conc_N_urine'] * 1000
+        ddung = m_DM[livestock_type] * N_ddung/conc_N[livestock_type]['conc_N_dung']
+        dmanure_water = (1000-m_DM[livestock_type])* N_ddung/conc_N[livestock_type]['conc_N_dung']
+        pH = pH_info[livestock_type]
+    else:
+        dN = 1000*waste_N/(365*(24/timestep))
+        N_durine = dN * frac_N[livestock_type]['urine_N']
+        N_durea = N_durine * frac_urea[livestock_type]
+        N_ddung = dN * frac_N[livestock_type]['dung_N']
+        ## daily urination and excretion
+        durine = number_density * urine_vol[livestock_type]/(24/timestep) * 1000
+        ddung = number_density * m_DM[livestock_type] * dung_mass[livestock_type]/(24/timestep)
+        dmanure_water = number_density * (1000-m_DM[livestock_type])*dung_mass[livestock_type]/(24/timestep)
+        pH = pH_info[livestock_type]
+    
     return N_durine, N_durea, N_ddung, durine, ddung, dmanure_water, pH
 
 ############################################
@@ -855,6 +868,8 @@ livestock_N = defaultdict(dict)
 livestock_Nrate = defaultdict(dict)
 livestock_weight = defaultdict(dict)
 stocking_desity = defaultdict(dict)
+urine_vol = defaultdict(dict)
+dung_mass = defaultdict(dict)
 frac_N = defaultdict(dict)
 conc_N = defaultdict(dict)
 frac_urea = defaultdict(dict)
@@ -898,8 +913,10 @@ name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDI
 den_stock = [200.0, 200.0, 200.0, 120.0, 120.0, 60.0, 100.0, 100.0, 30.0, 200.0]
 ## fraction of urine N and dung N; proportion
 ## for poultry: fraction of uric acid N and org N; proportion
-f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
-       [1.0/2, 1.0/2], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
+# f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
+#        [1.0/2, 1.0/2], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
+f_N = [[3.0/5, 2.0/5], [8.8/13.8, 5/13.8], [8.8/13.8, 5/13.8], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
+       [2.0/3, 1.0/3], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
 ## N concentration in urine and dung; g N per L urine,  g N per kg SM
 ## for poultry, "urine N" (1st value) represents the UA concentration of excretion water (moisture)
 ## for poultry, "dung N" (2nd value) represents the orgN concentration of excretion
@@ -907,6 +924,9 @@ f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3
 #        [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
 c_N = [[6.90, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
        [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
+## daily urination and defecation of livestock (L urine; kg dung)
+urination = [12.0, 21.0, 21.0, 3.8, 3.8, 3.8, 2.4, 2.4, 0.0, 21.0]
+defecation = [20.9, 27.5, 27.5, 1.2, 1.2, 1.2, 1.2, 1.2, 30.0e-3 ,27.5]
 ## fraction of dry matter in solid manure; g DM per kg SM
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
@@ -928,6 +948,8 @@ for ii in np.arange(10):
         livestock_N[name[ii]][region[jj]] = N_values[ii][jj]
         livestock_Nrate[name[ii]][region[jj]] = N_rates[ii][jj]
         livestock_weight[name[ii]][region[jj]] = 1000*N_values[ii][jj]/(N_rates[ii][jj]*365)
+        urine_vol[name[ii]] = urination[ii]
+        dung_mass[name[ii]] = defecation[ii]
         stocking_desity[name[ii]] = den_stock[ii]
 for ii in np.arange(10):
     for jj in np.arange(2):
