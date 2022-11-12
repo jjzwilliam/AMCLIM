@@ -337,6 +337,7 @@ class LAND_module:
 
         if grazing is True:
             self.pastarea = np.zeros(field_shape)
+            self.dailysourcearea = np.zeros(field_shape)
             self.tempmin10d_avg = np.zeros(outarray_shape)
             self.grazing_dailyidx = np.zeros(outarray_shape)
             self.grazing_days = np.zeros(field_shape)
@@ -750,7 +751,7 @@ class LAND_module:
         ## slurry: 3mm (3kg/m2 or 30 tons/hectare)
         ## solid manure: 1kg/m2 or 10 tons/hectare
         if phase == "liquid":
-            croparea = (spring_manure+spring_water)/3e3
+            croparea = spring_water/3e3
         elif phase == "solid":
             croparea = (spring_manure+spring_water)/1e3
         self.manureapparea = croparea[self.plat1:self.plat2,:]
@@ -1931,8 +1932,9 @@ class LAND_module:
         ## average annual coverage of urine and dung
         source_area = field_area * (f_urine_patch+f_dung_pat)
         self.pastarea = source_area
+        self.dailysourcearea = source_area/Days
         # self.pastarea = np.nan_to_num(self.pastarea)
-        excret_N = excretN_info/source_area
+        excret_N = excretN_info/(source_area/Days)
         excret_N = xr_to_np(excret_N)
         if production_system == "grassland":
             durine_N, durea, dmanure_N, durine, dmanure, manure_wc,sim_pH = livestock_waste_info(livestock_type=livestock_name, 
@@ -2527,12 +2529,12 @@ class LAND_module:
         f_FYM = f_dung_pat*frac_FYM/(f_urine_patch+f_dung_pat)
         # print("urine patch ",f_urinepatch,"dung pat ",f_dungpat,"FYM ",f_FYM)
 
-        sim_urinepatch_area = self.pastarea.values * f_urinepatch
-        sim_dungpat_area = self.pastarea.values * f_dungpat
-        sim_FYM_area = self.pastarea.values * f_FYM
+        sim_urinepatch_area = (self.pastarea.values/Days) * f_urinepatch
+        sim_dungpat_area = (self.pastarea.values/Days) * f_dungpat
+        sim_FYM_area = (self.pastarea.values/Days) * f_FYM
 
         grazing_total_N = (self.urea_added[0:Days] + self.avail_N_added[0:Days] + self.resist_N_added[0:Days] + \
-                            self.unavail_N_added[0:Days]) * self.pastarea.values
+                            self.unavail_N_added[0:Days]) * (self.pastarea.values/Days)
 
         ## FYM; lvl_idx=0
         self.o_NH3flux_FYM = self.o_NH3flux_FYM*sim_FYM_area

@@ -98,8 +98,8 @@ class HOUSING_MODULE:
                 np.nanmedian(self.animal_weight.values[np.where(self.animal_weight!=0)])
             self.animal_weight.values[np.where((self.animal_head!=0)&(np.isnan(self.animal_weight))&(~np.isnan(self.animal_head)))] =\
                  np.nanmedian(self.animal_weight.values[np.where(self.animal_weight!=0)])
-        self.animal_density = stocking_desity[self.livestock]
-        # print(str(livestock)+" stocking density is "+str(animal_density)+" kg/m^2")
+        self.animal_density = stocking_desity[self.livestock][self.lvl_idx]
+        print("Stocking (housing) density is: "+str(self.animal_density)+" kg/m^2")
         self.massgrid = self.animal_head*self.animal_weight.values
         ## calculate housing area
         self.housing_area = self.animal_head.values*self.animal_weight.values/self.animal_density
@@ -178,9 +178,14 @@ class HOUSING_MODULE:
                 self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
                             waste_N=self.excret_N)
             else:
-                print(self.livestock,"fixed elimination (urination+defecation) scheme")
-                self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
-                            waste_N=self.excret_N,number_density=(self.animal_head.values/self.housing_area))
+                if self.production_system == "feedlot":
+                    print(self.livestock,"fixed N content scheme")
+                    self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
+                                waste_N=self.excret_N)
+                else:
+                    print(self.livestock,"fixed elimination (urination+defecation) scheme")
+                    self.durine_N, self.durea, self.dmanure_N, self.durine, self.dmanure, self.manure_wc,self.pH = livestock_waste_info(livestock_type=self.livestock, 
+                                waste_N=self.excret_N,number_density=(self.animal_head.values/self.housing_area))
 
         # self.durine = self.durine * 1000
         # self.manure_wc = self.manure_wc * 1000
@@ -403,7 +408,7 @@ class HOUSING_MODULE:
             rhum_data = rhum_file.rhum2m[hhidx:hhidx+24]
             wind_data = wind_file.wind10m[hhidx:hhidx+24]
         ## housing environmental conditions
-        if house_env.lower() == 'insulated':
+        if house_env.lower() == 'enclosed':
             # print("HOUSING ENV: House with slatted floor")
             self.T_sim[1:], self.u_sim[1:], self.RH_sim[1:] = housing_env(temp_data,rhum_data,self.livestock,self.production_system)
             self.T_gnd = self.T_sim
@@ -596,7 +601,6 @@ class HOUSING_MODULE:
             ## ruminants of "mixed" production system are condersider to be grazed seasonally
             if self.production_system == "mixed":
                 grazing_idx = self.grazing_indicator(dd)
-                # grazing_idx = self.grazing_indicator(dd)
                 self.grazing_excretion_N(dd,grazing_idx)
             else:
                 grazing_idx = np.zeros((CONFIG_lats,CONFIG_lons))     

@@ -37,52 +37,54 @@ def housing_env(temp,rhum,livestock_type,production_system_type):
     temp = np.array(temp)
     rhum_in = np.zeros(temp.shape)
     u_in = np.zeros(temp.shape)
-    if livestock_type.lower() == 'cattle':
-        t_in = temp
-        # u_in[temp<0] = 0.2
-        # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
-        # u_in[temp>=12.5] = 0.38
+    if livestock_type == 'BEEF_CATTLE':
+        t_in = 12.5 + (temp - 12.5) * 0.9
+        t_in = np.maximum(12.5,temp)
         ## maximum ventilation is 0.38; minimum is 0.2
         u_in = 0.2+temp*(0.18/12.5)
         u_in = np.maximum(u_in,0.2)
         u_in = np.minimum(u_in,0.38)
         rhum_in = rhum
-    if livestock_type.lower() == 'dairy':
-        t_in = temp
-        # u_in[temp<0] = 0.2
-        # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
-        # u_in[temp>=12.5] = 0.38
+    if livestock_type == 'FEEDLOT_CATTLE':
+        t_in = 12.5 + (temp - 12.5) * 0.9
+        t_in = np.maximum(12.5,temp)
+        ## maximum ventilation is 0.38; minimum is 0.2
         u_in = 0.2+temp*(0.18/12.5)
         u_in = np.maximum(u_in,0.2)
         u_in = np.minimum(u_in,0.38)
         rhum_in = rhum
-    elif livestock_type.lower() == 'pig':
+    if livestock_type == 'DAIRY_CATTLE':
+        t_in = 12.5 + (temp - 12.5) * 0.9
+        t_in = np.maximum(12.5,temp)
+        u_in = 0.2+temp*(0.18/12.5)
+        u_in = np.maximum(u_in,0.2)
+        u_in = np.minimum(u_in,0.38)
+        rhum_in = rhum
+    if livestock_type == 'OTHER_CATTLE':
+        t_in = 12.5 + (temp - 12.5) * 0.9
+        t_in = np.maximum(12.5,temp)
+        u_in = 0.2+temp*(0.18/12.5)
+        u_in = np.maximum(u_in,0.2)
+        u_in = np.minimum(u_in,0.38)
+        rhum_in = rhum
+    elif livestock_type == 'PIG':
         t_in = np.zeros(temp.shape)
         t_in[temp<0] = 20+0.25*temp[temp<0]
         t_in[(temp>0)&(temp<12.5)] = 20
         t_in[temp>=12.5] = 20+(temp[temp>=12.5]-12.5)
-        # u_in[temp<0] = 0.2
-        # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.18/12.5)
-        # u_in[temp>=12.5] = 0.38
         u_in = 0.2+temp*(0.18/12.5)
         u_in = np.maximum(u_in,0.2)
         u_in = np.minimum(u_in,0.38)
         rhum_in = rhum - 10
-    elif livestock_type.lower() == 'poultry':
-        if production_system_type.lower() == 'broiler':
+    elif livestock_type == 'POULTRY':
+        if production_system_type == 'broiler':
             t_in = 0.00020*temp**3 + 0.0010*temp**2 + 0.024*temp + 22.1        ## Jiang et a., 2021
-            # u_in[temp<0] = 0.2  
-            # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.23/12.5)
-            # u_in[temp>=12.5] = 0.43 
             u_in = 0.2+temp*(0.23/12.5)
             u_in = np.maximum(u_in,0.2)
             u_in = np.minimum(u_in,0.43)
             rhum_in = rhum
-        elif production_system_type.lower() == 'layer':
+        elif production_system_type == 'layer':
             t_in = 0.00014*temp**3 + 0.0023*temp**2 + 0.011*temp + 23.8        ## Jiang et a., 2021
-            # u_in[temp<0] = 0.2
-            # u_in[(temp>0)&(temp<12.5)] = 0.2+temp[(temp>0)&(temp<12.5)]*(0.23/12.5)
-            # u_in[temp>=12.5] = 0.43
             u_in = 0.2+temp*(0.23/12.5)
             u_in = np.maximum(u_in,0.2)
             u_in = np.minimum(u_in,0.43)
@@ -864,9 +866,6 @@ def livestock_waste_info(livestock_type, waste_N, number_density=None):
 ############################################
 ## livestock waste info database
 ############################################
-livestock_N = defaultdict(dict)
-livestock_Nrate = defaultdict(dict)
-livestock_weight = defaultdict(dict)
 stocking_desity = defaultdict(dict)
 urine_vol = defaultdict(dict)
 dung_mass = defaultdict(dict)
@@ -877,81 +876,48 @@ m_DM = defaultdict(dict)
 solid_m_DM = defaultdict(dict)
 rho_m = defaultdict(dict)
 pH_info = defaultdict(dict)
-name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
+name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','FEEDLOT_CATTLE','PIG','SHEEP','GOAT','POULTRY','BUFFALO']
 ## regions include: 1)North America, 2)Western Europe, 3) Eastern Europe, 4)Oceania, 5)Latin America, 6)Africa
 ##                  7) Middle East, 8)Asia, 9) India
 region = ['NA','WE','EE','OC','LA','AF','ME','AS','IN']
 N_type = ['urine_N','dung_N']
 conc_type = ['conc_N_urine','conc_N_dung']
-## ref: Vira, J., Hess, P., Melkonian, J., and Wieder, W. R.: An improved mechanistic model for ammonia volatilization 
-##      in Earth system models: Flow of Agricultural Nitrogen, version 2 (FANv2), 
-##      Geosci. Model Dev. Discuss., https://doi.org/10.5194/gmd-2019-233, in review, 2019.
-##      in supplementary materials, sect.2.2, Table 1.
-N_values = [[58.0,65.0,55.3,65.5,44.2,42.6,52.7,42.4,25.4],
-          [97.0,105.1,70.3,80.3,70.1,60.2,70.3,60.0,47.2],
-          [44.0,50.6,50.0,60.2,40.1,39.8,49.9,39.6,13.7], 
-          [11.2,16.1,17.0,15.6,16.8,16.8,16.8,5.1,5.1],
-          [7.1,9.3,10.0,8.7,16.0,16.0,16.0,4.3,4.3],
-          [17.3,30.4,30.2,30.2,5.6,5.6,5.6,2.5,2.5],
-          [7.4,15.0,15.9,20.0,12.0,12.0,12.0,12.0,12.0],
-          [6.3,18.0,18.0,20.0,15.0,15.0,15.0,15.0,15.0],
-          [0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],
-          [44.4,44.4,44.4,44.4,44.4,44.4,44.4,44.4,34.5]]
-## Nitrogen excretion rates: kg N per 1000 kg animal mass per day; (equivalent to: g N per kg animal mass per day)
-N_rates =[[0.29,0.31,0.32,0.44,0.35,0.59,0.74,0.34],
-          [0.44,0.48,0.35,0.44,0.48,0.60,0.70,0.47],
-          [0.31,0.33,0.35,0.50,0.36,0.63,0.79,0.34],
-          [0.40,0.50,0.54,0.52,1.47,1.47,1.47,0.40],
-          [0.42,0.51,0.55,0.53,1.57,1.57,1.57,0.42],
-          [0.24,0.42,0.46,0.46,0.55,0.55,0.55,0.24],
-          [0.42,0.85,0.90,1.13,1.17,1.17,1.17,1.17],
-          [0.45,1.28,1.28,1.42,1.37,1.37,1.37,1.37],
-          [0.83,0.83,0.82,0.82,0.82,0.82,0.82,0.82],
-          [0.32,0.32,0.32,0.32,0.32,0.32,0.32,0.32]]
 ## livestock stocking density in animal houses (needs to be updated)
-name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','PIG','MARKET_SWINE','BREEDING_SWINE','SHEEP','GOAT','POULTRY','BUFFALO']
-den_stock = [200.0, 200.0, 200.0, 120.0, 120.0, 60.0, 100.0, 100.0, 30.0, 200.0]
+den_stock = [[2500,100.0], [2500,80.0], [2500,80.0], [150.0], [120.0,80.0,60.0], [400,50.0], [400,50.0], 
+            [30.0,15.0,4.0], [80.0]]
 ## fraction of urine N and dung N; proportion
 ## for poultry: fraction of uric acid N and org N; proportion
-# f_N = [[1.0/2, 1.0/2], [8.8/13.8, 5/13.8], [1.0/2, 1.0/2], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
-#        [1.0/2, 1.0/2], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
-f_N = [[3.0/5, 2.0/5], [8.8/13.8, 5/13.8], [8.8/13.8, 5/13.8], [2.0/3, 1.0/3],[2.0/3, 1.0/3],[2.0/3, 1.0/3],
+f_N = [[3.0/5, 2.0/5], [8.8/13.8, 5/13.8], [8.8/13.8, 5/13.8], [3.0/5, 2.0/5], [2.0/3, 1.0/3],
        [2.0/3, 1.0/3], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
 ## N concentration in urine and dung; g N per L urine,  g N per kg SM
 ## for poultry, "urine N" (1st value) represents the UA concentration of excretion water (moisture)
 ## for poultry, "dung N" (2nd value) represents the orgN concentration of excretion
-# c_N = [[4.40, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
-#        [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
-c_N = [[6.90, 4.85], [9.00, 4.85], [4.40, 4.85], [4.90, 10.45], [4.90, 10.45], [4.90, 10.45],
-       [12.60, 6.40], [12.60, 6.40], [70.42, 20.00], [4.40, 4.85]]
+c_N = [[7.2, 4.85], [6.9, 4.85], [6.9, 4.85], [7.2, 4.85], [6.4, 11.90],
+       [8.7, 6.40], [12.0, 6.40], [70.42, 20.00], [4.40, 4.85]]
 ## daily urination and defecation of livestock (L urine; kg dung)
-urination = [12.0, 21.0, 21.0, 3.8, 3.8, 3.8, 2.4, 2.4, 0.0, 21.0]
-defecation = [20.9, 27.5, 27.5, 1.2, 1.2, 1.2, 1.2, 1.2, 30.0e-3 ,27.5]
+urination = [12.0, 21.0, 21.0, 12.0, 3.8, 2.4, 2.4, 0.0, 21.0]
+defecation = [20.9, 27.5, 27.5, 20.9, 1.2, 1.2, 1.2, 30.0e-3 ,27.5]
 ## fraction of dry matter in solid manure; g DM per kg SM
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
 ##      2. Zhao et al., Nitrogen utilization efficiency and prediction of nitrogen excretion in sheep
 ##      offered fresh perennial ryegrass, J. of. Animal Science, 2016; (for sheep/goat)
-f_DM = [181.5, 181.5, 181.5, 222.0, 222.0, 222.0, 155.0, 155.0, 574.0, 181.5]
+f_DM = [181.5, 181.5, 181.5, 181.5, 222.0, 155.0, 155.0, 574.0, 181.5]
 ## the dry matter (DM) content of solid manure (assumed to be equivalent to manure fertilizer)； ref (Boyd, CAB reviews, 2018)
-f_solid_DM = [31.4, 24.1, 31.4, 30.8, 30.8, 30.8, 32.2, 32.2, 60.6, 31.4]
+f_solid_DM = [31.4, 24.1, 31.4, 31.4, 30.8, 32.2, 32.2, 60.6, 31.4]
 ## assuming the density of manure; 1t/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
-rho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
+rho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
 ## fraction of urinal N in the form of urea
-f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75]
+f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75]
 ## pH value of livestock slurry
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
-pH_val = [7.8, 7.8, 7.8, 7.7, 7.7, 7.7, 8.0, 8.0, 8.5, 7.8]
-for ii in np.arange(10):
-    for jj in np.arange(8):
-        livestock_N[name[ii]][region[jj]] = N_values[ii][jj]
-        livestock_Nrate[name[ii]][region[jj]] = N_rates[ii][jj]
-        livestock_weight[name[ii]][region[jj]] = 1000*N_values[ii][jj]/(N_rates[ii][jj]*365)
-        urine_vol[name[ii]] = urination[ii]
-        dung_mass[name[ii]] = defecation[ii]
-        stocking_desity[name[ii]] = den_stock[ii]
-for ii in np.arange(10):
+pH_val = [7.8, 7.8, 7.8, 7.8, 7.7, 8.0, 8.0, 8.5, 7.8]
+for ii in np.arange(9):
+    urine_vol[name[ii]] = urination[ii]
+    dung_mass[name[ii]] = defecation[ii]
+    stocking_desity[name[ii]] = den_stock[ii]
+for ii in np.arange(9):
     for jj in np.arange(2):
         frac_N[name[ii]][N_type[jj]] = f_N[ii][jj]
         conc_N[name[ii]][conc_type[jj]] = c_N[ii][jj]

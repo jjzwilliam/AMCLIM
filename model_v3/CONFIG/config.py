@@ -67,6 +67,7 @@ CONFIG_production_system_dict = {
         'BEEF_CATTLE':['grassland','mixed',None],
         'DAIRY_CATTLE':['grassland','mixed',None],
         'OTHER_CATTLE':['grassland','mixed',None],
+        'FEEDLOT_CATTLE':['feedlot',None,None],
         'SHEEP':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
@@ -76,19 +77,21 @@ CONFIG_livestock_prodsyst_Nappland_lict = {
         'BEEF_CATTLE':['mixed'],
         'DAIRY_CATTLE':['mixed'],
         'OTHER_CATTLE':['mixed'],
+        'FEEDLOT_CATTLE':['feedlot'],
         'SHEEP':['mixed'],
         'POULTRY':['broiler','layer','backyard']
         }
 # production_system = CONFIG_production_system_dict[livestock][lvl_idx]
-## housing_system: 1. insulated building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
+## housing_system: 1. enclosed building with pit (or without pit) 2. open/naturally ventilated barn 3. poultry houses
 ## housing_system_list = ['slat/pit house','barn','poultry_house','bck_poultry']
 CONFIG_housing_system_dict = {
-        'PIG':['insulated','naturally ventilated','naturally ventilated'],
+        'PIG':['enclosed','naturally ventilated','naturally ventilated'],
         'BEEF_CATTLE':[None,'naturally ventilated',None],
         'DAIRY_CATTLE':[None,'naturally ventilated',None],
         'OTHER_CATTLE':[None,'naturally ventilated',None],
+        'FEEDLOT_CATTLE':['enclosed',None,None],
         'SHEEP':[None,'naturally ventilated',None],
-        'POULTRY':['insulated','insulated','naturally ventilated']
+        'POULTRY':['enclosed','enclosed','naturally ventilated']
         }
 # housing_system = housing_system_dict[livestock][lvl_idx]
 
@@ -97,6 +100,7 @@ CONFIG_animal_file_dict = {
         'BEEF_CATTLE':'beefinfo_faogleam.nc',
         'DAIRY_CATTLE':'dairyinfo_faogleam.nc',
         'OTHER_CATTLE':'otherdairyinfo_faogleam.nc',
+        'FEEDLOT_CATTLE':'feedlotcattleinfo_faogleam.nc',
         'SHEEP':'sheepinfo_faogleam.nc',
         'POULTRY':'chickeninfo_faogleam.nc'
         }
@@ -107,6 +111,7 @@ CONFIG_MMS_file_dict = {
         'BEEF_CATTLE':'beefmms_faogleam.nc',
         'DAIRY_CATTLE':'dairymms_faogleam.nc',
         'OTHER_CATTLE':'otherdairymms_faogleam.nc',
+        'FEEDLOT_CATTLE':'feedlotcattlemms_faogleam.nc',
         'SHEEP':'sheepmms_faogleam.nc',
         'POULTRY':'chickenmms_faogleam.nc'
         }
