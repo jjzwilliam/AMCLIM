@@ -179,6 +179,14 @@ class LAND_module:
             ## area with manure/slurry application
             self.manureapparea = np.zeros(array_shape[1:])
 
+            ## N pools buried in soils
+            self.soil_TAN = np.zeros((2,)+field_shape)
+            self.soil_NO3 = np.zeros((2,)+field_shape)
+            self.soil_UAN = np.zeros((2,)+field_shape)
+            self.soil_availN = np.zeros((2,)+field_shape)
+            self.soil_resistN = np.zeros((2,)+field_shape)
+            self.soil_unavailN = np.zeros((2,)+field_shape)
+
         else:
             ## cropping area for nitrate N fertilizer
             self.nitN_area = np.zeros(array_shape[1:])
@@ -334,6 +342,9 @@ class LAND_module:
         self.o_NO3washoff = np.zeros(outarray_shape)
         self.o_NO3leaching = np.zeros(outarray_shape)
         self.o_NO3diff = np.zeros(outarray_shape)
+
+        
+        
 
         if grazing is True:
             self.pastarea = np.zeros(field_shape)
@@ -803,6 +814,40 @@ class LAND_module:
         # print("test N total: ",np.round(np.nansum(test_Ntotal)/1e9,decimals=3), " Gg N",
         #         np.allclose(totalNapplied[self.plat1:self.plat2,:]/1e9,test_Ntotal/1e9))
         return 
+
+
+    ## N pools buried in soils after certain amount of time 
+    ## this is to prevent N pools accumulating in soils for too long (<360 days)
+    def soil_buried_N(self,dayidx,springplantidx,winterplantidx):
+
+        spanday = 360
+        self.soil_TAN[0][springplantidx+spanday==dayidx] = np.nansum(self.TAN_pool[:,-1],axis=0)[springplantidx+spanday==dayidx]
+        self.soil_NO3[0][springplantidx+spanday==dayidx] = np.nansum(self.NO3_pool[:,-1],axis=0)[springplantidx+spanday==dayidx]
+        self.soil_UAN[0][springplantidx+spanday==dayidx] = self.UA_pool[-1][springplantidx+spanday==dayidx]
+        self.soil_availN[0][springplantidx+spanday==dayidx] = self.avail_N_pool[-1][springplantidx+spanday==dayidx]
+        self.soil_resistN[0][springplantidx+spanday==dayidx] = self.resist_N_pool[-1][springplantidx+spanday==dayidx]
+        self.soil_unavailN[0][springplantidx+spanday==dayidx] = self.unavail_N_pool[-1][springplantidx+spanday==dayidx]
+
+        self.TAN_pool[:,:,springplantidx+spanday==dayidx] = 0.0
+        self.NO3_pool[:,:,springplantidx+spanday==dayidx] = 0.0
+        self.UA_pool[:,springplantidx+spanday==dayidx] = 0.0
+        self.avail_N_pool[:,springplantidx+spanday==dayidx]  = 0.0
+        self.resist_N_pool[:,springplantidx+spanday==dayidx]  = 0.0
+        self.unavail_N_pool[:,springplantidx+spanday==dayidx]  = 0.0
+
+        self.soil_TAN[1][winterplantidx+spanday==dayidx] = np.nansum(self.TAN_pool[:,-1],axis=0)[winterplantidx+spanday==dayidx]
+        self.soil_NO3[1][winterplantidx+spanday==dayidx] = np.nansum(self.NO3_pool[:,-1],axis=0)[winterplantidx+spanday==dayidx]
+        self.soil_UAN[1][winterplantidx+spanday==dayidx] = self.UA_pool[-1][winterplantidx+spanday==dayidx]
+        self.soil_availN[1][winterplantidx+spanday==dayidx] = self.avail_N_pool[-1][winterplantidx+spanday==dayidx]
+        self.soil_resistN[1][winterplantidx+spanday==dayidx] = self.resist_N_pool[-1][winterplantidx+spanday==dayidx]
+        self.soil_unavailN[1][winterplantidx+spanday==dayidx] = self.unavail_N_pool[-1][winterplantidx+spanday==dayidx]
+
+        self.TAN_pool[:,:,winterplantidx+spanday==dayidx] = 0.0
+        self.NO3_pool[:,:,winterplantidx+spanday==dayidx] = 0.0
+        self.UA_pool[:,winterplantidx+spanday==dayidx] = 0.0
+        self.avail_N_pool[:,winterplantidx+spanday==dayidx] = 0.0
+        self.resist_N_pool[:,winterplantidx+spanday==dayidx] = 0.0
+        self.unavail_N_pool[:,winterplantidx+spanday==dayidx] = 0.0
 
     ## irrigation of the land
     def irrigation_event(self,dayidx,plant_calendar,harvest_calendar,irrigation_map,theta_WP,theta_FC):
@@ -1496,11 +1541,12 @@ class LAND_module:
                                                 theta2=self.theta[1,hh+1],theta3=self.theta[2,hh+1],
                                                 theta_sat=self.soil_satmoist[0,hh+1],water_added=self.water[hh+1])
                                     ## soil moisture change due to the manure water addition at the top 2 soil layers
-                                    delta_sw12 = (theta1_post-self.theta[0,hh+1])*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
-                                    self.TAN_pool[0,hh] = self.TAN_pool[0,hh]+self.TAN[hh+1]*\
-                                                                ((theta1_post-self.theta[0,hh+1])*zlayers[0]/delta_sw12)
-                                    self.TAN_pool[1,hh] = self.TAN_pool[1,hh]+self.TAN[hh+1]*\
-                                                                ((theta2_post-self.theta[1,hh+1])*zlayers[0]/delta_sw12)
+                                    # delta_sw12 = theta1_post*zlayers[0] + (theta2_post-self.theta[1,hh+1])*zlayers[1]
+                                    # self.TAN_pool[0,hh] = self.TAN_pool[0,hh]+self.TAN[hh+1]*\
+                                    #                             (theta1_post*zlayers[0]/delta_sw12)
+                                    # self.TAN_pool[1,hh] = self.TAN_pool[1,hh]+self.TAN[hh+1]*\
+                                    #                             ((theta2_post-self.theta[1,hh+1])*zlayers[0]/delta_sw12)
+                                    self.TAN_pool[0,hh] = self.TAN_pool[0,hh]+self.TAN[hh+1]                          
                                     self.theta[0,hh+1] = theta1_post
                                     self.theta[1,hh+1] = theta2_post
                                     self.theta[2,hh+1] = theta3_post
@@ -1863,7 +1909,8 @@ class LAND_module:
                 self.daily_init()  
             elif manure_fert is True:
                 self.daily_output(dd,fert="manure")
-                self.daily_init(manure=True)  
+                self.daily_init(manure=True)
+                self.soil_buried_N(dd,spring_plantdate,winter_plantdate)
         return
 
     ## main sim function for grazing

@@ -1216,7 +1216,7 @@ class HOUSING_MODULE:
 
         if output_stat is True:
             print("Total excreted N from "+self.production_system+' '+self.livestock+' in '+housing_type+\
-                ' is '+str(np.round(np.nansum(n_excret)/1e9,decimals=2))+' GgN.')
+                ' is '+str(np.round((np.nansum(n_excret)-np.nansum(grazing_total_N))/1e9,decimals=2))+' GgN.')
             print("NH3 emission from "+self.production_system+' '+self.livestock+' in '+housing_type+\
                 ' is '+str(np.round(np.nansum(total_emiss)/1e9,decimals=2))+' GgN.')
             if self.production_system == "mixed":
