@@ -477,7 +477,7 @@ class HOUSING_MODULE:
                 self.unavail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_unavail
 
                 ## urea hydrolysis rate
-                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta=1.0,delta_t=timestep)
+                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta_ratio=1.0,delta_t=timestep)
                 ## decomposition rate of available and resistant N components
                 self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_sim[hh+1], 
                                                                                                     delta_t=timestep)
@@ -611,6 +611,9 @@ class HOUSING_MODULE:
                 ## manure pool
                 self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1]
 
+                # print("dd",dd,"hh+1",hh+1)
+                # print("urine","High Africa",self.urine[hh+1,145,400],"China",self.urine[hh+1,120,590],"Low Africa",self.urine[hh+1,190,400])
+
                 ## N input in multiple forms
                 self.urea[hh+1] = self.durea*(1-grazing_idx)
                 self.avail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_avail*(1-grazing_idx)
@@ -618,10 +621,20 @@ class HOUSING_MODULE:
                 self.unavail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_unavail*(1-grazing_idx)
 
                 ## urea hydrolysis rate
-                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_gnd[hh+1],theta=1.0,delta_t=timestep)
+                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_gnd[hh+1],theta_ratio=1.0,delta_t=timestep)
                 ## decomposition rate of available and resistant N components
                 self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_gnd[hh+1], 
                                                                                                     delta_t=timestep)
+
+                # print("T gnd","High Africa",self.T_gnd[hh+1,145,400],
+                #                         "China",self.T_gnd[hh+1,120,590],
+                #                         "Low Africa",self.T_gnd[hh+1,190,400])
+                # print("vent","High Africa",self.u_sim[hh+1,145,400],
+                #                         "China",self.u_sim[hh+1,120,590],
+                #                         "Low Africa",self.u_sim[hh+1,190,400])
+                # print("urea_hydro_rate","High Africa",self.urea_hydro_rate[hh+1,145,400],
+                #                         "China",self.urea_hydro_rate[hh+1,120,590],
+                #                         "Low Africa",self.urea_hydro_rate[hh+1,190,400])
 
                 ## Urea pool
                 self.urea_pool[hh+1] = self.urea_pool[hh] + self.urea[hh+1]
@@ -651,6 +664,10 @@ class HOUSING_MODULE:
                 self.Total_water_pool[hh+1] = self.Total_water_pool[hh]+self.urine[hh+1]+self.manure_initwc[hh+1]-self.evap[hh+1]
                 self.Total_water_pool[hh+1] = np.maximum(self.Total_water_pool[hh+1],self.manure_minwc[hh+1])
 
+                # print("evap","High Africa",self.evap[hh+1,145,400],
+                #                         "China",self.evap[hh+1,120,590],
+                #                         "Low Africa",self.evap[hh+1,190,400])
+
                 ## TAN pool 
                 self.TAN_pool[hh+1] = self.TAN_pool[hh]+self.TAN_prod[hh+1]
 
@@ -667,6 +684,13 @@ class HOUSING_MODULE:
 
                 ## resistance
                 self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house)+self.R_surf
+
+                # print("KNH3","High Africa",KNH3[145,400],
+                #                         "China",KNH3[120,590],
+                #                         "Low Africa",KNH3[190,400])
+                # print("R_star","High Africa",self.R_star[hh+1,145,400],
+                #                         "China",self.R_star[hh+1,120,590],
+                #                         "Low Africa",self.R_star[hh+1,190,400])
 
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss[hh+1] = NH3_volslat(slat_conc=self.NH3_gas[hh+1],conc_in=0.0,
@@ -1215,14 +1239,18 @@ class HOUSING_MODULE:
         print("ncfile saved.")
 
         if output_stat is True:
-            print("Total excreted N from "+self.production_system+' '+self.livestock+' in '+housing_type+\
-                ' is '+str(np.round((np.nansum(n_excret)-np.nansum(grazing_total_N))/1e9,decimals=2))+' GgN.')
-            print("NH3 emission from "+self.production_system+' '+self.livestock+' in '+housing_type+\
-                ' is '+str(np.round(np.nansum(total_emiss)/1e9,decimals=2))+' GgN.')
             if self.production_system == "mixed":
+                print("Total excreted N from "+self.production_system+' '+self.livestock+' in '+housing_type+\
+                ' is '+str(np.round((np.nansum(n_excret)-np.nansum(grazing_total_N))/1e9,decimals=2))+' GgN.')
+                print("NH3 emission from "+self.production_system+' '+self.livestock+' in '+housing_type+\
+                ' is '+str(np.round(np.nansum(total_emiss)/1e9,decimals=2))+' GgN.')
                 print("Excreted N while grazing is "+\
                     str(np.round(np.nansum(grazing_total_N)/1e9,decimals=2))+" GgN.")
-
+            else:
+                print("Total excreted N from "+self.production_system+' '+self.livestock+' in '+housing_type+\
+                ' is '+str(np.round(np.nansum(n_excret)/1e9,decimals=2))+' GgN.')
+                print("NH3 emission from "+self.production_system+' '+self.livestock+' in '+housing_type+\
+                ' is '+str(np.round(np.nansum(total_emiss)/1e9,decimals=2))+' GgN.')
         return
 
     

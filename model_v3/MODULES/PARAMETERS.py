@@ -139,11 +139,14 @@ def ua_hydrolysis_rate(temp,rhum,ph,delta_t):
     drate = (dmax_rate*delta_t)*fenv
     return drate
 ## EMPIRICAL - rate: urea hydrolysis to TAN; temp in degC, delta_t is the time step, i.e 1 hour, daily res: delta_t=24
-def urea_hydrolysis_rate(temp,theta,delta_t,k_h=0.23): 
-    ## DEFAULT:k_h equals 0.23 per hour at 20 degC; Goh and Sherlock, 1985; Muck, 1981;
+def urea_hydrolysis_rate(temp,theta_ratio,delta_t,k_h=0.23): 
+    ## DEFAULT:k_h equals 0.23 per hour at 20 degC for livestock urine; Goh and Sherlock, 1985; Muck, 1981;
+    ##         k_h equals 0.03 per hour for urea degradation (chemical fertilizer); 
+    ##                                                                  Bolado et al., 2005; Cortus et al., 2008; Dutta et al., 2016
     ## Ah_t is a temeprature scaling factor for k_h; temperature dependence Q10 is ~2. 
     Ah_t = 0.25 * np.exp(0.0693*temp)
-    hydrolysis_rate = 1 - np.exp((-k_h*theta*delta_t)*Ah_t)  
+    theta_ratio = np.nan_to_num(theta_ratio)
+    hydrolysis_rate = 1 - theta_ratio*np.exp((-k_h*delta_t)*Ah_t)  
     # hydrolysis_rate[np.isnan(hydrolysis_rate)] = 0.0
     hydrolysis_rate = np.nan_to_num(hydrolysis_rate)
     return hydrolysis_rate

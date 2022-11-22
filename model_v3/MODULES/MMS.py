@@ -513,7 +513,7 @@ class MMS_module:
                 self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1]
                 
                 ## urea/UA hydrolysis rate; orgN decomposition rate
-                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta=1.0,delta_t=timestep)
+                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta_ratio=1.0,delta_t=timestep)
                 ## UA hydrolysis will no longer be constrained by RH (moisture) under liquid conditions/slurry management
                 self.ua_conv_factor[hh+1] = ua_hydrolysis_rate(temp=self.T_sim[hh+1],rhum=100.0,ph=self.pH,
                                     delta_t=timestep)
@@ -657,7 +657,7 @@ class MMS_module:
                 self.manure_pool[hh+1] = self.manure_pool[hh] + self.manure[hh+1] 
 
                 ## urea/UA hydrolysis rate; orgN decomposition rate
-                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta=1.0,delta_t=timestep)
+                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta_ratio=1.0,delta_t=timestep)
                 ## note the difference between the liquid and solid management; 
                 ## UA hydrolysis rate is constrained by RH under solid management
                 self.ua_conv_factor[hh+1] = ua_hydrolysis_rate(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1],ph=self.pH,
