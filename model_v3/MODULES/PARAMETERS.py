@@ -146,7 +146,7 @@ def urea_hydrolysis_rate(temp,WFPS,delta_t,k_h=0.23):
     ## Ah_t is a temeprature scaling factor for k_h; temperature dependence Q10 is ~2. 
     Ah_t = 0.25 * np.exp(0.0693*temp)
     WFPS = np.nan_to_num(WFPS)
-    hydrolysis_rate = (1 - WFPS*np.exp((-k_h*delta_t)*Ah_t))
+    hydrolysis_rate = (1 - np.exp((-k_h*WFPS*delta_t)*Ah_t))
     hydrolysis_rate = np.nan_to_num(hydrolysis_rate)
     return hydrolysis_rate
 ## EMPIRICAL - rate: TAN production from the decompostion of N_avail and N_resist; temp in degC
