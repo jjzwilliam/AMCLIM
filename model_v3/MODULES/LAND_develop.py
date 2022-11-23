@@ -1403,7 +1403,7 @@ class LAND_module:
                                 self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusionup[ll,hh]
                                 ## urea hydrolysis
                                 self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                            theta_ratio=self.theta[llidx,hh]/self.theta[llidx,hh+1],
+                                                                                                            WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[llidx,hh+1]),
                                                                                                             delta_t=timestep,k_h=0.03)
                                 ## subtracting chemical losses
                                 self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
@@ -1439,7 +1439,7 @@ class LAND_module:
                                                             self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
                                 ## urea hydrolysis
                                 self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                            theta_ratio=self.theta[llidx,hh]/self.theta[llidx,hh+1],
+                                                                                                            WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[llidx,hh+1]),
                                                                                                             delta_t=timestep,k_h=0.03)
                                 ## subtracting chemical losses
                                 self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
@@ -1470,7 +1470,7 @@ class LAND_module:
                                 self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh]+self.ureadiffusiondown[ll-1,hh+1]+self.ureainfil[ll-1,hh+1]
                                 ## urea hydrolysis
                                 self.ureahydrolysis[ll,hh+1] = self.urea_pool[ll,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[llidx,hh+1],
-                                                                                                            theta_ratio=self.theta[llidx,hh]/self.theta[llidx,hh+1],
+                                                                                                            WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[llidx,hh+1]),
                                                                                                             delta_t=timestep,k_h=0.03)
                                 ## subtracting chemical losses
                                 self.urea_pool[ll,hh+1] = self.urea_pool[ll,hh+1]-self.ureahydrolysis[ll,hh+1]
@@ -2100,7 +2100,7 @@ class LAND_module:
                     nonN_washoff_rate = f_washoff_nonN*surfrunoffrate*3600*timestep*1e3
                     N_washoff_rate = f_washoff_N*surfrunoffrate*3600*timestep*1e3
                     ## urea hydrolysis rate
-                    urea_hydro_rate = urea_hydrolysis_rate(temp=self.soil_temp[0,hh+1],theta_ratio=1.0,delta_t=timestep)
+                    urea_hydro_rate = urea_hydrolysis_rate(temp=self.soil_temp[0,hh+1],WFPS=1.0,delta_t=timestep)
                     ## org N decomposition rate
                     Na_decomp_rate, Nr_decomp_rate = N_pools_decomp_rate(temp=self.soil_temp[0,hh+1],delta_t=timestep)
                     ## NH3 partition coefficient
@@ -2364,7 +2364,7 @@ class LAND_module:
                     self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
                     ## urea hydrolysis
                     self.ureahydrolysis[llidx,hh+1] = self.urea_pool[llidx,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[0,hh+1],
-                                                                                                theta_ratio=self.theta[llidx,hh]/self.theta[llidx,hh+1],
+                                                                                                WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[llidx,hh+1]),
                                                                                                 delta_t=timestep)
                     ## subtracting chemical losses
                     self.urea_pool[llidx,hh+1] = self.urea_pool[llidx,hh+1]-self.ureahydrolysis[llidx,hh+1]

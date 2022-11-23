@@ -477,7 +477,7 @@ class HOUSING_MODULE:
                 self.unavail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_unavail
 
                 ## urea hydrolysis rate
-                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],theta_ratio=1.0,delta_t=timestep)
+                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_sim[hh+1],WFPS=1.0,delta_t=timestep)
                 ## decomposition rate of available and resistant N components
                 self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_sim[hh+1], 
                                                                                                     delta_t=timestep)
@@ -621,7 +621,7 @@ class HOUSING_MODULE:
                 self.unavail_N[hh+1] = (self.dmanure_N + (self.durine_N-self.durea))*f_unavail*(1-grazing_idx)
 
                 ## urea hydrolysis rate
-                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_gnd[hh+1],theta_ratio=1.0,delta_t=timestep)
+                self.urea_hydro_rate[hh+1] = urea_hydrolysis_rate(temp=self.T_gnd[hh+1],WFPS=1.0,delta_t=timestep)
                 ## decomposition rate of available and resistant N components
                 self.Na_decomp_rate[hh+1], self.Nr_decomp_rate[hh+1] = N_pools_decomp_rate(temp=self.T_gnd[hh+1], 
                                                                                                     delta_t=timestep)
