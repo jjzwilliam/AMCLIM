@@ -28,6 +28,7 @@ sim = "base"
 start = time.time()
 
 for prodsyst in ruminant_prodsysts:
+# for prodsyst in ["mixed"]:
     print(prodsyst)
     grazing_sim = LAND.LAND_module(prank=rank,psize=band,
                         fert_type='manure',manure_added=np.zeros(arr),urea_added=np.zeros(arr),
@@ -37,7 +38,7 @@ for prodsyst in ruminant_prodsysts:
                         pH_value=7.0,grazing=True)
 
     grazing_sim.grazing_main(livestock_name=livestock,production_system=prodsyst,
-                                start_day_idx=CONFIG.Days-LAND.grazing_span,end_day_idx=CONFIG.Days*2,stat=True)
+                                start_day_idx=0,end_day_idx=CONFIG.Days,stat=True)
 
     # grazing_sim.grazing_main(livestock_name=livestock,production_system=prodsyst,
     #                         start_day_idx=0,end_day_idx=1,stat=True)

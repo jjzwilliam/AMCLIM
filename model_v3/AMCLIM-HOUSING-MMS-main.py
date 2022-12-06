@@ -87,7 +87,7 @@ elif livestock == "DAIRY_CATTLE":
             print("=============================================")
                 
 ###############################
-## other CATTLE: Housing & MMS
+## other DAIRY: Housing & MMS
 ###############################
 elif livestock == "OTHER_CATTLE":
     ## other Cattle: mixed production system (barn)
@@ -103,6 +103,39 @@ elif livestock == "OTHER_CATTLE":
     for mmsphase in ["liquid","solid"]:
         if mmsphase == "liquid":
             mmscats = ['MMS_indoor',"MMS_open","MMS_cover","MMS_lagoon"]
+        elif mmsphase == "solid":
+            mmscats = ['MMS_indoor',"MMS_open"]
+        for mmscat in mmscats: 
+            mms_manure = MMS.MMS_module(livestock_name=livestock,production_system_lvl_idx=prodsyst_idx,
+                mms_cat=mmscat,phase=mmsphase,manure_added=housing_manure.manure_pool_to_storage,
+                urea_added=housing_manure.urea_pool_to_storage,UA_added=np.zeros(CONFIG.CONFIG_mtrx),avail_N_added=housing_manure.avail_N_pool_to_storage,
+                resist_N_added=housing_manure.resist_N_pool_to_storage,
+                unavail_N_added=housing_manure.unavail_N_pool_to_storage,
+                TAN_added=housing_manure.TAN_pool_to_storage,
+                water_added=housing_manure.Total_water_pool_to_storage,area_housing=housing_manure.floor_area)
+            mms_manure.MMS_sim_main(mms_cat=mmscat,phase=mmsphase,start_day_idx=0,end_day_idx=CONFIG.Days*2,stat=True)
+            if mmsphase == "solid":
+                if mmscat == "MMS_open":
+                    mms_manure.output_MMS_pathway(output_stat=True)
+            print("=============================================")
+
+#################################
+## feedlot CATTLE: Housing & MMS
+#################################
+elif livestock == "FEEDLOT_CATTLE":
+    ## BEEF: mixed production system (only barn)
+    prodsyst_idx = CONFIG.CONFIG_production_system_dict['FEEDLOT_CATTLE'].index("feedlot")
+    print("=============================================")
+    housing_manure = HOUSING.HOUSING_MODULE(livestock_name="FEEDLOT_CATTLE",
+                                            production_system_lvl_idx=prodsyst_idx,
+                                            housing_type="barn")
+    housing_manure.barn_sim_main(housing_type="barn",
+                                    start_idx=0,end_idx=CONFIG.Days,cleaning_frequency=HOUSING.cleaning_freq["barn"],ncfile_o=True)
+    print("=============================================")
+
+    for mmsphase in ["liquid","solid"]:
+        if mmsphase == "liquid":
+            mmscats = ['MMS_indoor',"MMS_open","MMS_cover"]
         elif mmsphase == "solid":
             mmscats = ['MMS_indoor',"MMS_open"]
         for mmscat in mmscats: 
@@ -157,6 +190,7 @@ elif livestock == "SHEEP":
 elif livestock == "PIG":
     ## PIG: industrial, intermediate, backyard (slat-pit_house, barn)
     for prodsyst_idx in np.arange(3):
+    # for prodsyst_idx in np.arange(1):
         if prodsyst_idx == 0:
             housetype = "slat-pit_house"
             print("=============================================")
@@ -236,6 +270,7 @@ elif livestock == "PIG":
 elif livestock == "POULTRY":
     ## POULTRY (chicken): broiler, layer, backyard (poultry house)
     for prodsyst_idx in np.arange(3):
+    # for prodsyst_idx in np.arange(1,2):
         ## broiler 0 and layer 1 (no backyard chicken 2)
         if prodsyst_idx != 2:
             print("=============================================")

@@ -1158,13 +1158,23 @@ class LAND_module:
             if test == '-':
                 ## soil pH decrease by 0.5
                 self.pH = self.pH - 0.5
+                self.cc_H = np.float(10**(-self.pH))
                 self.soil_pH = self.soil_pH - 0.5
+                self.cc_H = np.float(10**(-self.pH))
                 print('Sensitivity tests for soil pH -0.5')
-            else:
+            elif test == '+':
                 ## soil pH increase by 0.5
                 self.pH = self.pH + 0.5
+                self.cc_H = np.float(10**(-self.pH))
                 self.soil_pH = self.soil_pH + 0.5
+                self.cc_H = np.float(10**(-self.pH))
                 print('Sensitivity tests for soil pH +0.5')
+            elif test == 'fixed':
+                self.pH[:] = 7.0
+                self.cc_H = np.float(10**(-self.pH))
+                self.soil_pH[:] = 7.0
+                self.soil_ccH = np.float(10**(-self.soil_pH))
+                print('Sensitivity tests for a fixed pH of 7.0')
 
         return
     
@@ -2364,7 +2374,7 @@ class LAND_module:
                     self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
                     ## urea hydrolysis
                     self.ureahydrolysis[llidx,hh+1] = self.urea_pool[llidx,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[0,hh+1],
-                                                                                                WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[llidx,hh+1]),
+                                                                                                WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[0,hh+1]),
                                                                                                 delta_t=timestep)
                     ## subtracting chemical losses
                     self.urea_pool[llidx,hh+1] = self.urea_pool[llidx,hh+1]-self.ureahydrolysis[llidx,hh+1]
