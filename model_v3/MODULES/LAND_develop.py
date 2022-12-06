@@ -1171,9 +1171,9 @@ class LAND_module:
                 print('Sensitivity tests for soil pH +0.5')
             elif test == 'fixed':
                 self.pH[:] = 7.0
-                self.cc_H = np.float(10**(-self.pH))
+                self.cc_H[:] = 10**(-self.pH)
                 self.soil_pH[:] = 7.0
-                self.soil_ccH = np.float(10**(-self.soil_pH))
+                self.soil_ccH[:] = 10**(-self.soil_pH)
                 print('Sensitivity tests for a fixed pH of 7.0')
 
         return
