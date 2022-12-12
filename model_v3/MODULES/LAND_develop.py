@@ -1155,26 +1155,36 @@ class LAND_module:
         ## SOIL PH
         ###########
         if var == 'ph':
-            if test == '-':
-                ## soil pH decrease by 0.5
-                self.pH = self.pH - 0.5
-                self.cc_H = np.float(10**(-self.pH))
-                self.soil_pH = self.soil_pH - 0.5
-                self.cc_H = np.float(10**(-self.pH))
-                print('Sensitivity tests for soil pH -0.5')
-            elif test == '+':
-                ## soil pH increase by 0.5
-                self.pH = self.pH + 0.5
-                self.cc_H = np.float(10**(-self.pH))
-                self.soil_pH = self.soil_pH + 0.5
-                self.cc_H = np.float(10**(-self.pH))
-                print('Sensitivity tests for soil pH +0.5')
+            if test == 'down':
+                ## soil pH decrease by 1.0
+                self.pH[:] = self.pH[:] - 1.0
+                self.pH = np.maximum(0.0,self.pH)
+                self.cc_H = 10**(-self.pH)
+                self.soil_pH[:] = self.soil_pH[:] - 1.0
+                self.soil_pH = np.maximum(0.0,self.soil_pH)
+                self.cc_H = 10**(-self.pH)
+                print('Sensitivity tests for soil pH -1.0')
+            elif test == 'up':
+                ## soil pH increase by 1.0
+                self.pH[:] = self.pH[:] + 1.0
+                self.pH = np.minimum(13.0,self.pH)
+                self.cc_H = 10**(-self.pH)
+                self.soil_pH[:] = self.soil_pH[:] + 1.0
+                self.soil_pH = np.minimum(13.0,self.soil_pH)
+                self.cc_H = 10**(-self.soil_pH)
+                print('Sensitivity tests for soil pH +1.0')
             elif test == 'fixed':
                 self.pH[:] = 7.0
                 self.cc_H[:] = 10**(-self.pH)
                 self.soil_pH[:] = 7.0
                 self.soil_ccH[:] = 10**(-self.soil_pH)
                 print('Sensitivity tests for a fixed pH of 7.0')
+            elif test == 'fixed6':
+                self.pH[:] = 6.0
+                self.cc_H[:] = 10**(-self.pH)
+                self.soil_pH[:] = 6.0
+                self.soil_ccH[:] = 10**(-self.soil_pH)
+                print('Sensitivity tests for a fixed pH of 6.0')
 
         return
     
@@ -1334,7 +1344,8 @@ class LAND_module:
                     sim_ccH = self.cc_H[dd-Days]
 
             if sim != 'base':
-                self.sensitivity_test(var=stvar,test=st)
+                if stvar != "ph":
+                    self.sensitivity_test(var=stvar,test=st)
 
             self.theta[0,1:] = np.copy(self.soil_moist[0,1:])
             self.theta[1,1:] = np.copy(self.soil_moist[0,1:])
@@ -2540,6 +2551,18 @@ class LAND_module:
         self.o_NO3leaching = self.o_NO3leaching*sim_area
         self.o_NO3diff = self.o_NO3diff*sim_area
 
+        self.o_NH3flux = np.nan_to_num(self.o_NH3flux)
+        self.o_washoff = np.nan_to_num(self.o_washoff)
+        self.o_nitrif = np.nan_to_num(self.o_nitrif)
+        self.o_NH4leaching = np.nan_to_num(self.o_NH4leaching)
+        self.o_diffaq = np.nan_to_num(self.o_diffaq)
+        self.o_diffgas = np.nan_to_num(self.o_diffgas)
+        self.o_ammNuptake = np.nan_to_num(self.o_ammNuptake)
+        self.o_nitNuptake = np.nan_to_num(self.o_nitNuptake)
+        self.o_NO3washoff = np.nan_to_num(self.o_NO3washoff)
+        self.o_NO3leaching = np.nan_to_num(self.o_NO3leaching)
+        self.o_NO3diff = np.nan_to_num(self.o_NO3diff)
+
         if output_stat is True:
             if manure_type is None:
                 print('Total N applied: '+str(sum_totalGg(chemfert_Ntotal))+' Gg')
@@ -2663,6 +2686,9 @@ class LAND_module:
         ##################
         if manure is None:
             self.chem_fert_input(crop=crop_item)
+            if sim_type != 'base':
+                if senstest_var == "ph":
+                    self.sensitivity_test(var="ph",test=senstest)
             self.land_sim(start_day_idx,end_day_idx,chem_fert_type,tech=fert_method,crop=crop_item,
                             sim=sim_type,stvar=senstest_var,st=senstest)
             self.para_out(chem_fert_type,None,output_stat,quality_check)
