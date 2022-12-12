@@ -7,7 +7,7 @@ import sys
 import MODULES.FUNC as FUNC
 import INPUT.input as INPUT
 import CONFIG.config as CONFIG
-import MODULES.HOUSING_v3 as HOUSING
+import MODULES.HOUSING as HOUSING
 import MODULES.MMS as MMS
 
 housing_envs = ["insulated","naturally ventilated"]
