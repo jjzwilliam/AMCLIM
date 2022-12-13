@@ -1017,6 +1017,14 @@ grazing_tempthreshold = 10.0
 ## fraction of ruminants manure N excreted while grazing; ref: FANv2
 f_grz = 0.65
 
+
+## techniques used in countries with different income level: high income, upper middle, lower middle, low income
+## techniques are: broadcasting, incorporation, deep placement
+tech_algorithim = [[0.70,0.20,0.10],
+                  [0.8,0.15,0.05],
+                  [0.95,0.05,0.0],
+                  [1.0,0.0,0.0]]
+
 # ###################################
 # ## housing parameters
 # ###################################
