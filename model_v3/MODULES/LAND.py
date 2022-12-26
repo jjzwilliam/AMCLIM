@@ -2385,7 +2385,7 @@ class LAND_module:
                     self.unavail_N_washoff[hh+1] = N_washoff_rate*self.unavail_N_pool[hh+1]
                     ## urea hydrolysis
                     self.ureahydrolysis[llidx,hh+1] = self.urea_pool[llidx,hh+1]*urea_hydrolysis_rate(temp=self.soil_temp[0,hh+1],
-                                                                                                WFPS=(self.theta[llidx,hh+1]/self.soil_satmoist[0,hh+1]),
+                                                                                                WFPS=1.0,
                                                                                                 delta_t=timestep)
                     ## subtracting chemical losses
                     self.urea_pool[llidx,hh+1] = self.urea_pool[llidx,hh+1]-self.ureahydrolysis[llidx,hh+1]
