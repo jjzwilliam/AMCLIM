@@ -878,7 +878,7 @@ m_DM = defaultdict(dict)
 solid_m_DM = defaultdict(dict)
 rho_m = defaultdict(dict)
 pH_info = defaultdict(dict)
-name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','FEEDLOT_CATTLE','PIG','SHEEP','GOAT','POULTRY','BUFFALO']
+name = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','FEEDLOT_CATTLE','PIG','SHEEP','GOAT','POULTRY','BUFFALO_BEEF','BUFFALO_DAIRY']
 ## regions include: 1)North America, 2)Western Europe, 3) Eastern Europe, 4)Oceania, 5)Latin America, 6)Africa
 ##                  7) Middle East, 8)Asia, 9) India
 region = ['NA','WE','EE','OC','LA','AF','ME','AS','IN']
@@ -890,31 +890,31 @@ den_stock = [[2500,100.0], [2500,80.0], [2500,80.0], [150.0], [120.0,80.0,60.0],
 ## fraction of urine N and dung N; proportion
 ## for poultry: fraction of uric acid N and org N; proportion
 f_N = [[3.0/5, 2.0/5], [8.8/13.8, 5/13.8], [8.8/13.8, 5/13.8], [3.0/5, 2.0/5], [2.0/3, 1.0/3],
-       [2.0/3, 1.0/3], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[1.0/2, 1.0/2]]
+       [2.0/3, 1.0/3], [1.0/2, 1.0/2], [0.6/1.0, 0.4/1.0],[3.0/5, 2.0/5], [8.8/13.8, 5/13.8]]
 ## N concentration in urine and dung; g N per L urine,  g N per kg SM
 ## for poultry, "urine N" (1st value) represents the UA concentration of excretion water (moisture)
 ## for poultry, "dung N" (2nd value) represents the orgN concentration of excretion
 c_N = [[7.2, 4.85], [6.9, 4.85], [6.9, 4.85], [7.2, 4.85], [6.4, 11.90],
-       [8.7, 6.40], [12.0, 6.40], [70.42, 20.00], [4.40, 4.85]]
+       [8.7, 6.40], [12.0, 6.40], [70.42, 20.00], [7.2, 4.85], [6.9, 4.85]]
 ## daily urination and defecation of livestock (L urine; kg dung)
-urination = [12.0, 21.0, 21.0, 12.0, 3.8, 2.4, 2.4, 0.0, 21.0]
-defecation = [20.9, 27.5, 27.5, 20.9, 1.2, 1.2, 1.2, 30.0e-3 ,27.5]
+urination = [12.0, 21.0, 21.0, 12.0, 3.8, 2.4, 2.4, 0.0, 12.0, 21.0]
+defecation = [20.9, 27.5, 27.5, 20.9, 1.2, 1.2, 1.2, 30.0e-3 ,20.9, 27.5]
 ## fraction of dry matter in solid manure; g DM per kg SM
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
 ##      2. Zhao et al., Nitrogen utilization efficiency and prediction of nitrogen excretion in sheep
 ##      offered fresh perennial ryegrass, J. of. Animal Science, 2016; (for sheep/goat)
-f_DM = [181.5, 181.5, 181.5, 181.5, 222.0, 155.0, 155.0, 574.0, 181.5]
+f_DM = [181.5, 181.5, 181.5, 181.5, 222.0, 155.0, 155.0, 574.0, 181.5, 181.5]
 ## the dry matter (DM) content of solid manure (assumed to be equivalent to manure fertilizer)； ref (Boyd, CAB reviews, 2018)
-f_solid_DM = [31.4, 24.1, 31.4, 31.4, 30.8, 32.2, 32.2, 60.6, 31.4]
+f_solid_DM = [31.4, 24.1, 31.4, 31.4, 30.8, 32.2, 32.2, 60.6, 31.4, 24.1]
 ## assuming the density of manure; 1t/m^3 or 1g/cm^3 for cattle, pigs etc, 0.4 for poultry
-rho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0]
+rho_manure = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.4, 1.0, 1.0]
 ## fraction of urinal N in the form of urea
-f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75]
+f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75, 0.75]
 ## pH value of livestock slurry
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
-pH_val = [7.8, 7.8, 7.8, 7.8, 7.7, 8.0, 8.0, 8.5, 7.8]
+pH_val = [7.8, 7.8, 7.8, 7.8, 7.7, 8.0, 8.0, 8.5, 7.8, 7.8]
 for ii in np.arange(9):
     urine_vol[name[ii]] = urination[ii]
     dung_mass[name[ii]] = defecation[ii]

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ## specify CONFIG_machine: STREAM, JASMIN, ARCHER
-CONFIG_machine = 'STREAM'
+CONFIG_machine = 'ARCHER'
 
 CONFIG_inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
@@ -21,7 +21,7 @@ CONFIG_outputpathdict = {
 infile_path = CONFIG_inputpathdict[CONFIG_machine]
 output_path = CONFIG_outputpathdict[CONFIG_machine]
 
-sim_year = 2018
+sim_year = 2010
 ## daily simulation or hourly simulation
 nhours = 24
 if (sim_year%4)==0: Days = 366
@@ -68,7 +68,10 @@ CONFIG_production_system_dict = {
         'DAIRY_CATTLE':['grassland','mixed',None],
         'OTHER_CATTLE':['grassland','mixed',None],
         'FEEDLOT_CATTLE':['feedlot',None,None],
+        'BUFFALO_BEEF':['grassland','mixed',None],
+        'BUFFALO_DAIRY':['grassland','mixed',None],
         'SHEEP':['grassland','mixed',None],
+        'GOAT':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
 ## manure N to land production systems
@@ -78,7 +81,10 @@ CONFIG_livestock_prodsyst_Nappland_lict = {
         'DAIRY_CATTLE':['mixed'],
         'OTHER_CATTLE':['mixed'],
         'FEEDLOT_CATTLE':['feedlot'],
+        'BUFFALO_BEEF':['mixed'],
+        'BUFFALO_DAIRY':['mixed'],
         'SHEEP':['mixed'],
+        'GOAT':['mixed'],
         'POULTRY':['broiler','layer','backyard']
         }
 # production_system = CONFIG_production_system_dict[livestock][lvl_idx]
@@ -90,7 +96,10 @@ CONFIG_housing_system_dict = {
         'DAIRY_CATTLE':[None,'naturally ventilated',None],
         'OTHER_CATTLE':[None,'naturally ventilated',None],
         'FEEDLOT_CATTLE':['enclosed',None,None],
+        'BUFFALO_BEEF':[None,'naturally ventilated',None],
+        'BUFFALO_DAIRY':[None,'naturally ventilated',None],
         'SHEEP':[None,'naturally ventilated',None],
+        'GOAT':[None,'naturally ventilated',None],
         'POULTRY':['enclosed','enclosed','naturally ventilated']
         }
 # housing_system = housing_system_dict[livestock][lvl_idx]
@@ -101,7 +110,10 @@ CONFIG_animal_file_dict = {
         'DAIRY_CATTLE':'dairyinfo_faogleam.nc',
         'OTHER_CATTLE':'otherdairyinfo_faogleam.nc',
         'FEEDLOT_CATTLE':'feedlotcattleinfo_faogleam.nc',
+        'BUFFALO_BEEF':'buffalo_beefinfo_faogleam.nc',
+        'BUFFALO_DAIRY':'buffalo_dairyinfo_faogleam.nc',
         'SHEEP':'sheepinfo_faogleam.nc',
+        'GOAT':'goatsinfo_faogleam.nc',
         'POULTRY':'chickeninfo_faogleam.nc'
         }
 # animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
@@ -112,6 +124,9 @@ CONFIG_MMS_file_dict = {
         'DAIRY_CATTLE':'dairymms_faogleam.nc',
         'OTHER_CATTLE':'otherdairymms_faogleam.nc',
         'FEEDLOT_CATTLE':'feedlotcattlemms_faogleam.nc',
+        'BUFFALO_BEEF':'buffalo_beefmms_faogleam.nc',
+        'BUFFALO_DAIRY':'buffalo_dairymms_faogleam.nc',
         'SHEEP':'sheepmms_faogleam.nc',
+        'GOAT':'goatsmms_faogleam.nc',
         'POULTRY':'chickenmms_faogleam.nc'
         }
