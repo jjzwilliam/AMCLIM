@@ -26,19 +26,23 @@ times = pd.date_range(yearidx,periods=ntime)
 mmslvl = np.arange(6)
 applvl = np.arange(4)
 
-livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','FEEDLOT_CATTLE',
-                    'SHEEP',
+livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','FEEDLOT_CATTLE','BUFFALO_BEEF','BUFFALO_DAIRY',
+                    'SHEEP','GOAT',
                     'PIG',
                     'POULTRY']
 
-ruminants_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','SHEEP']
+ruminants_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE','BUFFALO_BEEF','BUFFALO_DAIRY','SHEEP','GOAT']
 
 CONFIG_production_system_dict = {
         'PIG':['industrial','intermediate','backyard'],
         'BEEF_CATTLE':['grassland','mixed',None],
         'DAIRY_CATTLE':['grassland','mixed',None],
         'OTHER_CATTLE':['grassland','mixed',None],
+        'FEEDLOT_CATTLE':['feedlot',None,None],
+        'BUFFALO_BEEF':['grassland','mixed',None],
+        'BUFFALO_DAIRY':['grassland','mixed',None],
         'SHEEP':['grassland','mixed',None],
+        'GOAT':['grassland','mixed',None],
         'POULTRY':['broiler','layer','backyard']
         }
 
@@ -47,7 +51,10 @@ housing_types = {
         'BEEF_CATTLE':[[None],["barn"]],
         'DAIRY_CATTLE':[[None],["barn"]],
         'OTHER_CATTLE':[[None],["barn"]],
+        'BUFFALO_BEEF':[[None],["barn"]],
+        'BUFFALO_DAIRY':[[None],["barn"]],
         'SHEEP':[[None],["barn"]],
+        'GOAT':[[None],["barn"]],
         'POULTRY':[["poultry_house_litter","poultry_house"],
                     ["poultry_house_litter","poultry_house"],["poultry_house"]],
         }
@@ -1014,12 +1021,14 @@ def livestock_output():
     cattle_N = np.zeros((nlat,nlon))
     sheep_emission = np.zeros((nlat,nlon))
     sheep_N = np.zeros((nlat,nlon))
+    goat_emission = np.zeros((nlat,nlon))
+    goat_N = np.zeros((nlat,nlon))
     pig_emission = np.zeros((nlat,nlon))
     pig_N = np.zeros((nlat,nlon))
     poultry_emission = np.zeros((nlat,nlon))
     poultry_N = np.zeros((nlat,nlon))
 
-    for livestock in ["BEEF_CATTLE","DAIRY_CATTLE","OTHER_CATTLE"]:
+    for livestock in ["BEEF_CATTLE","DAIRY_CATTLE","OTHER_CATTLE","BUFFALO_BEEF","BUFFALO_DAIRY"]:
         print(livestock)
         filename = str(livestock)+'.NH3emission.annual.'+str(sim_year)+'.nc'
         livestockds = xr.open_dataset(outpath+filename)
@@ -1032,14 +1041,14 @@ def livestock_output():
         grazing_emiss = livestockds.seasonalgrazing_NH3 + livestockds.allyeargrazing_NH3 
         grazing_N = livestockds.seasonalgrazing_N + livestockds.allyeargrazing_N 
         
-        print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
-        print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
-        print("grazing emission",grazing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("grazing N",grazing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("grazing emission",grazing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("grazing N",grazing_N.where(region_mask).sum().values/1e9,"GgN")
         
         cattle_emission = cattle_emission + housing_emiss + mms_emiss + app_emiss + grazing_emiss
         cattle_N = cattle_N + housing_N.fillna(0)+ grazing_N
@@ -1055,12 +1064,12 @@ def livestock_output():
         app_emiss = livestockds.manureapp_NH3.sum(dim="applevel")
         app_N = livestockds.manureapp_N.sum(dim="applevel")
         
-        print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
-        print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
         
         cattle_emission = cattle_emission + housing_emiss + mms_emiss + app_emiss
         cattle_N = cattle_N + housing_N.fillna(0)
@@ -1078,17 +1087,42 @@ def livestock_output():
         grazing_emiss = livestockds.seasonalgrazing_NH3 + livestockds.allyeargrazing_NH3 
         grazing_N = livestockds.seasonalgrazing_N + livestockds.allyeargrazing_N 
         
-        print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
-        print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
-        print("grazing emission",grazing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("grazing N",grazing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("grazing emission",grazing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("grazing N",grazing_N.where(region_mask).sum().values/1e9,"GgN")
         
         sheep_emission = housing_emiss + mms_emiss + app_emiss + grazing_emiss
         sheep_N = housing_N.fillna(0) + grazing_N
+
+    for livestock in ["GOAT"]:
+        print(livestock)
+        filename = str(livestock)+'.NH3emission.annual.'+str(sim_year)+'.nc'
+        livestockds = xr.open_dataset(outpath+filename)
+        housing_emiss = livestockds.housing_NH3
+        housing_N = livestockds.housing_N
+        mms_emiss = livestockds.mms_NH3.sum(dim="mmslevel")
+        mms_N = livestockds.mms_N.sum(dim="mmslevel")
+        app_emiss = livestockds.manureapp_NH3.sum(dim="applevel")
+        app_N = livestockds.manureapp_N.sum(dim="applevel")
+        grazing_emiss = livestockds.seasonalgrazing_NH3 + livestockds.allyeargrazing_NH3 
+        grazing_N = livestockds.seasonalgrazing_N + livestockds.allyeargrazing_N 
+        
+        # print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("grazing emission",grazing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("grazing N",grazing_N.where(region_mask).sum().values/1e9,"GgN")
+        
+        goat_emission = housing_emiss + mms_emiss + app_emiss + grazing_emiss
+        goat_N = housing_N.fillna(0) + grazing_N
         
     for livestock in ["PIG"]:
         print(livestock)
@@ -1101,12 +1135,12 @@ def livestock_output():
         app_emiss = livestockds.manureapp_NH3.sum(dim=("level","applevel"))
         app_N = livestockds.manureapp_N.sum(dim=("level","applevel"))
         
-        print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
-        print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
         
         pig_emission = housing_emiss + mms_emiss + app_emiss 
         pig_N = housing_N.fillna(0) 
@@ -1122,12 +1156,12 @@ def livestock_output():
         app_emiss = livestockds.manureapp_NH3.sum(dim=("level","applevel"))
         app_N = livestockds.manureapp_N.sum(dim=("level","applevel"))
         
-        print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
-        print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
-        print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing emission",housing_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("housing N",housing_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms emission",mms_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("mms N",mms_N.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app emission",app_emiss.where(region_mask).sum().values/1e9,"GgN")
+        # print("manure app N",app_N.where(region_mask).sum().values/1e9,"GgN")
         
         poultry_emission = housing_emiss + mms_emiss + app_emiss 
         poultry_N = housing_N.fillna(0)
