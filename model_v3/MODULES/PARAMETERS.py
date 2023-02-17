@@ -886,7 +886,7 @@ N_type = ['urine_N','dung_N']
 conc_type = ['conc_N_urine','conc_N_dung']
 ## livestock stocking density in animal houses (needs to be updated)
 den_stock = [[2500,100.0], [2500,80.0], [2500,80.0], [150.0], [120.0,80.0,60.0], [400,50.0], [400,50.0], 
-            [30.0,15.0,4.0], [80.0]]
+            [30.0,15.0,4.0], [2500,100.0], [2500,80.0]]
 ## fraction of urine N and dung N; proportion
 ## for poultry: fraction of uric acid N and org N; proportion
 f_N = [[3.0/5, 2.0/5], [8.8/13.8, 5/13.8], [8.8/13.8, 5/13.8], [3.0/5, 2.0/5], [2.0/3, 1.0/3],
@@ -915,11 +915,11 @@ f_urea = [0.75, 0.75, 0.75, 0.75, 0.75, 0.80, 0.80, 0, 0.75, 0.75]
 ## ref: 1. Sommer and Hutchings, Ammonia emission from field applied manure and its reduction -- invited paper,
 ##      Europ. J. Agronomy 15 (2001) 1-15; (for cattle, pig and poultry)
 pH_val = [7.8, 7.8, 7.8, 7.8, 7.7, 8.0, 8.0, 8.5, 7.8, 7.8]
-for ii in np.arange(9):
+for ii in np.arange(10):
     urine_vol[name[ii]] = urination[ii]
     dung_mass[name[ii]] = defecation[ii]
     stocking_desity[name[ii]] = den_stock[ii]
-for ii in np.arange(9):
+for ii in np.arange(10):
     for jj in np.arange(2):
         frac_N[name[ii]][N_type[jj]] = f_N[ii][jj]
         conc_N[name[ii]][conc_type[jj]] = c_N[ii][jj]

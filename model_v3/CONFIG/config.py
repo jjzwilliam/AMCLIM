@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 ## specify CONFIG_machine: STREAM, JASMIN, ARCHER
-CONFIG_machine = 'ARCHER'
+CONFIG_machine = 'STREAM'
 
 CONFIG_inputpathdict = {
         "STREAM": '/home/s1576984/scratch/working_directory/AMCLIM/input_files/',
@@ -21,7 +21,7 @@ CONFIG_outputpathdict = {
 infile_path = CONFIG_inputpathdict[CONFIG_machine]
 output_path = CONFIG_outputpathdict[CONFIG_machine]
 
-sim_year = 2010
+sim_year = 2018
 ## daily simulation or hourly simulation
 nhours = 24
 if (sim_year%4)==0: Days = 366
@@ -116,6 +116,7 @@ CONFIG_animal_file_dict = {
         'GOAT':'goatsinfo_faogleam.nc',
         'POULTRY':'chickeninfo_faogleam.nc'
         }
+CONFIG_livestockNfactorfile = 'livestockN_factor.nc'
 # animal_file_name = animal_file_dict[livestock]      ## input files should be put in AMCLIM/INPUT/
 
 CONFIG_MMS_file_dict = {

@@ -81,10 +81,13 @@ class HOUSING_MODULE:
         self.MMS_file_name = CONFIG_MMS_file_dict[self.livestock] 
         self.animal_file = xr.open_dataset(infile_path+animal_data_path+self.animal_file_name)
         self.MMS_file = xr.open_dataset(infile_path+animal_data_path+self.MMS_file_name)
+        ## factor of annual variations
+        self.livestockNfactor_file = xr.open_dataset(infile_path+animal_data_path+CONFIG_livestockNfactorfile)
         ## livestock info: N excretion, heads, body weights
-        self.excretN_info = self.animal_file['Excreted_N'][self.lvl_idx]
+        self.yearly_factor = self.livestockNfactor_file.yearly_factor.sel(year=sim_year)
+        self.excretN_info = self.animal_file['Excreted_N'][self.lvl_idx]*self.yearly_factor
         print("Total excreted N from "+str(self.livestock)+" :",np.nansum(self.excretN_info*1e3)/1e9, " GgN")
-        self.animal_head = self.animal_file['Animal_head'][self.lvl_idx]
+        self.animal_head = self.animal_file['Animal_head'][self.lvl_idx]*self.yearly_factor
         if self.livestock == "POULTRY":
             self.animal_weight = xr.DataArray(
                         data=np.zeros(self.animal_head.shape),

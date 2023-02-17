@@ -1963,12 +1963,14 @@ class LAND_module:
             print('seasonal grazing of mixed production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
             MMS_file_name = CONFIG_MMS_file_dict[livestock_name]
+            livestockNfactords = open_ds(infile_path+animal_data_path+CONFIG_livestockNfactorfile)
             livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
             mmsds = open_ds(infile_path+animal_data_path+MMS_file_name)
             ## lvl idx 1 is the [Mixed] production system; see config.py
-            excretN_info = livestockds['Excreted_N'][1][self.plat1:self.plat2,:]
+            yearly_factor = livestockNfactords.yearly_factor.sel(year=sim_year)
+            excretN_info = livestockds['Excreted_N'][1][self.plat1:self.plat2,:]*yearly_factor[self.plat1:self.plat2,:]
             print("Total excreted N from mixed production system "+str(livestock_name)+" is: "+str(np.round(np.nansum(excretN_info*1e3/1e9),decimals=2))+" Gg.")
-            animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]
+            animal_head = livestockds['Animal_head'][1][self.plat1:self.plat2,:]*yearly_factor[self.plat1:self.plat2,:]
             ## fraction of manure/N from ruminants while grazing
             for mms in MMS_ruminants_grazing_list:
                 try:
@@ -1992,11 +1994,13 @@ class LAND_module:
         else:
             print('year-round grazing of grassland production system '+str(livestock_name))
             animal_file_name = CONFIG_animal_file_dict[livestock_name]
+            livestockNfactords = open_ds(infile_path+animal_data_path+CONFIG_livestockNfactorfile)
             livestockds = open_ds(infile_path+animal_data_path+animal_file_name)
             ## lvl idx 0 is the [Grassland] production system; see config.py
-            excretN_info = livestockds['Excreted_N'][0][self.plat1:self.plat2,:]
+            yearly_factor = livestockNfactords.yearly_factor.sel(year=sim_year)
+            excretN_info = livestockds['Excreted_N'][0][self.plat1:self.plat2,:]*yearly_factor[self.plat1:self.plat2,:]
             print("Total excreted N from "+str(livestock_name)+" grazing (year-round) is: "+str(np.round(np.nansum(excretN_info*1e3/1e9),decimals=2))+" Gg.")
-            animal_head = livestockds['Animal_head'][0][self.plat1:self.plat2,:]
+            animal_head = livestockds['Animal_head'][0][self.plat1:self.plat2,:]*yearly_factor[self.plat1:self.plat2,:]
 
         field_area = animal_head * grazing_density[livestock_name]
         # source_area = (1-np.exp(-animal_head*patch_area/field_area))*field_area
