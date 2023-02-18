@@ -42,10 +42,12 @@ zo_barn = 0.5
 zo_manureland = 1.0
 ## manure surface thickness is set to be 2 cm
 z_manuresurf = 0.02
-## source layer of manure for NH3 emission; 1cm thickness
-z_topmanure = 0.01
+## source layer of manure for NH3 emission; 2 cm thickness
+z_topmanure = 0.02
 ## dry matter (DM) content of liquid manure is assumed to be 5%
 f_DM_liquid = 0.05
+## litter resistance: ~0.04 d/m
+rlitter = 3456
 ## assuming the soil interface (source layer) of 4mm
 # z_soil = 0.004
 z_soil = 0.02  ## test 2cm
@@ -501,6 +503,7 @@ class MMS_module:
             ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
+                self.u_sim = np.minimum(self.u_sim,0.1)
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
             elif mms_cat == "MMS_cover":
@@ -648,6 +651,7 @@ class MMS_module:
             ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid",insitu_Ninit=N_frominsitu)
+                self.u_sim = np.minimum(self.u_sim,0.1)
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid",insitu_Ninit=N_frominsitu)
             
@@ -721,7 +725,7 @@ class MMS_module:
                     self.R_manureg[hh+1] = diff_resistance(distance=z_topmanure/2,phase='gaseous',theta_sat=manure_porosity,
                                                             theta=manurewc,temp=self.T_sim[hh+1])
                     ## resistance
-                    self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=z_manuresurf)
+                    self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=z_manuresurf) + rlitter
 
                     ## TAN conc; g/m3
                     ## TAN will partitioned into gaseous NH3, aqueous and solid (adsorption to manure) NH4+

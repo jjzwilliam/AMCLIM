@@ -31,7 +31,9 @@ zo_water = 0.002
 ## assuming the roughness height of manure storage barn is ~ 0.5m (<ref height of 2m)
 zo_barn = 0.5 
 ## surface resistance of bedding (s/m)
-rsurf = 100 
+rsurf = 100
+## litter resistance: ~0.04 d/m
+rlitter = 3456
 ## NH3 absorbed by bedding
 bedding_reduction = 0.4
 ## cleaning frequency of each housing type
@@ -762,6 +764,7 @@ class HOUSING_MODULE:
 
                 mois_coeff = min_manurewc(temp=self.T_sim[hh+1],rhum=self.RH_sim[hh+1])
                 self.manure_minwc[hh+1] = self.manure_pool[hh+1]*mois_coeff
+                self.manure_initwc[hh+1] = self.manure_wc
                 self.Total_water_pool[hh+1] = self.Total_water_pool[hh] + self.manure_initwc[hh+1] - self.evap[hh+1]
                 self.Total_water_pool[hh+1] = np.maximum(self.Total_water_pool[hh+1],self.manure_minwc[hh+1])
                 
@@ -784,20 +787,29 @@ class HOUSING_MODULE:
 
                 ## resistance
                 # self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house)+16500
-                self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house) + self.R_surf
+                # self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house) + self.R_surf
+                self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house) +\
+                                        self.R_surf + rlitter
 
-                ## the thickness of accumulated manure
+                # ## the thickness of accumulated manure
                 z_manure = (self.manure_pool[hh+1] + self.Total_water_pool[hh+1])/1e6
-                manure_wc = self.Total_water_pool[hh+1]/(self.manure_pool[hh+1] + self.Total_water_pool[hh+1])
-                Rmanure = diff_resistance(distance=z_manure,phase='aqueous',
-                            theta_sat=manure_wc,theta=manure_wc,temp=self.T_sim[hh+1])
-                ## equilibrium TAN concentration at the surface
+                # manure_wc = self.Total_water_pool[hh+1]/(self.manure_pool[hh+1] + self.Total_water_pool[hh+1])
+                # Rmanure = diff_resistance(distance=z_manure,phase='aqueous',
+                #             theta_sat=manure_wc,theta=manure_wc,temp=self.T_sim[hh+1])
+                diff_dis = np.minimum(z_manure/2,0.02/2)
+                Rmanure = diff_dis/diffusivity_NH4(temp=self.T_sim[hh+1],phase='aqueous')
+                # ## equilibrium TAN concentration at the surface
                 TAN_surf = (self.TAN_amount[hh+1]/Rmanure)/(KNH3/self.R_star[hh+1]+1/Rmanure)
                 self.NH3_gas[hh+1] = TAN_surf*KNH3
+
+                # self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house) +\
+                #                         self.R_surf + rpoultrylitter
+                # self.NH3_gas[hh+1] = self.TAN_amount[hh+1]*KNH3
 
                 ## determining the maximum emission; emission cannot exceed TAN pool
                 self.modelled_emiss[hh+1] = NH3_volslat(slat_conc=self.NH3_gas[hh+1],conc_in=0.0,
                                                         Rslat=self.R_star[hh+1])*timestep*3600
+                # fTANavail = np.minimum(0.02,z_manure)/z_manure
                 self.modelled_emiss[hh+1] = np.minimum(self.modelled_emiss[hh+1],self.TAN_pool[hh+1])
 
                 ## final emission flux 
