@@ -30,12 +30,12 @@ zo_house = 0.002
 zo_water = 0.002
 ## assuming the roughness height of manure storage barn is ~ 0.5m (<ref height of 2m)
 zo_barn = 0.5 
-## surface resistance of bedding (s/m)
-rsurf = 100
-## litter resistance: ~0.04 d/m
-rlitter = 3456
+## surface resistance of bedding ~0.06 d/m
+rsurf = 12000
+## litter resistance: ~0.06 d/m
+rlitter = 5200
 ## NH3 absorbed by bedding
-bedding_reduction = 0.4
+bedding_reduction = 0.0
 ## cleaning frequency of each housing type
 cleaning_freq = {"slat-pit_house_insitu": 60,
                 "slat-pit_house": 1,
@@ -96,7 +96,8 @@ class HOUSING_MODULE:
                         dims=self.animal_head.dims,
                         coords=self.animal_head.coords,
                     )
-            self.animal_weight.values[np.where(self.animal_head!=0)] = 1.5
+            ## poultry density is in head/m2; the weight is a normalised unit here
+            self.animal_weight.values[np.where(self.animal_head!=0)] = 1.0
         else:
             self.animal_weight = self.animal_file['Animal_weight'][self.lvl_idx]
             self.animal_weight.values[np.where((self.animal_head!=0)&(self.animal_weight==0)&(~np.isnan(self.animal_head)))] =\
@@ -104,7 +105,10 @@ class HOUSING_MODULE:
             self.animal_weight.values[np.where((self.animal_head!=0)&(np.isnan(self.animal_weight))&(~np.isnan(self.animal_head)))] =\
                  np.nanmedian(self.animal_weight.values[np.where(self.animal_weight!=0)])
         self.animal_density = stocking_desity[self.livestock][self.lvl_idx]
-        print("Stocking (housing) density is: "+str(self.animal_density)+" kg/m^2")
+        if self.livestock == "POULTRY":
+            print("Stocking (housing) density is: "+str(self.animal_density)+" head/m^2")
+        else:
+            print("Stocking (housing) density is: "+str(self.animal_density)+" kg/m^2")
         self.massgrid = self.animal_head*self.animal_weight.values
         ## calculate housing area
         self.housing_area = self.animal_head.values*self.animal_weight.values/self.animal_density
@@ -796,10 +800,11 @@ class HOUSING_MODULE:
                 # manure_wc = self.Total_water_pool[hh+1]/(self.manure_pool[hh+1] + self.Total_water_pool[hh+1])
                 # Rmanure = diff_resistance(distance=z_manure,phase='aqueous',
                 #             theta_sat=manure_wc,theta=manure_wc,temp=self.T_sim[hh+1])
-                diff_dis = np.minimum(z_manure/2,0.02/2)
-                Rmanure = diff_dis/diffusivity_NH4(temp=self.T_sim[hh+1],phase='aqueous')
+                # diff_dis = np.minimum(z_manure/2,0.02/2)
+                # Rmanure = diff_dis/diffusivity_NH4(temp=self.T_sim[hh+1],phase='aqueous')
                 # ## equilibrium TAN concentration at the surface
-                TAN_surf = (self.TAN_amount[hh+1]/Rmanure)/(KNH3/self.R_star[hh+1]+1/Rmanure)
+                # TAN_surf = (self.TAN_amount[hh+1]/Rmanure)/(KNH3/self.R_star[hh+1]+1/Rmanure)
+                TAN_surf = self.TAN_amount[hh+1]
                 self.NH3_gas[hh+1] = TAN_surf*KNH3
 
                 # self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=zo_house) +\

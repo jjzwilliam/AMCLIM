@@ -82,7 +82,7 @@ def housing_env(temp,rhum,livestock_type,production_system_type):
             u_in = 0.2+temp*(0.23/12.5)
             u_in = np.maximum(u_in,0.2)
             u_in = np.minimum(u_in,0.43)
-            rhum_in = rhum
+            rhum_in = rhum - 10.0
         elif production_system_type == 'layer':
             t_in = 0.00014*temp**3 + 0.0023*temp**2 + 0.011*temp + 23.8        ## Jiang et a., 2021
             u_in = 0.2+temp*(0.23/12.5)

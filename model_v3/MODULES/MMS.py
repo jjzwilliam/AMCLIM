@@ -46,8 +46,8 @@ z_manuresurf = 0.02
 z_topmanure = 0.02
 ## dry matter (DM) content of liquid manure is assumed to be 5%
 f_DM_liquid = 0.05
-## litter resistance: ~0.04 d/m
-rlitter = 3456
+## litter resistance: ~0.06 d/m
+rlitter = 5200
 ## assuming the soil interface (source layer) of 4mm
 # z_soil = 0.004
 z_soil = 0.02  ## test 2cm
@@ -272,6 +272,8 @@ class MMS_module:
         self.evap_sim = np.zeros(array_shape)
         ## barn/buidling resistance
         self.R_star = np.zeros(array_shape)
+        ## manure resistance (for poultry litter)
+        self.R_surf = np.zeros(array_shape)
         ## manure resistance for aqueous diffusion
         self.R_manurel = np.zeros(array_shape)
         ## manure resistance for gaseous diffusion
@@ -503,7 +505,7 @@ class MMS_module:
             ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
-                self.u_sim = np.minimum(self.u_sim,0.1)
+                # self.u_sim = np.minimum(self.u_sim,0.2)
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_liquid")
             elif mms_cat == "MMS_cover":
@@ -644,6 +646,7 @@ class MMS_module:
 
         if self.livestock.lower()=="poultry":
             print("Simulation for poultry.")
+            self.R_surf[:] = rlitter
 
         for dd in np.arange(start_day_idx,end_day_idx):
             ## environemnts
@@ -651,7 +654,7 @@ class MMS_module:
             ## daily input from housing
             if mms_cat == "MMS_indoor":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid",insitu_Ninit=N_frominsitu)
-                self.u_sim = np.minimum(self.u_sim,0.1)
+                # self.u_sim = np.minimum(self.u_sim,0.2)
             elif mms_cat == "MMS_open":
                 self.daily_init(dayidx=dd,mms_info="mms_indoor_solid",insitu_Ninit=N_frominsitu)
             
@@ -720,12 +723,14 @@ class MMS_module:
                     ##        tortuosity dependence for aqueous diffusion is not considered here
                     ## layer thickness of manure (DM+water) in meter: z = Vmanure
                     z_total = vtotal
-                    self.R_manurel[hh+1] = diff_resistance(distance=z_topmanure/2,phase='aqueous',theta_sat=manure_porosity,
-                                                            theta=manurewc,temp=self.T_sim[hh+1])
-                    self.R_manureg[hh+1] = diff_resistance(distance=z_topmanure/2,phase='gaseous',theta_sat=manure_porosity,
-                                                            theta=manurewc,temp=self.T_sim[hh+1])
+                    # self.R_manurel[hh+1] = diff_resistance(distance=z_topmanure/2,phase='aqueous',theta_sat=manure_porosity,
+                    #                                         theta=manurewc,temp=self.T_sim[hh+1])
+                    # self.R_manureg[hh+1] = diff_resistance(distance=z_topmanure/2,phase='gaseous',theta_sat=manure_porosity,
+                    #                                         theta=manurewc,temp=self.T_sim[hh+1])
+                    diff_dis = np.minimum(z_total/2,z_topmanure/2)
+                    Rmanure = diff_dis/diffusivity_NH4(temp=self.T_sim[hh+1],phase='aqueous')
                     ## resistance
-                    self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=z_manuresurf) + rlitter
+                    self.R_star[hh+1] = 1/k_gas_NH3(temp=self.T_sim[hh+1],u=self.u_sim[hh+1],Z=2,zo=z_manuresurf) + self.R_surf[hh+1]
 
                     ## TAN conc; g/m3
                     ## TAN will partitioned into gaseous NH3, aqueous and solid (adsorption to manure) NH4+
@@ -758,10 +763,15 @@ class MMS_module:
                     ## TAN conc at the surface (g/m3)
                     # self.TAN_surf_amount[hh+1] = (self.TAN_amount[hh+1]*(1/self.R_manurel[hh+1]+KNH3/self.R_manureg[hh+1])/\
                     #         (KNH3*(1/self.R_star[hh+1]+1/self.R_manureg[hh+1])+1/self.R_manurel[hh+1]))
-                    self.TAN_surf_amount[hh+1] = surf_TAN_cnc(tan_cnc=self.TAN_amount[hh+1],rliq=self.R_manurel[hh+1],
-                                                            rgas=self.R_manureg[hh+1],knh3=KNH3,ratm=self.R_star[hh+1],qrunoff=0.0)
+                    # self.TAN_surf_amount[hh+1] = surf_TAN_cnc(tan_cnc=self.TAN_amount[hh+1],rliq=self.R_manurel[hh+1],
+                    #                                         rgas=self.R_manureg[hh+1],knh3=KNH3,ratm=self.R_star[hh+1],qrunoff=0.0)
+                    self.TAN_surf_amount[hh+1] = (self.TAN_amount[hh+1]/Rmanure)/(KNH3/self.R_star[hh+1]+1/Rmanure)
+                    
                     ## Gaseous NH3 at the surface
-                    self.NH3_gas_surf[hh+1] = self.TAN_surf_amount[hh+1]*KNH3
+                    if self.livestock.lower()=="poultry":
+                        self.NH3_gas_surf[hh+1] = self.TAN_amount[hh+1]*KNH3
+                    else:
+                        self.NH3_gas_surf[hh+1] = self.TAN_surf_amount[hh+1]*KNH3
 
                     ## determining the maximum emission; 
                     emiss_idx = (self.NH3_gas_surf[hh+1]/self.R_star[hh+1])*timestep*3600
@@ -832,11 +842,13 @@ class MMS_module:
                     # print(dd,hh+1,"manure wc", manurewc[192,386])
                     # print(dd,hh+1,"z total", z_total[192,386])
                     
-                    self.R_manurel[hh+1] = diff_resistance(distance=z_topmanure/2,phase='aqueous',theta_sat=manure_porosity,
-                                                            theta=manurewc,temp=self.T_sim[hh+1])
-                    self.R_manureg[hh+1] = diff_resistance(distance=z_topmanure/2,phase='gaseous',theta_sat=manure_porosity,
-                                                            theta=manurewc,temp=self.T_sim[hh+1])
-                    
+                    # self.R_manurel[hh+1] = diff_resistance(distance=z_topmanure/2,phase='aqueous',theta_sat=manure_porosity,
+                    #                                         theta=manurewc,temp=self.T_sim[hh+1])
+                    # self.R_manureg[hh+1] = diff_resistance(distance=z_topmanure/2,phase='gaseous',theta_sat=manure_porosity,
+                    #                                         theta=manurewc,temp=self.T_sim[hh+1])
+                    diff_dis = np.minimum(z_total/2,z_topmanure/2)
+                    Rmanure = diff_dis/diffusivity_NH4(temp=self.T_sim[hh+1],phase='aqueous')
+
                     ## washoff: 1) manure, 2) urea, 3) available org N, 4) reistant org N, 5) TAN
                     ## washoff coefficient (%) = washoff water (mm) * washoff (%/mm)
                     nonN_washoff_rate = self.rain_avail_washoff[hh+1]*f_washoff_nonN/1e3
@@ -908,17 +920,12 @@ class MMS_module:
                     ## TAN conc at the surface (solved); atmospheric NH3 is ignored
                     # self.TAN_surf_amount[hh+1] = (self.TAN_amount[hh+1]*(1/self.R_manurel[hh+1]+KNH3/self.R_manureg[hh+1])/\
                     #         (self.rain_avail_washoff[hh+1]+KNH3*(1/self.R_star[hh+1]+1/self.R_manureg[hh+1])+1/self.R_manurel[hh+1]))
-                    self.TAN_surf_amount[hh+1] = surf_TAN_cnc(tan_cnc=self.TAN_amount[hh+1],rliq=self.R_manurel[hh+1],
-                                                            rgas=self.R_manureg[hh+1],knh3=KNH3,ratm=self.R_atm[hh+1],
+                    self.TAN_surf_amount[hh+1] = surf_TAN_cnc(tan_cnc=self.TAN_amount[hh+1],rliq=Rmanure,
+                                                            rgas=np.inf,knh3=KNH3,ratm=self.R_atm[hh+1],
                                                             qrunoff=self.rain_avail_washoff[hh+1])
+                    # self.TAN_surf_amount[hh+1] = self.TAN_amount[hh+1]
                     ## Gaseous NH3 at the surface
                     self.NH3_gas_surf[hh+1] = self.TAN_surf_amount[hh+1]*KNH3
-
-                    # print(dd,hh+1,"TAN pool", self.TAN_pool[hh+1,192,386])
-                    # print(dd,hh+1,"water pool", self.Total_water_pool[hh+1,192,386])
-                    # print(dd,hh+1,"TAN conc", self.TAN_amount[hh+1,192,386])
-                    # print(dd,hh+1,"TAN surf conc", self.TAN_surf_amount[hh+1,192,386])
-                    # print(dd,hh+1,"NH3 surf conc", self.NH3_gas_surf[hh+1,192,386])
 
                     ## determining the maximum emission; 
                     emiss_idx = (self.NH3_gas_surf[hh+1]/self.R_atm[hh+1])*timestep*3600
