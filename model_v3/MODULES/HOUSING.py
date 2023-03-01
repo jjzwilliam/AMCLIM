@@ -30,10 +30,10 @@ zo_house = 0.002
 zo_water = 0.002
 ## assuming the roughness height of manure storage barn is ~ 0.5m (<ref height of 2m)
 zo_barn = 0.5 
-## surface resistance of bedding ~0.06 d/m
-rsurf = 12000
-## litter resistance: ~0.06 d/m
-rlitter = 5200
+## surface resistance of bedding ~0.1 d/m
+rsurf = 8640
+## litter resistance: ~0.1 d/m
+rlitter = 8640
 ## NH3 absorbed by bedding
 bedding_reduction = 0.0
 ## cleaning frequency of each housing type
