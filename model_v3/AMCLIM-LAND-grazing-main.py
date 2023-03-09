@@ -27,6 +27,11 @@ sim = "base"
 
 start = time.time()
 
+print("Year of study:",CONFIG.sim_year)
+
+comm.Barrier()
+print("Rank", rank, "sync at Barrier 1.")
+
 for prodsyst in ruminant_prodsysts:
 # for prodsyst in ["mixed"]:
     print(prodsyst)
@@ -43,12 +48,16 @@ for prodsyst in ruminant_prodsysts:
     # grazing_sim.grazing_main(livestock_name=livestock,production_system=prodsyst,
     #                         start_day_idx=0,end_day_idx=1,stat=True)
 
+    comm.Barrier()
+    # print("Rank", rank, "sync at Barrier 2.")
+
     mid = time.time()
     cal_time = mid - start
     print("=======================================================")
     print(livestock,prodsyst)
     print("Rank: ",rank)
     print('sim time: ', np.round(cal_time/60,decimals=2),' mins')
+
 
     newshape = int(365*720)
     sendNH3flux_urinepatch = np.transpose(grazing_sim.o_NH3flux,(1,0,2)).reshape((band,newshape))
@@ -157,6 +166,10 @@ for prodsyst in ruminant_prodsysts:
         soilTAN_mixed = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
         soilorgN_mixed = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
 
+
+    comm.Barrier()
+    # print("Rank", rank, "sync at Barrier 3.")
+
     print("Rank", rank, "is sending data")
 
     comm.Gather(sendNH3flux_urinepatch, NH3flux_urinepatch, root=0)
@@ -207,6 +220,9 @@ for prodsyst in ruminant_prodsysts:
     print("Rank", rank, "sent data 37")
 
     print("Rank", rank, "has sent data")
+
+    comm.Barrier()
+    print("Rank", rank, "sync at Barrier 4.")
 
     if rank == 0:
         nlat = int(180.0/CONFIG.CONFIG_dlat)
@@ -315,6 +331,9 @@ for prodsyst in ruminant_prodsysts:
         print("xarray saved.")
         outds.to_netcdf(path=str(full_path),mode="w",encoding=encoding)
         print("ncfile saved.")
+    
+    comm.Barrier()
+    print("Rank", rank, "sync at Barrier 5.")
 
 end = time.time()
 runtime = end - start

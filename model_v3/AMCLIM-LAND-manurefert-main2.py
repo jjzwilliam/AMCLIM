@@ -16,19 +16,60 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 
-crops = [sys.argv[1]]
-chem_ferts = ['ammonium','urea']
-# chem_ferts = ['urea']
+livestock = str(sys.argv[1])
+
+if livestock == "PIG1":
+    prodsyst = CONFIG.CONFIG_livestock_prodsyst_Nappland_lict["PIG"][0]
+    livestock = "PIG"
+elif livestock == "PIG2":
+    prodsyst = CONFIG.CONFIG_livestock_prodsyst_Nappland_lict["PIG"][1]
+    livestock = "PIG"
+elif livestock == "PIG3":
+    prodsyst = CONFIG.CONFIG_livestock_prodsyst_Nappland_lict["PIG"][2]
+    livestock = "PIG"
+
+elif livestock == "broiler_CHICKEN":
+    prodsyst = CONFIG.CONFIG_livestock_prodsyst_Nappland_lict["POULTRY"][0]
+    livestock = "POULTRY"
+elif livestock == "layer_CHICKEN":
+    prodsyst = CONFIG.CONFIG_livestock_prodsyst_Nappland_lict["POULTRY"][1]
+    livestock = "POULTRY"
+else:
+    prodsyst = CONFIG.CONFIG_livestock_prodsyst_Nappland_lict[livestock][0]
+print(livestock,prodsyst)
+
 startday = 0
 endday = CONFIG.Days*2
-methods = ['broadcasting-surf','incorporating-disk','deep injection']
-# methods = ['broadcasting-surf']
+# methods = ['broadcasting-surf','incorporating-disk','deep injection']
+methods = ['broadcasting-surf']
 
 techs = {
     "broadcasting-surf": 'surf',
     "incorporating-disk": 'disk',
     "deep injection": 'injection'
 }
+
+manure_types = {
+    "liquid": "slurry",
+    "solid": "solid manure",
+}
+
+mmscats = {
+    "liquid":["MMS_indoor","MMS_open","MMS_cover"],
+    "solid":["MMS_indoor"],
+}
+
+if livestock == "BUFFALO_BEEF":
+    mmscats = {
+        "liquid":["MMS_indoor","MMS_open"],
+        "solid":["MMS_indoor"],
+    }
+elif livestock == "BUFFALO_DAIRY":
+    mmscats = {
+        "liquid":["MMS_indoor","MMS_open"],
+        "solid":["MMS_indoor"],
+    }
+
 sim = 'base'
 
 #sens_vars = ['temp','sw','srf','sub','Napp','ph']
@@ -43,36 +84,43 @@ arr = (730,band,720)
 start = time.time()
 print("Year of study:",CONFIG.sim_year)
 
-for chem_fert_use in chem_ferts:
-    for crop_item in crops:
+
+for mmsphase in ["liquid","solid"]:
+    for mmscat in mmscats[mmsphase]:
+# for mmsphase in ["liquid"]:
+#     for mmscat in ["MMS_indoor"]:
         for method_used in methods:
-            chemfertapp_sim = LAND.LAND_module(prank=rank,psize=band,
-fert_type='mineral',manure_added=np.zeros(arr),urea_added=np.zeros(arr),
-UA_added=np.zeros(arr),avail_N_added=np.zeros(arr),resist_N_added=np.zeros(arr),
-unavail_N_added=np.zeros(arr),
-TAN_added=np.zeros(arr),NO3_added=np.zeros(arr),water_added=np.zeros(arr),
-pH_value=7.0)
-            chemfertapp_sim.main(techs[method_used],crop_item,chem_fert_use,startday,endday,
-sim_type='base',output_stat=True,quality_check=True)
+            print("=======================================================")
+            manurefertapp_sim = LAND.LAND_module(prank=rank,psize=band,
+    fert_type='manure',manure_added=np.zeros(arr),urea_added=np.zeros(arr),
+    UA_added=np.zeros(arr),avail_N_added=np.zeros(arr),resist_N_added=np.zeros(arr),
+    unavail_N_added=np.zeros(arr),
+    TAN_added=np.zeros(arr),NO3_added=np.zeros(arr),water_added=np.zeros(arr),
+    pH_value=LAND.pH_info[livestock])
+            manurefertapp_sim.main(techs[method_used],None,None,
+                        startday,730,manure_types[mmsphase],
+                        livestock,prodsyst,
+                        mmscat,mmsphase,
+                        sim_type='base',
+                        output_stat=True,quality_check=True)
             mid = time.time()
             cal_time = mid - start
             print("=======================================================")
-            print(crop_item)
             print("Rank: ",rank)
             print('sim time: ', np.round(cal_time/60,decimals=2),' mins')
 
             newshape = int(365*720)
-            sendNH3flux = np.transpose(chemfertapp_sim.o_NH3flux,(1,0,2)).reshape((band,newshape))
-            sendwashoff = np.transpose(chemfertapp_sim.o_washoff,(1,0,2)).reshape((band,newshape))
-            sendnitrif = np.transpose(chemfertapp_sim.o_nitrif,(1,0,2)).reshape((band,newshape))
-            sendNH4leaching = np.transpose(chemfertapp_sim.o_NH4leaching,(1,0,2)).reshape((band,newshape))
-            senddiffaq = np.transpose(chemfertapp_sim.o_diffaq,(1,0,2)).reshape((band,newshape))
-            senddiffgas = np.transpose(chemfertapp_sim.o_diffgas,(1,0,2)).reshape((band,newshape))
-            sendammNuptake = np.transpose(chemfertapp_sim.o_ammNuptake,(1,0,2)).reshape((band,newshape))
-            sendnitNuptake = np.transpose(chemfertapp_sim.o_nitNuptake,(1,0,2)).reshape((band,newshape))
-            sendNO3washoff = np.transpose(chemfertapp_sim.o_NO3washoff,(1,0,2)).reshape((band,newshape))
-            sendNO3leaching = np.transpose(chemfertapp_sim.o_NO3leaching,(1,0,2)).reshape((band,newshape))
-            sendNO3diff = np.transpose(chemfertapp_sim.o_NO3diff,(1,0,2)).reshape((band,newshape))
+            sendNH3flux = np.transpose(manurefertapp_sim.o_NH3flux,(1,0,2)).reshape((band,newshape))
+            sendwashoff = np.transpose(manurefertapp_sim.o_washoff,(1,0,2)).reshape((band,newshape))
+            sendnitrif = np.transpose(manurefertapp_sim.o_nitrif,(1,0,2)).reshape((band,newshape))
+            sendNH4leaching = np.transpose(manurefertapp_sim.o_NH4leaching,(1,0,2)).reshape((band,newshape))
+            senddiffaq = np.transpose(manurefertapp_sim.o_diffaq,(1,0,2)).reshape((band,newshape))
+            senddiffgas = np.transpose(manurefertapp_sim.o_diffgas,(1,0,2)).reshape((band,newshape))
+            sendammNuptake = np.transpose(manurefertapp_sim.o_ammNuptake,(1,0,2)).reshape((band,newshape))
+            sendnitNuptake = np.transpose(manurefertapp_sim.o_nitNuptake,(1,0,2)).reshape((band,newshape))
+            sendNO3washoff = np.transpose(manurefertapp_sim.o_NO3washoff,(1,0,2)).reshape((band,newshape))
+            sendNO3leaching = np.transpose(manurefertapp_sim.o_NO3leaching,(1,0,2)).reshape((band,newshape))
+            sendNO3diff = np.transpose(manurefertapp_sim.o_NO3diff,(1,0,2)).reshape((band,newshape))
 
             NH3flux = None
             Nwashoff = None
@@ -99,17 +147,30 @@ sim_type='base',output_stat=True,quality_check=True)
                 NO3leaching = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
                 NO3diff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
 
+            print("Rank", rank, "is sending data")
             comm.Gather(sendNH3flux, NH3flux, root=0)
+            print("Rank", rank, "sent data 1")
             comm.Gather(sendwashoff, Nwashoff, root=0)
+            print("Rank", rank, "sent data 2")
             comm.Gather(sendnitrif, TANnitrif, root=0)
+            print("Rank", rank, "sent data 3")
             comm.Gather(sendNH4leaching, NH4leaching, root=0)
+            print("Rank", rank, "sent data 4")
             comm.Gather(senddiffaq, TANdiff, root=0)
+            print("Rank", rank, "sent data 5")
             comm.Gather(senddiffgas, NH3diff, root=0)
+            print("Rank", rank, "sent data 6")
             comm.Gather(sendammNuptake, Ammuptake, root=0)
+            print("Rank", rank, "sent data 7")
             comm.Gather(sendnitNuptake, Nituptake, root=0)
+            print("Rank", rank, "sent data 8")
             comm.Gather(sendNO3washoff, NO3washoff, root=0)
+            print("Rank", rank, "sent data 9")
             comm.Gather(sendNO3leaching, NO3leaching, root=0)
+            print("Rank", rank, "sent data 10")
             comm.Gather(sendNO3diff, NO3diff, root=0)
+            print("Rank", rank, "sent data 11")
+
 
             if rank == 0:
                 nlat = int(180.0/CONFIG.CONFIG_dlat)
@@ -140,23 +201,22 @@ sim_type='base',output_stat=True,quality_check=True)
                         lat=(["lat"], lats),
                                 ),
                     attrs=dict(
-                        description="AMCLIM-Land_chem_fert: \
-                            N pathways of chemical fertilizer application in " +str(CONFIG.sim_year),
-                        info = method_used+" of "+chem_fert_use+" for: "+str(crop_item),
+                        description="AMCLIM-Land_manure_fert: \
+                            N pathways of manure fertilizer application in " +str(CONFIG.sim_year),
                         units="gN per grid",
                     ),
                 )
 
                 outds.NH3emiss.attrs["unit"] = 'gN/day'
-                outds.NH3emiss.attrs["long name"] = 'NH3 emission from fertilizer application'
+                outds.NH3emiss.attrs["long name"] = 'NH3 emission from manure application'
                 outds.TANwashoff.attrs["unit"] = 'gN/day'
-                outds.TANwashoff.attrs["long name"] = 'TAN washoff from fertilizer application'
+                outds.TANwashoff.attrs["long name"] = 'TAN washoff from manure application'
                 outds.TANleaching.attrs["unit"] = 'gN/day'
-                outds.TANleaching.attrs["long name"] = 'TAN leaching from fertilizer application'
+                outds.TANleaching.attrs["long name"] = 'TAN leaching from  manure application'
                 outds.TANdiffaq.attrs["unit"] = 'gN/day'
-                outds.TANdiffaq.attrs["long name"] = 'TAN diffusion to deep soil from fertilizer application'
+                outds.TANdiffaq.attrs["long name"] = 'TAN diffusion to deep soil from manure application'
                 outds.NH3diffgas.attrs["unit"] = 'gN/day'
-                outds.NH3diffgas.attrs["long name"] = 'NH3 diffusion to deep soil from fertilizer application'
+                outds.NH3diffgas.attrs["long name"] = 'NH3 diffusion to deep soil from manure application'
                 outds.NH4nitrif.attrs["unit"] = 'gN/day'
                 outds.NH4nitrif.attrs["long name"] = 'Nitrification'
                 outds.NH4uptake.attrs["unit"] = 'gN/day'
@@ -164,17 +224,25 @@ sim_type='base',output_stat=True,quality_check=True)
                 outds.NO3uptake.attrs["unit"] = 'gN/day'
                 outds.NO3uptake.attrs["long name"] = 'Uptake of NO3- by crops'
                 outds.NO3washoff.attrs["unit"] = 'gN/day'
-                outds.NO3washoff.attrs["long name"] = 'Nitrate washoff from fertilizer application'
+                outds.NO3washoff.attrs["long name"] = 'Nitrate washoff from manure application'
                 outds.NO3leaching.attrs["unit"] = 'gN/day'
-                outds.NO3leaching.attrs["long name"] = 'Nitrate leaching from fertilizer application'
+                outds.NO3leaching.attrs["long name"] = 'Nitrate leaching from manure application'
                 outds.NO3diff.attrs["unit"] = 'gN/day'
-                outds.NO3diff.attrs["long name"] = 'Nitrate diffusion to deep soil from fertilizer application'
+                outds.NO3diff.attrs["long name"] = 'Nitrate diffusion to deep soil from manure application'
 
                 comp = dict(zlib=True, complevel=9)
                 encoding = {var: comp for var in outds.data_vars}
 
-                outds.to_netcdf(CONFIG.output_path+sim+'.'+str(crop_item)+'.'+\
-                    str(chem_fert_use)+'.'+str(techs[method_used])+'.'+str(CONFIG.sim_year)+'.nc',encoding=encoding)
+                print("xarray saved.")
+
+                filename = sim+'.'+str(prodsyst)+'.'+\
+                    str(livestock)+'.'+str(mmscat)+'.'+str(mmsphase)+'.'+str(techs[method_used])+'.'+str(CONFIG.sim_year)+'.nc'
+                
+                full_path = CONFIG.output_path+filename
+                print("ncfile",filename)
+                print("path",CONFIG.output_path)
+                print("full path",CONFIG.output_path+filename)
+                outds.to_netcdf(path=str(full_path),mode="w",encoding=encoding)
                 print("ncfile saved.")
 
 end = time.time()

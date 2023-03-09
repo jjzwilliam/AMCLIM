@@ -19,6 +19,7 @@ livestock_list = ['BEEF_CATTLE','DAIRY_CATTLE','OTHER_CATTLE',
                     'POULTRY']
 
 livestock = sys.argv[1]
+print("Year of study:",CONFIG.sim_year)
 print(livestock)
 
 ##############################

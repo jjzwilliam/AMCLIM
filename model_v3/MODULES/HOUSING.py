@@ -87,6 +87,7 @@ class HOUSING_MODULE:
         self.livestockNfactor_file = xr.open_dataset(infile_path+animal_data_path+CONFIG_livestockNfactorfile)
         ## livestock info: N excretion, heads, body weights
         self.yearly_factor = self.livestockNfactor_file.yearly_factor.sel(year=sim_year)
+        ## yearly factor: fill Nan with 1 (trend should not alter base value in 2010)
         self.excretN_info = self.animal_file['Excreted_N'][self.lvl_idx]*self.yearly_factor
         print("Total excreted N from "+str(self.livestock)+" :",np.nansum(self.excretN_info*1e3)/1e9, " GgN")
         self.animal_head = self.animal_file['Animal_head'][self.lvl_idx]*self.yearly_factor

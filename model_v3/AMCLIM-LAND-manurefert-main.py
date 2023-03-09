@@ -59,10 +59,16 @@ mmscats = {
     "solid":["MMS_indoor"],
 }
 
-# mmscats = {
-#     "liquid":["MMS_open","MMS_cover"],
-#     "solid":["MMS_indoor"],
-# }
+if livestock == "BUFFALO_BEEF":
+    mmscats = {
+        "liquid":["MMS_indoor","MMS_open"],
+        "solid":["MMS_indoor"],
+    }
+elif livestock == "BUFFALO_DAIRY":
+    mmscats = {
+        "liquid":["MMS_indoor","MMS_open"],
+        "solid":["MMS_indoor"],
+    }
 
 sim = 'base'
 
@@ -76,7 +82,9 @@ arr = (730,band,720)
 
 
 start = time.time()
+print("Year of study:",CONFIG.sim_year)
 
+comm.Barrier()
 
 for mmsphase in ["liquid","solid"]:
     for mmscat in mmscats[mmsphase]:
@@ -101,6 +109,8 @@ for mmsphase in ["liquid","solid"]:
             print("=======================================================")
             print("Rank: ",rank)
             print('sim time: ', np.round(cal_time/60,decimals=2),' mins')
+
+            comm.Barrier()
 
             newshape = int(365*720)
             sendNH3flux = np.transpose(manurefertapp_sim.o_NH3flux,(1,0,2)).reshape((band,newshape))
@@ -140,17 +150,33 @@ for mmsphase in ["liquid","solid"]:
                 NO3leaching = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
                 NO3diff = np.transpose(np.zeros((365,360,720), dtype=np.float64),(1,0,2)).reshape((360,newshape))
 
+            comm.Barrier()
+
+            print("Rank", rank, "is sending data")
             comm.Gather(sendNH3flux, NH3flux, root=0)
+            print("Rank", rank, "sent data 1")
             comm.Gather(sendwashoff, Nwashoff, root=0)
+            print("Rank", rank, "sent data 2")
             comm.Gather(sendnitrif, TANnitrif, root=0)
+            print("Rank", rank, "sent data 3")
             comm.Gather(sendNH4leaching, NH4leaching, root=0)
+            print("Rank", rank, "sent data 4")
             comm.Gather(senddiffaq, TANdiff, root=0)
+            print("Rank", rank, "sent data 5")
             comm.Gather(senddiffgas, NH3diff, root=0)
+            print("Rank", rank, "sent data 6")
             comm.Gather(sendammNuptake, Ammuptake, root=0)
+            print("Rank", rank, "sent data 7")
             comm.Gather(sendnitNuptake, Nituptake, root=0)
+            print("Rank", rank, "sent data 8")
             comm.Gather(sendNO3washoff, NO3washoff, root=0)
+            print("Rank", rank, "sent data 9")
             comm.Gather(sendNO3leaching, NO3leaching, root=0)
+            print("Rank", rank, "sent data 10")
             comm.Gather(sendNO3diff, NO3diff, root=0)
+            print("Rank", rank, "sent data 11")
+
+            comm.Barrier()
 
             if rank == 0:
                 nlat = int(180.0/CONFIG.CONFIG_dlat)
@@ -224,6 +250,8 @@ for mmsphase in ["liquid","solid"]:
                 print("full path",CONFIG.output_path+filename)
                 outds.to_netcdf(path=str(full_path),mode="w",encoding=encoding)
                 print("ncfile saved.")
+
+            comm.Barrier()
 
 end = time.time()
 runtime = end - start

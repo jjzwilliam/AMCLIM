@@ -107,7 +107,7 @@ def barn_env(temp,wind):
     t_gnd = temp + tempdiff
     t_gnd = np.maximum(t_gnd,Gnd_temp)
     t_barn = temp + 3.0
-    # t_gnd = temp + 0.6*(20-temp)
+    t_gnd = temp + 0.4*(20-temp)
     
     blocking_factor1 = 0.2
     blocking_factor2 = 0.8
