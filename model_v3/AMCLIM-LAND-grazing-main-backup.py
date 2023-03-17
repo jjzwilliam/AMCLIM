@@ -8,8 +8,7 @@ import sys
 import MODULES.FUNC as FUNC
 import INPUT.input as INPUT
 import CONFIG.config as CONFIG
-import MODULES.LAND_develop as LAND
-# import MODULES.LAND_v3 as LAND
+import MODULES.LAND as LAND
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
