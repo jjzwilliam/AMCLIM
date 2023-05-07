@@ -21,7 +21,7 @@ CONFIG_outputpathdict = {
 infile_path = CONFIG_inputpathdict[CONFIG_machine]
 output_path = CONFIG_outputpathdict[CONFIG_machine]
 
-sim_year = 2018
+sim_year = 2010
 ## daily simulation or hourly simulation
 nhours = 24
 if (sim_year%4)==0: Days = 366

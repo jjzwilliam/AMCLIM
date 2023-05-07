@@ -1353,16 +1353,19 @@ class LAND_module:
             self.theta[2,1:] = np.copy(self.soil_moist[1,1:])
 
             for hh in np.arange(0,24):
-                if CONFIG_machine == "STREAM":
-                    surfrunoffrate = self.surfrunoffrate[hh+1]
-                    subrunoffrate = self.subrunoffrate[hh+1] 
-                    evap = self.evap[hh+1] 
-                else:
-                    surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
-                    surfrunoffrate = np.maximum(surfrunoffrate,0.0)
-                    subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
-                    subrunoffrate = np.maximum(subrunoffrate,0.0)
-                    evap = self.evap[hh+1]-self.evap[hh]
+                # if CONFIG_machine == "STREAM":
+                #     surfrunoffrate = self.surfrunoffrate[hh+1]
+                #     subrunoffrate = self.subrunoffrate[hh+1] 
+                #     evap = self.evap[hh+1] 
+                # else:
+                #     surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                #     surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                #     subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                #     subrunoffrate = np.maximum(subrunoffrate,0.0)
+                #     evap = self.evap[hh+1]-self.evap[hh]
+                surfrunoffrate = self.surfrunoffrate[hh+1]
+                subrunoffrate = self.subrunoffrate[hh+1] 
+                evap = self.evap[hh+1]
 
                 delta_sw1 = self.soil_moist[0,hh+1] - self.soil_moist[0,hh]
                 delta_sw2 = self.soil_moist[1,hh+1] - self.soil_moist[1,hh]
@@ -2112,16 +2115,19 @@ class LAND_module:
                     self.manure_water[:] = 0.0
 
                 for hh in np.arange(0,24):
-                    if CONFIG_machine == "STREAM":
-                        surfrunoffrate = self.surfrunoffrate[hh+1]
-                        subrunoffrate = self.subrunoffrate[hh+1] 
-                        evap = self.evap[hh+1] 
-                    else:
-                        surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
-                        surfrunoffrate = np.maximum(surfrunoffrate,0.0)
-                        subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
-                        subrunoffrate = np.maximum(subrunoffrate,0.0)
-                        evap = self.evap[hh+1]-self.evap[hh]
+                    # if CONFIG_machine == "STREAM":
+                    #     surfrunoffrate = self.surfrunoffrate[hh+1]
+                    #     subrunoffrate = self.subrunoffrate[hh+1] 
+                    #     evap = self.evap[hh+1] 
+                    # else:
+                    #     surfrunoffrate = self.surfrunoffrate[hh+1]-self.surfrunoffrate[hh]
+                    #     surfrunoffrate = np.maximum(surfrunoffrate,0.0)
+                    #     subrunoffrate = self.subrunoffrate[hh+1]-self.subrunoffrate[hh]
+                    #     subrunoffrate = np.maximum(subrunoffrate,0.0)
+                    #     evap = self.evap[hh+1]-self.evap[hh]
+                    surfrunoffrate = self.surfrunoffrate[hh+1]
+                    subrunoffrate = self.subrunoffrate[hh+1] 
+                    evap = self.evap[hh+1] 
                     ## surface washoff rate of N pools/non N pool
                     nonN_washoff_rate = f_washoff_nonN*surfrunoffrate*3600*timestep*1e3
                     N_washoff_rate = f_washoff_N*surfrunoffrate*3600*timestep*1e3
