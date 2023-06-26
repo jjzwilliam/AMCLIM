@@ -24,8 +24,8 @@ output_path = CONFIG_outputpathdict[CONFIG_machine]
 sim_year = 2010
 ## daily simulation or hourly simulation
 nhours = 24
-if (sim_year%4)==0: Days = 366
-else: Days = 365
+## currently not consider leap year
+Days = 365
 Hours = nhours * Days
 CONFIG_time = Days
 timestep = 1

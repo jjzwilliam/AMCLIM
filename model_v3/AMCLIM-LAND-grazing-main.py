@@ -1,6 +1,9 @@
 from mpi4py import MPI
 import numpy as np
 import xarray as xr
+import netCDF4
+import h5py
+import h5netcdf
 import pandas as pd
 import time
 import sys
@@ -22,6 +25,7 @@ endday = 730
 band = int(360/size)
 arr = (730,band,720)
 
+# ruminant_prodsysts = ["mixed"]
 ruminant_prodsysts = ["grassland","mixed"]
 sim = "base"
 
@@ -331,6 +335,7 @@ for prodsyst in ruminant_prodsysts:
         print("xarray saved.")
         outds.to_netcdf(path=str(full_path),mode="w",encoding=encoding)
         print("ncfile saved.")
+        outds.close()
     
     comm.Barrier()
     print("Rank", rank, "sync at Barrier 5.")

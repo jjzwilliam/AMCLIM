@@ -1,6 +1,9 @@
 from mpi4py import MPI
 import numpy as np
 import xarray as xr
+import netCDF4
+import h5py
+import h5netcdf
 import pandas as pd
 import time
 import sys

@@ -1,6 +1,8 @@
 ## import python packages
 import xarray as xr
-import netCDF4 as nc4
+import netCDF4
+import h5py
+import h5netcdf
 from pathlib import Path
 
 
